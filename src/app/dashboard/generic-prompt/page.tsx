@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useUser } from "@clerk/nextjs";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
@@ -13,10 +13,14 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs";
+import { toast } from "sonner";
 
 export default function GenericPromptPage() {
   const { user } = useUser();
   const runGenerate = useAction(api.promptGenerators.generateGenericPrompt);
+  const stats = useQuery(api.users.getUserStats, user?.id ? { userId: user.id } : "skip") as
+    | { remainingPrompts: number; isPro: boolean }
+    | undefined;
 
   const [goal, setGoal] = React.useState("");
   const [context, setContext] = React.useState("");
@@ -24,6 +28,7 @@ export default function GenericPromptPage() {
   const [tone, setTone] = React.useState("professional");
   const [loading, setLoading] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
+  const [showConfetti, setShowConfetti] = React.useState(false);
 
   const [optimizedPrompt, setOptimizedPrompt] = React.useState<string | null>(null);
   const [explanation, setExplanation] = React.useState<string | null>(null);
@@ -32,9 +37,14 @@ export default function GenericPromptPage() {
 
   async function onGenerate() {
     if (!user?.id || !goal.trim()) return;
+    if (stats && !stats.isPro && stats.remainingPrompts <= 0) {
+      toast.error("Daily limit reached. Please upgrade to continue.");
+      return;
+    }
     setLoading(true);
     setSuccess(false);
     try {
+      toast.info("Generating... This might take a few seconds.");
       const res = await runGenerate({
         userGoal: goal.trim(),
         context: context.trim() || undefined,
@@ -48,9 +58,12 @@ export default function GenericPromptPage() {
       setTips(r.tips);
       setExample(r.exampleOutput);
       setSuccess(true);
+      setShowConfetti(true);
+      toast.success("Prompt generated!");
     } finally {
       setLoading(false);
       setTimeout(() => setSuccess(false), 1200);
+      setTimeout(() => setShowConfetti(false), 1200);
     }
   }
 
@@ -65,7 +78,7 @@ export default function GenericPromptPage() {
     <div className="mx-auto w-full max-w-4xl space-y-8 px-4 py-6">
       <div className="text-center">
         <h1 className="text-2xl font-semibold tracking-tight">Generic Prompt Assistant</h1>
-        <p className="mt-1 text-sm text-foreground/70">We'll help you create the perfect prompt!</p>
+        <p className="mt-1 text-sm text-foreground/70">We&apos;ll help you create the perfect prompt!</p>
       </div>
 
       {/* Main Input Card */}
@@ -121,9 +134,14 @@ export default function GenericPromptPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button onClick={onGenerate} disabled={loading || !goal.trim()} className="shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg">
+            <Button onClick={onGenerate} disabled={loading || !goal.trim() || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)} className="h-11 shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg">
               {loading ? "Generating..." : "Generate Optimized Prompt"}
             </Button>
+            {stats && !stats.isPro && (
+              <span className={`text-sm ${stats.remainingPrompts <= 0 ? "text-red-600" : stats.remainingPrompts <= 5 ? "text-yellow-600" : "text-foreground/70"}`}>
+                {stats.remainingPrompts <= 0 ? "Limit reached" : `${stats.remainingPrompts} remaining today`}
+              </span>
+            )}
             {success && (
               <motion.span
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -138,6 +156,11 @@ export default function GenericPromptPage() {
           </div>
         </div>
       </Card>
+      {showConfetti && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="pointer-events-none fixed inset-0 z-50">
+          {/* lightweight confetti substitute (placeholder) */}
+        </motion.div>
+      )}
 
       {/* Quick Templates */}
       <div>

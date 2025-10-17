@@ -23,6 +23,7 @@ type UserStats = {
   promptsToday: number;
   remainingPrompts: number;
   promptTypeBreakdown: Record<string, number>;
+  promptsTodayByType: Record<string, number>;
 };
 
 const DAILY_FREE_LIMIT = 5;
@@ -179,6 +180,7 @@ export const getUserStats = query({
         promptsToday: 0,
         remainingPrompts: 20,
         promptTypeBreakdown: {},
+        promptsTodayByType: {},
       };
     }
 
@@ -206,9 +208,19 @@ export const getUserStats = query({
     const promptsToday = user.lastPromptResetDate === promptKey ? (user.promptsCreatedToday ?? 0) : 0;
     const remainingPrompts = isPro ? Number.MAX_SAFE_INTEGER : Math.max(0, DAILY_FREE_PROMPT_LIMIT - promptsToday);
 
+    // Today's prompts by type
+    const startToday = startOfUtcDayTimestampMs(Date.now());
+    const promptsTodayByType: Record<string, number> = {};
+    for (const p of prompts) {
+      if (typeof p.createdAt === "number" && p.createdAt >= startToday) {
+        const t = p.type || "unknown";
+        promptsTodayByType[t] = (promptsTodayByType[t] ?? 0) + 1;
+      }
+    }
+
     const promptTypeBreakdown: Record<string, number> = {};
-    for (const p of prompts as Array<{ type?: string }>) {
-      const t = (p as any).type || "unknown";
+    for (const p of prompts) {
+      const t = p.type || "unknown";
       promptTypeBreakdown[t] = (promptTypeBreakdown[t] ?? 0) + 1;
     }
 
@@ -221,6 +233,7 @@ export const getUserStats = query({
       promptsToday,
       remainingPrompts,
       promptTypeBreakdown,
+      promptsTodayByType,
     };
   },
 });

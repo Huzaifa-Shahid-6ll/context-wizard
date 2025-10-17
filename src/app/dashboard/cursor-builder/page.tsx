@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useUser } from "@clerk/nextjs";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import JSZip from "jszip";
+import { toast } from "sonner";
 
 type GeneratedItem = { title: string; prompt: string; order: number };
 type GenerationResult = {
@@ -29,11 +31,15 @@ type Step = typeof steps[number];
 export default function CursorBuilderPage() {
   const { user } = useUser();
   const runGenerate = useAction(api.promptGenerators.generateCursorAppPrompts);
+  const stats = useQuery(api.users.getUserStats, user?.id ? { userId: user.id } : "skip") as
+    | { remainingPrompts: number; isPro: boolean }
+    | undefined;
 
   const [currentStep, setCurrentStep] = React.useState<number>(0);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [result, setResult] = React.useState<GenerationResult | null>(null);
+  const [showConfetti, setShowConfetti] = React.useState(false);
 
   // Form state
   const [projectName, setProjectName] = React.useState("");
@@ -75,11 +81,43 @@ export default function CursorBuilderPage() {
     });
   }
 
+  // Prefill from sessionStorage if available (set by dashboard)
+  React.useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("cursorBuilderPrefill");
+      if (!raw) return;
+      const data = JSON.parse(raw) as { projectName?: string; projectDescription?: string; techStack?: string[] };
+      if (data.projectName) setProjectName(data.projectName);
+      if (data.projectDescription) setProjectDescription(data.projectDescription);
+      if (data.techStack && data.techStack.length) {
+        const ts = data.techStack.map((s) => String(s));
+        // naive mapping to primary selectors
+        if (ts.find((s) => /react|next/i.test(s))) setFrontend("React");
+        if (ts.find((s) => /vue|nuxt/i.test(s))) setFrontend("Vue");
+        if (ts.find((s) => /svelte|kit/i.test(s))) setFrontend("Svelte");
+        if (ts.find((s) => /node|express|next api/i.test(s))) setBackend("Node.js");
+        if (ts.find((s) => /python|django|fastapi|flask/i.test(s))) setBackend("Python");
+        if (ts.find((s) => /go|golang/i.test(s))) setBackend("Go");
+        if (ts.find((s) => /postgres|pg/i.test(s))) setDatabase("PostgreSQL");
+        if (ts.find((s) => /mongo/i.test(s))) setDatabase("MongoDB");
+        if (ts.find((s) => /mysql/i.test(s))) setDatabase("MySQL");
+        setTools((prev) => Array.from(new Set([...(prev || []), ...ts.filter((s) => !["React","Vue","Svelte","Node.js","Python","Go","PostgreSQL","MongoDB","MySQL"].includes(s))])));
+      }
+      // one-time use
+      sessionStorage.removeItem("cursorBuilderPrefill");
+    } catch {}
+  }, []);
+
   async function submit() {
     if (!user?.id) return;
+    if (stats && !stats.isPro && stats.remainingPrompts <= 0) {
+      toast.error("Daily limit reached. Please upgrade to continue.");
+      return;
+    }
     setIsSubmitting(true);
     setProgress(10);
     try {
+      toast.info("Generating... This might take a few seconds.");
       const techStack = [frontend, backend, database, ...tools.filter(Boolean), projectType].filter(Boolean);
       const featureList = features.map((f) => f.name);
       setProgress(35);
@@ -92,18 +130,39 @@ export default function CursorBuilderPage() {
       setProgress(80);
       setResult(generated as unknown as GenerationResult);
       setProgress(100);
+      setShowConfetti(true);
+      toast.success("Prompt set generated!");
     } catch (e) {
       console.error(e);
       setProgress(100);
+      toast.error("Something went wrong. Try again.");
     } finally {
       setIsSubmitting(false);
+      setTimeout(() => setShowConfetti(false), 1200);
     }
   }
 
   const stepVariants = {
-    initial: { opacity: 0, x: 20 },
-    animate: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 260, damping: 24 } },
-    exit: { opacity: 0, x: -20, transition: { duration: 0.15 } },
+    initial: { 
+      opacity: 0, 
+      x: 20 
+    },
+    animate: { 
+      opacity: 1, 
+      x: 0,
+      transition: { 
+        type: "spring" as const,  // Add 'as const' here
+        stiffness: 100, 
+        damping: 15 
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      x: -20,
+      transition: { 
+        duration: 0.2 
+      }
+    }
   };
 
   return (
@@ -271,7 +330,14 @@ export default function CursorBuilderPage() {
                   <Separator className="my-2" />
                   <div className="flex items-center justify-between">
                     <div className="text-xs text-foreground/60">These preferences inform tone and completeness.</div>
-                    <Button onClick={submit} disabled={isSubmitting || !user?.id}>Generate Prompts</Button>
+                    <div className="flex items-center gap-3">
+                      {stats && !stats.isPro && (
+                        <span className={`text-sm ${stats.remainingPrompts <= 0 ? "text-red-600" : stats.remainingPrompts <= 5 ? "text-yellow-600" : "text-foreground/70"}`}>
+                          {stats.remainingPrompts <= 0 ? "Limit reached" : `${stats.remainingPrompts} remaining today`}
+                        </span>
+                      )}
+                      <Button onClick={submit} disabled={isSubmitting || !user?.id || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)} className="h-11">Generate Prompts</Button>
+                    </div>
                   </div>
                   {isSubmitting && (
                     <div className="mt-2 h-2 w-full rounded bg-secondary/20">
@@ -283,9 +349,9 @@ export default function CursorBuilderPage() {
             </motion.div>
           </AnimatePresence>
 
-          <div className="mt-4 flex justify-between">
-            <Button variant="outline" onClick={prev} disabled={currentStep === 0}>Back</Button>
-            <Button onClick={next} disabled={currentStep === steps.length - 1}>Next</Button>
+          <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:justify-between">
+            <Button variant="outline" onClick={prev} disabled={currentStep === 0} className="h-11">Back</Button>
+            <Button onClick={next} disabled={currentStep === steps.length - 1} className="h-11">Next</Button>
           </div>
         </Card>
 
@@ -363,7 +429,40 @@ export default function CursorBuilderPage() {
               ))}
             </TabsContent>
           </Tabs>
+
+          {/* Export ZIP */}
+          <div className="mt-4 flex justify-end">
+            <Button variant="outline" onClick={async () => {
+              const zip = new JSZip();
+              // README
+              zip.file("README.txt", "Import these prompts into your workflow. Edit as needed.\n");
+              // Project requirements
+              zip.folder("project-requirements")?.file("PROJECT_REQUIREMENTS.md", result.projectRequirements);
+              // Frontend
+              const fe = zip.folder("frontend-prompts");
+              result.frontendPrompts.forEach((item) => fe?.file(`${sanitize(item.title)}.md`, item.prompt));
+              // Backend
+              const be = zip.folder("backend-prompts");
+              result.backendPrompts.forEach((item) => be?.file(`${sanitize(item.title)}.md`, item.prompt));
+              // Cursor rules
+              zip.file(".cursorrules", result.cursorRules);
+              // Error fixes
+              const ef = zip.folder("error-fixes");
+              result.errorFixPrompts.forEach((e) => ef?.file(`${sanitize(e.error)}.md`, e.fix));
+
+              const blob = await zip.generateAsync({ type: "blob" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `${(projectName || "prompts").replace(/[^a-z0-9-_]+/gi, "_")}.zip`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}>Download .zip</Button>
+          </div>
         </Card>
+      )}
+      {showConfetti && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="pointer-events-none fixed inset-0 z-50" />
       )}
     </div>
   );
@@ -382,6 +481,15 @@ function ResultToolbar({ content, filename, compact }: { content: string; filena
     a.click();
     URL.revokeObjectURL(url);
   }
+  function downloadMd() {
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename.endsWith(".md") ? filename : `${filename}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
   async function useInCursor() {
     try { await navigator.clipboard.writeText(content); } catch {}
     alert("Copied! In Cursor, paste into the chat or appropriate file.");
@@ -390,6 +498,7 @@ function ResultToolbar({ content, filename, compact }: { content: string; filena
     <div className={"flex gap-2 " + (compact ? "" : "justify-end") }>
       <Button variant="outline" size="sm" onClick={copy} className="shadow-sm hover:shadow-md">Copy</Button>
       <Button variant="outline" size="sm" onClick={download} className="shadow-sm hover:shadow-md">Download</Button>
+      <Button variant="outline" size="sm" onClick={downloadMd} className="shadow-sm hover:shadow-md">Download .md</Button>
       <Button size="sm" onClick={useInCursor} className="shadow-sm hover:shadow-md">Use in Cursor</Button>
     </div>
   );
@@ -401,6 +510,10 @@ function PreBlock({ children, className }: { children: React.ReactNode; classNam
       {children}
     </pre>
   );
+}
+
+function sanitize(name: string): string {
+  return name.replace(/[^a-z0-9-_]+/gi, "_");
 }
 
 

@@ -3,13 +3,14 @@
 import React from "react";
 import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 type ImageResult = {
   midjourneyPrompt: string;
@@ -33,6 +34,9 @@ const MOODS = ["Bright", "Dark", "Moody", "Vibrant", "Warm", "Cool", "Dreamy", "
 export default function ImagePromptPage() {
   const { user } = useUser();
   const runGenerate = useAction(api.promptGenerators.generateImagePrompt);
+  const stats = useQuery(api.users.getUserStats, user?.id ? { userId: user.id } : "skip") as
+    | { remainingPrompts: number; isPro: boolean }
+    | undefined;
 
   const [description, setDescription] = React.useState("");
   const [style, setStyle] = React.useState<string | undefined>(undefined);
@@ -44,8 +48,13 @@ export default function ImagePromptPage() {
 
   async function onGenerate() {
     if (!user?.id || !description.trim()) return;
+    if (stats && !stats.isPro && stats.remainingPrompts <= 0) {
+      toast.error("Daily limit reached. Please upgrade to continue.");
+      return;
+    }
     setLoading(true);
     try {
+      toast.info("Generating... This might take a few seconds.");
       const res = await runGenerate({
         description: description.trim(),
         style,
@@ -54,6 +63,7 @@ export default function ImagePromptPage() {
         userId: user.id,
       });
       setResult(res as unknown as ImageResult);
+      toast.success("Prompts generated!");
     } finally {
       setLoading(false);
     }
@@ -175,10 +185,15 @@ export default function ImagePromptPage() {
               )}
             </div>
 
-            <div className="pt-2">
-              <Button onClick={onGenerate} disabled={loading || !description.trim()} className="shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg">
+            <div className="pt-2 flex items-center gap-3">
+              <Button onClick={onGenerate} disabled={loading || !description.trim() || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)} className="h-11 shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg">
                 {loading ? "Generating..." : "Generate Prompts"}
               </Button>
+              {stats && !stats.isPro && (
+                <span className={`text-sm ${stats.remainingPrompts <= 0 ? "text-red-600" : stats.remainingPrompts <= 5 ? "text-yellow-600" : "text-foreground/70"}`}>
+                  {stats.remainingPrompts <= 0 ? "Limit reached" : `${stats.remainingPrompts} remaining today`}
+                </span>
+              )}
             </div>
           </div>
         </Card>

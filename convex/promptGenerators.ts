@@ -1,5 +1,5 @@
 import { action } from "./_generated/server";
-import { v } from "convex/values";
+import { v, JsonValue } from "convex/values";
 import { api } from "./_generated/api";
 import { generateWithOpenRouter } from "../src/lib/openrouter";
 
@@ -89,7 +89,7 @@ export const generateCursorAppPrompts = action({
     let parsed: GenerationResult;
     try {
       parsed = JSON.parse(jsonText) as GenerationResult;
-    } catch (e) {
+    } catch {
       // As a fallback, try to trim code fences if present
       const trimmed = jsonText.replace(/^```[a-zA-Z]*\n|\n```$/g, "");
       parsed = JSON.parse(trimmed) as GenerationResult;
@@ -97,7 +97,12 @@ export const generateCursorAppPrompts = action({
 
     // Persist prompts into Convex `prompts` table
     const now = Date.now();
-    const baseContext = { projectDescription, techStack, features, targetAudience } as const;
+    const baseContext: JsonValue = {
+      projectDescription,
+      techStack,
+      features,
+      targetAudience,
+    };
 
     // PROJECT_REQUIREMENTS.md prompt
     await ctx.runMutation(api.mutations.insertPrompt, {
@@ -105,8 +110,8 @@ export const generateCursorAppPrompts = action({
       type: "cursor-app",
       title: "PROJECT_REQUIREMENTS.md",
       content: parsed.projectRequirements,
-      context: baseContext as unknown as any,
-      metadata: { estimatedComplexity: parsed.estimatedComplexity },
+      context: baseContext,
+      metadata: { estimatedComplexity: parsed.estimatedComplexity } as JsonValue,
       createdAt: now,
       updatedAt: now,
     });
@@ -118,8 +123,8 @@ export const generateCursorAppPrompts = action({
         type: "cursor-app",
         title: `Frontend: ${item.title}`,
         content: item.prompt,
-        context: baseContext as unknown as any,
-        metadata: { section: "frontend", order: item.order },
+        context: baseContext,
+        metadata: { section: "frontend", order: item.order } as JsonValue,
         createdAt: now,
         updatedAt: now,
       });
@@ -132,8 +137,8 @@ export const generateCursorAppPrompts = action({
         type: "cursor-app",
         title: `Backend: ${item.title}`,
         content: item.prompt,
-        context: baseContext as unknown as any,
-        metadata: { section: "backend", order: item.order },
+        context: baseContext,
+        metadata: { section: "backend", order: item.order } as JsonValue,
         createdAt: now,
         updatedAt: now,
       });
@@ -145,8 +150,8 @@ export const generateCursorAppPrompts = action({
       type: "cursor-app",
       title: ".cursorrules",
       content: parsed.cursorRules,
-      context: baseContext as unknown as any,
-      metadata: { section: "cursorrules" },
+      context: baseContext,
+      metadata: { section: "cursorrules" } as JsonValue,
       createdAt: now,
       updatedAt: now,
     });
@@ -158,8 +163,8 @@ export const generateCursorAppPrompts = action({
         type: "cursor-app",
         title: `Error: ${ef.error}`,
         content: ef.fix,
-        context: baseContext as unknown as any,
-        metadata: { section: "error-fix" },
+        context: baseContext,
+        metadata: { section: "error-fix" } as JsonValue,
         createdAt: now,
         updatedAt: now,
       });
@@ -237,13 +242,13 @@ export const generateGenericPrompt = action({
         context: extraContext,
         outputFormat,
         tone,
-      } as unknown as any,
+      } as JsonValue,
       metadata: {
         explanation: parsed.explanation,
         tips: parsed.tips,
         exampleOutput: parsed.exampleOutput,
         section: "generic",
-      } as unknown as any,
+      } as JsonValue,
       createdAt: now,
       updatedAt: now,
     });
@@ -322,12 +327,12 @@ export const generateImagePrompt = action({
         style,
         mood,
         details,
-      } as unknown as any,
+      } as JsonValue,
       metadata: {
         tips: parsed.tips,
         negativePrompts: parsed.negativePrompts,
         section: "image",
-      } as unknown as any,
+      } as JsonValue,
       createdAt: now,
       updatedAt: now,
     });
@@ -462,8 +467,7 @@ export const predictPromptOutput = action({
     }
 
     const now = Date.now();
-    const apiAny = api as unknown as any;
-    await ctx.runMutation(apiAny.mutations.insertOutputPrediction, {
+    await ctx.runMutation(api.mutations.insertOutputPrediction, {
       userId,
       prompt,
       predictedOutput: parsed.predictedOutput,

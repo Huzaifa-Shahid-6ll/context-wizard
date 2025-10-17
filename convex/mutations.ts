@@ -77,9 +77,19 @@ export const deleteGeneration = mutation({
   handler: async (ctx, { id, userId }) => {
     const gen = await ctx.db.get(id);
     if (!gen) return;
-    if ((gen as any).userId !== userId) {
+    if (gen.userId !== userId) {
       throw new Error("Not authorized to delete this generation");
     }
+    await ctx.db.delete(id);
+  },
+});
+
+export const deletePrompt = mutation({
+  args: { id: v.id("prompts"), userId: v.string() },
+  handler: async (ctx, { id, userId }) => {
+    const p = await ctx.db.get(id);
+    if (!p) throw new Error("Not found");
+    if (p.userId !== userId) throw new Error("Not authorized");
     await ctx.db.delete(id);
   },
 });
@@ -104,7 +114,12 @@ export const insertPrompt = mutation({
     updatedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    const id = await ctx.db.insert("prompts", args as any);
+    const id = await ctx.db.insert("prompts", {
+      ...args,
+      // ensure loosely-typed fields are treated as unknown JSON blobs
+      context: args.context as unknown,
+      metadata: args.metadata as unknown,
+    });
     return id;
   },
 });
@@ -149,6 +164,19 @@ export const incrementUserPromptsCreatedToday = mutation({
     if (!user) return;
     const current = user.promptsCreatedToday ?? 0;
     await ctx.db.patch(user._id, { promptsCreatedToday: current + delta });
+  },
+});
+
+export const incrementPromptViews = mutation({
+  args: { id: v.id("prompts") },
+  handler: async (ctx, { id }) => {
+    const p = await ctx.db.get(id);
+    if (!p) throw new Error("Prompt not found");
+    const metaBase: unknown = p.metadata ?? {};
+    const meta = (metaBase && typeof metaBase === "object") ? (metaBase as Record<string, unknown>) : {};
+    const currentViews = typeof meta.views === "number" ? meta.views : Number((meta.views as unknown) ?? 0);
+    const views = (currentViews || 0) + 1;
+    await ctx.db.patch(id, { metadata: { ...meta, views } as unknown });
   },
 });
 

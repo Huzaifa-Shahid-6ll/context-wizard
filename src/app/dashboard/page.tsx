@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
@@ -28,6 +29,7 @@ function isValidGithubUrl(url: string): boolean {
 export default function DashboardHome() {
   const { user, isSignedIn } = useUser();
   const userId = user?.id;
+  const router = useRouter();
 
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -52,7 +54,7 @@ export default function DashboardHome() {
     if (latestCompleted) {
       setShowPreview(true);
     }
-  }, [latestCompleted?._id]);
+  }, [latestCompleted]);
 
   function validateOnBlur() {
     setTouched(true);
@@ -169,6 +171,19 @@ export default function DashboardHome() {
         </CardContent>
       </Card>
 
+      {/* Quick Action: Cursor App Builder */}
+      <div className="mt-6">
+        <Card className="p-4 shadow-sm ring-1 ring-border">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-medium">Analyzed a repo? Generate prompts to build similar apps</div>
+              <div className="text-xs text-foreground/60">Jump into the Cursor App Builder to create development prompts.</div>
+            </div>
+            <Button onClick={() => router.push("/dashboard/cursor-builder")}>Open Cursor App Builder</Button>
+          </div>
+        </Card>
+      </div>
+
       {/* Recent Generations */}
       {recent && recent.length > 0 && (
         <section className="mt-8">
@@ -214,6 +229,37 @@ export default function DashboardHome() {
               </Card>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* Post-analysis: Generate Cursor Prompts from this Repo */}
+      {latestCompleted && (
+        <section className="mt-8">
+          <Card className="p-4 shadow-lg ring-1 ring-border">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-base font-semibold">Generate Cursor Prompts from This Repo</h3>
+                <p className="text-sm text-foreground/70">We’ll pre-fill the builder with the detected tech stack, project structure, and existing patterns.</p>
+              </div>
+              <Button
+                onClick={() => {
+                  const techStack = latestCompleted.techStack || [];
+                  const files = (latestCompleted.files || []).map((f) => f.name);
+                  const prefill = {
+                    projectName: latestCompleted.repoName || latestCompleted.repoUrl,
+                    projectDescription: `Derived from ${latestCompleted.repoName || latestCompleted.repoUrl}. Detected stack: ${techStack.join(", ")}.`,
+                    techStack,
+                    files,
+                  };
+                  try { sessionStorage.setItem("cursorBuilderPrefill", JSON.stringify(prefill)); } catch {}
+                  router.push("/dashboard/cursor-builder");
+                }}
+                className="shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg"
+              >
+                Create Development Prompts
+              </Button>
+            </div>
+          </Card>
         </section>
       )}
 

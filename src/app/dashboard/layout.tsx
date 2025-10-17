@@ -14,12 +14,13 @@ import {
   BarChart2,
   Eye,
   Clock,
+  Settings as SettingsIcon,
   ChevronLeft,
   ChevronRight,
   Crown,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -27,22 +28,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const { user, isSignedIn } = useUser();
   const getOrCreateUser = useMutation(api.users.getOrCreateUser);
+  const stats = useQuery(api.users.getUserStats, isSignedIn && user?.id ? { userId: user.id } : "skip") as
+    | {
+        remainingPrompts: number;
+        promptsToday: number;
+        isPro: boolean;
+        promptsTodayByType?: Record<string, number>;
+      }
+    | undefined;
+  const remainingPrompts = stats?.remainingPrompts ?? 0;
 
   React.useEffect(() => {
     if (isSignedIn && user?.id && user?.primaryEmailAddress?.emailAddress) {
       // Best-effort create to avoid missing user records
       getOrCreateUser({ clerkId: user.id, email: user.primaryEmailAddress.emailAddress }).catch(() => {});
     }
-  }, [isSignedIn, user?.id, user?.primaryEmailAddress?.emailAddress]);
+  }, [isSignedIn, user?.id, user?.primaryEmailAddress?.emailAddress, getOrCreateUser]);
 
   const navItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { href: "/dashboard", label: "Prompt Studio", icon: Home },
-    { href: "/dashboard/cursor-app-builder", label: "Cursor App Builder", icon: AppWindow },
-    { href: "/dashboard/generic-prompts", label: "Generic Prompts", icon: FileText },
-    { href: "/dashboard/image-prompts", label: "Image Prompts", icon: Image },
-    { href: "/dashboard/analyze-improve", label: "Analyze & Improve", icon: BarChart2 },
-    { href: "/dashboard/output-predictor", label: "Output Predictor", icon: Eye },
-    { href: "/dashboard/history", label: "History", icon: Clock },
+    // @dashboard/
+    { href: "/dashboard", label: "Dashboard", icon: Home },
+    // @cursor-builder/
+    { href: "/dashboard/cursor-builder", label: "Cursor App Builder", icon: AppWindow },
+    // @generic-prompt/
+    { href: "/dashboard/generic-prompt", label: "Generic Prompts", icon: FileText },
+    // @image-prompt/
+    { href: "/dashboard/image-prompt", label: "Image Prompts", icon: Image },
+    // @predict/
+    { href: "/dashboard/predict", label: "Output Predictor", icon: Eye },
+    // @history/
+    { href: "/dashboard/history", label: "Generation History", icon: Clock },
+    // @prompt-history/
+    { href: "/dashboard/prompt-history", label: "Prompt History", icon: Clock },
+    // @prompt-studio/
+    { href: "/dashboard/prompt-studio", label: "Prompt Studio", icon: BarChart2 },
+    // @settings/
+    { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
   ];
 
   function isActive(href: string) {
@@ -130,7 +151,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-foreground/70">X/5 generations today</span>
+              {/* Usage indicator */}
+              {isSignedIn && (
+                <UsageIndicator remaining={remainingPrompts} breakdown={stats?.promptsTodayByType || {}} isPro={!!stats?.isPro} />
+              )}
               <UserButton />
             </div>
           </div>
@@ -143,8 +167,76 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {children}
           </main>
         </div>
+
+        {/* Mobile bottom tab bar */}
+        <nav className="sticky bottom-0 z-40 block border-t border-border bg-base/95 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-base/80 md:hidden">
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { href: "/dashboard", label: "Home", Icon: Home },
+              { href: "/dashboard/cursor-builder", label: "Builder", Icon: AppWindow },
+              { href: "/dashboard/generic-prompt", label: "Generic", Icon: FileText },
+              { href: "/dashboard/image-prompt", label: "Image", Icon: Image },
+              { href: "/dashboard/predict", label: "Predict", Icon: Eye },
+              { href: "/dashboard/history", label: "History", Icon: Clock },
+              { href: "/dashboard/prompt-history", label: "Prompts", Icon: Clock },
+              { href: "/dashboard/prompt-studio", label: "Studio", Icon: BarChart2 },
+              { href: "/dashboard/settings", label: "Settings", Icon: SettingsIcon },
+            ].map(({ href, label, Icon }) => (
+              <Link key={href} href={href} className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-xs">
+                <Icon className="h-5 w-5" />
+                <span>{label}</span>
+              </Link>
+            ))}
+          </div>
+        </nav>
       </div>
     </div>
+  );
+}
+
+function UsageIndicator({ remaining, breakdown, isPro }: { remaining: number; breakdown: Record<string, number>; isPro: boolean }) {
+  const [open, setOpen] = React.useState(false);
+  let color = "text-green-600";
+  if (!isPro) {
+    if (remaining < 5) color = "text-red-600";
+    else if (remaining <= 10) color = "text-yellow-600";
+  }
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className={`min-h-11 min-w-11 rounded-md border border-border px-3 py-2 text-sm ${color}`}
+        title="Daily prompt usage"
+      >
+        {isPro ? "Pro: Unlimited" : `${remaining} remaining`}
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+          <div className="relative w-full max-w-md rounded-lg bg-base p-4 ring-1 ring-border">
+            <div className="mb-2 text-base font-semibold">Daily usage</div>
+            <div className="text-sm text-foreground/70">{isPro ? "Unlimited for Pro users" : `${remaining} remaining today`}</div>
+            {!isPro && (
+              <div className="mt-3">
+                <div className="text-xs font-medium text-foreground/60">Today&apos;s prompts by type</div>
+                <ul className="mt-1 space-y-1 text-sm">
+                  {Object.keys(breakdown).length === 0 && <li className="text-foreground/60">No prompts yet today.</li>}
+                  {Object.entries(breakdown).map(([k, v]) => (
+                    <li key={k} className="flex justify-between"><span className="capitalize">{k}</span><span>{v}</span></li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {!isPro && (
+              <div className="mt-4 flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)}>Close</Button>
+                <Button className="bg-primary text-primary-foreground">Upgrade</Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

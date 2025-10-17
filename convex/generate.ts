@@ -63,7 +63,7 @@ async function withRetries<T>(fn: () => Promise<T>, retries = 2, baseDelayMs = 8
   throw lastErr instanceof Error ? lastErr : new Error("Failed after retries");
 }
 
-function buildPrompt(data: RepoData): string {
+export function buildPrompt(data: RepoData): string {
   const { repoStructure, techStack, packageJson, readmeContent } = data;
   const structureSample = repoStructure
     .slice(0, 500)
@@ -90,7 +90,7 @@ function buildPrompt(data: RepoData): string {
   ].join("\n");
 }
 
-function buildOutputsFromBase(baseRules: string, data: RepoData): GeneratedFile[] {
+export function buildOutputsFromBase(baseRules: string, data: RepoData): GeneratedFile[] {
   const { techStack, repoStructure, readmeContent } = data;
   const structureByFolders = repoStructure
     .filter(i => i.type === "tree")

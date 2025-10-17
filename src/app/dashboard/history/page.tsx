@@ -5,23 +5,13 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { Github, Calendar, Search, Download, Eye, Trash2, Code2, Boxes, Braces, Server } from "lucide-react";
 import JSZip from "jszip";
+import type { Doc, Id } from "@/../convex/_generated/dataModel";
 
-type Generation = {
-  _id: string;
-  userId: string;
-  repoUrl: string;
-  repoName?: string;
-  techStack?: string[];
-  status: "processing" | "completed" | "failed";
-  createdAt: number;
-  files?: { name: string; content: string }[];
-  errorMessage?: string;
-};
+type Generation = Doc<"generations">;
 
 const PAGE_SIZE = 10;
 
@@ -70,7 +60,7 @@ export default function HistoryPage() {
     if (!userId) return;
     const confirmed = window.confirm("Delete this generation? This cannot be undone.");
     if (!confirmed) return;
-    await deleteGeneration({ id: id as any, userId });
+    await deleteGeneration({ id: id as Id<"generations">, userId });
   }
 
   function relativeTime(ts: number): string {
@@ -209,18 +199,7 @@ export default function HistoryPage() {
   );
 }
 
-function downloadOne(g: Generation) {
-  const content = (g.files || []).map(f => `\n/* ===== ${f.name} ===== */\n` + (f.content || "")).join("\n\n");
-  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${g.repoName || "context"}-files.txt`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
+// removed unused downloadOne helper
 
 async function downloadOneZip(g: Generation) {
   const zip = new JSZip();
