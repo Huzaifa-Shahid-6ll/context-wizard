@@ -1,7 +1,7 @@
 import { action } from "./_generated/server";
 import { v, JsonValue } from "convex/values";
 import { api } from "./_generated/api";
-import { generateWithOpenRouter } from "../src/lib/openrouter";
+import { wrapperGenerateWithOpenRouter as generateWithOpenRouter } from "./openrouterWrapper";
 
 type GeneratedPromptItem = { title: string; prompt: string; order: number };
 type ErrorFixItem = { error: string; fix: string };

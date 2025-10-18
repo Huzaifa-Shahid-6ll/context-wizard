@@ -92,6 +92,34 @@ export default defineSchema({
   prompts,
   promptAnalyses,
   outputPredictions,
+  // ADD THIS TABLE (do not modify existing tables)
+  healthChecks: defineTable({
+    service: v.string(), // 'openrouter-free' | 'openrouter-pro'
+    status: v.union(v.literal('healthy'), v.literal('degraded'), v.literal('down')),
+    checkedAt: v.number(),
+    responseTime: v.optional(v.number()),
+    failedModels: v.array(v.string()),
+    lastError: v.optional(v.string()),
+  }).index('by_service_time', ['service', 'checkedAt']),
+  // Security tables
+  securityEvents: defineTable({
+    type: v.string(),
+    userId: v.optional(v.string()),
+    ip: v.string(),
+    fingerprint: v.string(),
+    details: v.any(),
+    severity: v.union(v.literal('low'), v.literal('medium'), v.literal('high')),
+    timestamp: v.number(),
+  })
+    .index('by_ip', ['ip'])
+    .index('by_fingerprint', ['fingerprint']),
+  bannedIps: defineTable({
+    ip: v.string(),
+    reason: v.string(),
+    bannedAt: v.number(),
+    expiresAt: v.optional(v.number()),
+    bannedBy: v.string(),
+  }).index('by_ip', ['ip']),
 });
 
 // Type helpers generated via convex codegen (imported by consumers):
