@@ -14,11 +14,13 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as actions from "../actions.js";
+import type * as contextManagement from "../contextManagement.js";
 import type * as debug from "../debug.js";
 import type * as generate from "../generate.js";
 import type * as mutations from "../mutations.js";
 import type * as promptGenerators from "../promptGenerators.js";
 import type * as queries from "../queries.js";
+import type * as security from "../security.js";
 import type * as testActions from "../testActions.js";
 import type * as testEnv from "../testEnv.js";
 import type * as users from "../users.js";
@@ -33,11 +35,13 @@ import type * as users from "../users.js";
  */
 declare const fullApi: ApiFromModules<{
   actions: typeof actions;
+  contextManagement: typeof contextManagement;
   debug: typeof debug;
   generate: typeof generate;
   mutations: typeof mutations;
   promptGenerators: typeof promptGenerators;
   queries: typeof queries;
+  security: typeof security;
   testActions: typeof testActions;
   testEnv: typeof testEnv;
   users: typeof users;

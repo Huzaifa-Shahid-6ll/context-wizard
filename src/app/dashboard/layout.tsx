@@ -11,6 +11,7 @@ import {
   AppWindow,
   FileText,
   Image,
+  Video,
   BarChart2,
   Eye,
   Clock,
@@ -54,6 +55,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/dashboard/generic-prompt", label: "Generic Prompts", icon: FileText },
     // @image-prompt/
     { href: "/dashboard/image-prompt", label: "Image Prompts", icon: Image },
+    // @video-prompt/
+    { href: "/dashboard/video-prompt", label: "Video Prompts", icon: Video },
     // @predict/
     { href: "/dashboard/predict", label: "Output Predictor", icon: Eye },
     // @history/
@@ -176,6 +179,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               { href: "/dashboard/cursor-builder", label: "Builder", Icon: AppWindow },
               { href: "/dashboard/generic-prompt", label: "Generic", Icon: FileText },
               { href: "/dashboard/image-prompt", label: "Image", Icon: Image },
+              { href: "/dashboard/video-prompt", label: "Video", Icon: Video },
               { href: "/dashboard/predict", label: "Predict", Icon: Eye },
               { href: "/dashboard/history", label: "History", Icon: Clock },
               { href: "/dashboard/prompt-history", label: "Prompts", Icon: Clock },

@@ -48,7 +48,8 @@ const prompts = defineTable({
     v.literal("cursorrules"),
     v.literal("error-fix"),
     v.literal("generic"),
-    v.literal("image")
+    v.literal("image"),
+    v.literal("video")
   ),
   title: v.string(),
   content: v.string(),
@@ -78,12 +79,83 @@ const promptAnalyses = defineTable({
 const outputPredictions = defineTable({
   userId: v.string(),
   prompt: v.string(),
-  predictedOutput: v.string(),
+  predictedOutput: v.any(), // Allow any type for backward compatibility
   confidence: v.number(), // 0-100
   createdAt: v.number(),
 })
   .index("by_userId", ["userId"]) // lookup by user
   .index("by_createdAt", ["createdAt"]); // sort/filter by creation time
+
+// Security Events table schema
+const securityEvents = defineTable({
+  type: v.string(),
+  userId: v.optional(v.string()),
+  ip: v.string(),
+  fingerprint: v.string(),
+  details: v.any(),
+  severity: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+  timestamp: v.number(),
+})
+  .index("by_timestamp", ["timestamp"])
+  .index("by_ip", ["ip"]);
+
+// Banned IPs table schema
+const bannedIps = defineTable({
+  ip: v.string(),
+  reason: v.string(),
+  bannedAt: v.number(),
+  expiresAt: v.optional(v.number()),
+  bannedBy: v.string(),
+})
+  .index("by_ip", ["ip"]);
+
+// Context Memory table schema for advanced context management
+const contextMemory = defineTable({
+  userId: v.string(),
+  sessionId: v.string(),
+  contextType: v.union(
+    v.literal("conversation"),
+    v.literal("project"),
+    v.literal("domain"),
+    v.literal("preference")
+  ),
+  content: v.string(),
+  metadata: v.optional(v.any()),
+  importance: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+  expiresAt: v.optional(v.number()),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+  .index("by_userId", ["userId"])
+  .index("by_sessionId", ["sessionId"])
+  .index("by_contextType", ["contextType"])
+  .index("by_importance", ["importance"])
+  .index("by_createdAt", ["createdAt"]);
+
+// Prompt Templates table schema for reusable prompt patterns
+const promptTemplates = defineTable({
+  userId: v.string(),
+  name: v.string(),
+  description: v.string(),
+  category: v.union(
+    v.literal("generic"),
+    v.literal("image"),
+    v.literal("video"),
+    v.literal("cursor-app"),
+    v.literal("analysis")
+  ),
+  template: v.string(),
+  variables: v.array(v.string()),
+  metadata: v.optional(v.any()),
+  isPublic: v.boolean(),
+  usageCount: v.number(),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+  .index("by_userId", ["userId"])
+  .index("by_category", ["category"])
+  .index("by_isPublic", ["isPublic"])
+  .index("by_usageCount", ["usageCount"]);
 
 // Export the schema
 export default defineSchema({
@@ -92,34 +164,10 @@ export default defineSchema({
   prompts,
   promptAnalyses,
   outputPredictions,
-  // ADD THIS TABLE (do not modify existing tables)
-  healthChecks: defineTable({
-    service: v.string(), // 'openrouter-free' | 'openrouter-pro'
-    status: v.union(v.literal('healthy'), v.literal('degraded'), v.literal('down')),
-    checkedAt: v.number(),
-    responseTime: v.optional(v.number()),
-    failedModels: v.array(v.string()),
-    lastError: v.optional(v.string()),
-  }).index('by_service_time', ['service', 'checkedAt']),
-  // Security tables
-  securityEvents: defineTable({
-    type: v.string(),
-    userId: v.optional(v.string()),
-    ip: v.string(),
-    fingerprint: v.string(),
-    details: v.any(),
-    severity: v.union(v.literal('low'), v.literal('medium'), v.literal('high')),
-    timestamp: v.number(),
-  })
-    .index('by_ip', ['ip'])
-    .index('by_fingerprint', ['fingerprint']),
-  bannedIps: defineTable({
-    ip: v.string(),
-    reason: v.string(),
-    bannedAt: v.number(),
-    expiresAt: v.optional(v.number()),
-    bannedBy: v.string(),
-  }).index('by_ip', ['ip']),
+  securityEvents,
+  bannedIps,
+  contextMemory,
+  promptTemplates,
 });
 
 // Type helpers generated via convex codegen (imported by consumers):

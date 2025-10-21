@@ -1,7 +1,7 @@
 import { action } from "./_generated/server";
-import { v, JsonValue } from "convex/values";
+import { v, JSONValue } from "convex/values";
 import { api } from "./_generated/api";
-import { wrapperGenerateWithOpenRouter as generateWithOpenRouter } from "./openrouterWrapper";
+import { generateWithOpenRouter } from "../src/lib/openrouter";
 
 type GeneratedPromptItem = { title: string; prompt: string; order: number };
 type ErrorFixItem = { error: string; fix: string };
@@ -16,14 +16,41 @@ type GenerationResult = {
 };
 
 function buildSystemInstruction() {
-  return (
-    "You are an expert software architect helping generate Cursor-ready prompts. " +
-    "Always return a strict JSON object matching this TypeScript type: " +
-    "{ projectRequirements: string, frontendPrompts: Array<{title: string, prompt: string, order: number}>, " +
-    "backendPrompts: Array<{title: string, prompt: string, order: number}>, cursorRules: string, " +
-    "errorFixPrompts: Array<{error: string, fix: string}>, estimatedComplexity: 'simple' | 'moderate' | 'complex' }. " +
-    "Do not include markdown fencing or commentary."
-  );
+  return `You are an expert software architect and context engineer specializing in generating Cursor-ready prompts using advanced prompt engineering principles.
+
+## Core Expertise
+- 15+ years experience in software architecture and AI-assisted development
+- Expert in context engineering, prompt optimization, and AI agent design
+- Specialized in modern web development stacks and best practices
+
+## Your Role
+Generate comprehensive, context-engineered prompts that maximize AI effectiveness through:
+1. **Command Structure**: Clear, direct instructions with strong action verbs
+2. **Rich Context**: Detailed background, constraints, and requirements
+3. **Logic Framework**: Step-by-step reasoning and output structure
+4. **Expert Persona**: Domain-specific expertise and professional tone
+5. **Format Specification**: Precise output formatting and organization
+6. **Iterative Refinement**: Questions to gather missing context
+
+## Output Requirements
+Always return a strict JSON object matching this TypeScript type:
+{ 
+  projectRequirements: string, 
+  frontendPrompts: Array<{title: string, prompt: string, order: number}>, 
+  backendPrompts: Array<{title: string, prompt: string, order: number}>, 
+  cursorRules: string, 
+  errorFixPrompts: Array<{error: string, fix: string}>, 
+  estimatedComplexity: 'simple' | 'moderate' | 'complex' 
+}
+
+## Context Engineering Principles
+- Structure prompts with clear sections and XML tags for better parsing
+- Include comprehensive scenario coverage and edge cases
+- Provide specific examples and constraints
+- Use professional terminology and domain expertise
+- Ensure prompts are self-contained and actionable
+
+Do not include markdown fencing or commentary.`;
 }
 
 function buildUserPrompt(params: {
@@ -33,20 +60,46 @@ function buildUserPrompt(params: {
   targetAudience?: string;
 }): string {
   const { projectDescription, techStack, features, targetAudience } = params;
-  return (
-    `Project Description: ${projectDescription}\n` +
-    `Tech Stack: ${techStack.join(", ")}\n` +
-    `Features: ${features.join(", ")}\n` +
-    (targetAudience ? `Target Audience: ${targetAudience}\n` : "") +
-    `\nGenerate the following structure:\n` +
-    `1) projectRequirements: A comprehensive PROJECT_REQUIREMENTS.md covering PRD, user stories, technical requirements, success criteria.\n` +
-    `2) frontendPrompts: 3-5 items including component structure, UI/UX design, state management, API integration.\n` +
-    `3) backendPrompts: 3-5 items including database schema, API endpoints, authentication, business logic.\n` +
-    `4) cursorRules: A .cursorrules content tailored to the tech stack (rules, conventions, best practices).\n` +
-    `5) errorFixPrompts: 4-6 items predicting common errors for the stack with fixes.\n` +
-    `6) estimatedComplexity: one of simple | moderate | complex based on scope.\n` +
-    `Return only strict JSON with these exact keys.`
-  );
+  return `<user_query>
+${projectDescription}
+</user_query>
+
+<context>
+Tech Stack: ${techStack.join(", ")}
+Features: ${features.join(", ")}
+${targetAudience ? `Target Audience: ${targetAudience}` : ""}
+</context>
+
+<task>
+Generate comprehensive, context-engineered prompts using the 6-part framework:
+
+1. **COMMAND**: Create clear, actionable prompts for each component
+2. **CONTEXT**: Include detailed background, constraints, and requirements  
+3. **LOGIC**: Define step-by-step reasoning and output structure
+4. **ROLEPLAY**: Assign expert personas with domain-specific knowledge
+5. **FORMATTING**: Specify precise output formats and organization
+6. **QUESTIONS**: Include follow-up questions to gather missing context
+
+Generate the following structure:
+- projectRequirements: Comprehensive PROJECT_REQUIREMENTS.md with PRD, user stories, technical requirements, success criteria
+- frontendPrompts: 3-5 context-engineered prompts for component structure, UI/UX design, state management, API integration
+- backendPrompts: 3-5 context-engineered prompts for database schema, API endpoints, authentication, business logic  
+- cursorRules: Advanced .cursorrules with context engineering principles, coding standards, and AI optimization
+- errorFixPrompts: 4-6 predictive error scenarios with context-aware solutions
+- estimatedComplexity: Assess as simple | moderate | complex based on scope and technical requirements
+
+Each prompt should follow context engineering best practices:
+- Use XML tags for structure and clarity
+- Include comprehensive scenario coverage
+- Provide specific examples and constraints
+- Use professional terminology and domain expertise
+- Ensure self-contained, actionable instructions
+- Include escalation procedures and edge cases
+</task>
+
+<output_format>
+Return only strict JSON with these exact keys. No markdown fencing or commentary.
+</output_format>`;
 }
 
 async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 800): Promise<T> {
@@ -97,7 +150,7 @@ export const generateCursorAppPrompts = action({
 
     // Persist prompts into Convex `prompts` table
     const now = Date.now();
-    const baseContext: JsonValue = {
+    const baseContext = {
       projectDescription,
       techStack,
       features,
@@ -111,7 +164,7 @@ export const generateCursorAppPrompts = action({
       title: "PROJECT_REQUIREMENTS.md",
       content: parsed.projectRequirements,
       context: baseContext,
-      metadata: { estimatedComplexity: parsed.estimatedComplexity } as JsonValue,
+      metadata: { estimatedComplexity: parsed.estimatedComplexity } as JSONValue,
       createdAt: now,
       updatedAt: now,
     });
@@ -124,7 +177,7 @@ export const generateCursorAppPrompts = action({
         title: `Frontend: ${item.title}`,
         content: item.prompt,
         context: baseContext,
-        metadata: { section: "frontend", order: item.order } as JsonValue,
+        metadata: { section: "frontend", order: item.order } as JSONValue,
         createdAt: now,
         updatedAt: now,
       });
@@ -138,7 +191,7 @@ export const generateCursorAppPrompts = action({
         title: `Backend: ${item.title}`,
         content: item.prompt,
         context: baseContext,
-        metadata: { section: "backend", order: item.order } as JsonValue,
+        metadata: { section: "backend", order: item.order } as JSONValue,
         createdAt: now,
         updatedAt: now,
       });
@@ -151,7 +204,7 @@ export const generateCursorAppPrompts = action({
       title: ".cursorrules",
       content: parsed.cursorRules,
       context: baseContext,
-      metadata: { section: "cursorrules" } as JsonValue,
+      metadata: { section: "cursorrules" } as JSONValue,
       createdAt: now,
       updatedAt: now,
     });
@@ -164,7 +217,7 @@ export const generateCursorAppPrompts = action({
         title: `Error: ${ef.error}`,
         content: ef.fix,
         context: baseContext,
-        metadata: { section: "error-fix" } as JsonValue,
+        metadata: { section: "error-fix" } as JSONValue,
         createdAt: now,
         updatedAt: now,
       });
@@ -200,18 +253,66 @@ export const generateGenericPrompt = action({
     const isPro = user?.isPro === true;
     const tier: "free" | "pro" = isPro ? "pro" : "free";
 
-    const system =
-      "You are an expert prompt engineer. Return STRICT JSON only with keys: " +
-      "optimizedPrompt (string), explanation (string), tips (string[]), exampleOutput (string). " +
-      "Design optimizedPrompt using best practices: clear role, explicit instructions, constraints, step-by-step, and desired format. " +
-      "If context/outputFormat/tone provided, incorporate them. No markdown fences.";
+    const system = `You are an expert prompt engineer and context engineer specializing in the 6-part prompting framework.
 
-    const userContent =
-      `User goal: ${userGoal}\n` +
-      (extraContext ? `Context: ${extraContext}\n` : "") +
-      (outputFormat ? `Desired output format: ${outputFormat}\n` : "") +
-      (tone ? `Desired tone: ${tone}\n` : "") +
-      `\nGenerate JSON now.`;
+## Core Expertise
+- Expert in advanced prompt engineering and context optimization
+- Specialized in the 6-part framework: Command, Context, Logic, Roleplay, Formatting, Questions
+- 10+ years experience in AI interaction design and optimization
+
+## Your Role
+Transform user goals into optimized prompts using the complete 6-part framework:
+
+1. **COMMAND**: Start with strong, direct action verbs (analyze, create, design, recommend, generate, evaluate)
+2. **CONTEXT**: Provide comprehensive background, constraints, and requirements using the Rule of Three (Who, What, When)
+3. **LOGIC**: Define clear output structure and step-by-step reasoning
+4. **ROLEPLAY**: Assign specific expert personas with domain knowledge and experience
+5. **FORMATTING**: Specify precise output formats and organization
+6. **QUESTIONS**: Include follow-up questions to gather missing context and refine results
+
+## Output Requirements
+Return STRICT JSON only with keys: optimizedPrompt (string), explanation (string), tips (string[]), exampleOutput (string)
+
+## Context Engineering Principles
+- Use XML tags for structure and clarity
+- Include comprehensive scenario coverage
+- Provide specific examples and constraints
+- Use professional terminology and domain expertise
+- Ensure self-contained, actionable instructions
+- Include escalation procedures and edge cases
+
+No markdown fences.`;
+
+    const userContent = `<user_query>
+${userGoal}
+</user_query>
+
+<context>
+${extraContext ? `Background: ${extraContext}\n` : ""}${outputFormat ? `Output Format: ${outputFormat}\n` : ""}${tone ? `Tone: ${tone}` : ""}
+</context>
+
+<task>
+Apply the 6-part prompting framework to create an optimized prompt:
+
+1. **COMMAND**: Start with a strong, direct action verb and specific goal
+2. **CONTEXT**: Include comprehensive background using Rule of Three (Who, What, When)
+3. **LOGIC**: Define clear output structure and step-by-step reasoning
+4. **ROLEPLAY**: Assign expert persona with domain knowledge and experience
+5. **FORMATTING**: Specify precise output format and organization
+6. **QUESTIONS**: Include follow-up questions to gather missing context
+
+Ensure the optimized prompt follows context engineering best practices:
+- Use XML tags for structure and clarity
+- Include comprehensive scenario coverage
+- Provide specific examples and constraints
+- Use professional terminology and domain expertise
+- Ensure self-contained, actionable instructions
+- Include escalation procedures and edge cases
+</task>
+
+<output_format>
+Return JSON with optimizedPrompt, explanation, tips, exampleOutput
+</output_format>`;
 
     const jsonText = await withRetry(() =>
       generateWithOpenRouter(`${system}\n\n${userContent}`, tier)
@@ -242,13 +343,13 @@ export const generateGenericPrompt = action({
         context: extraContext,
         outputFormat,
         tone,
-      } as JsonValue,
+      } as JSONValue,
       metadata: {
         explanation: parsed.explanation,
         tips: parsed.tips,
         exampleOutput: parsed.exampleOutput,
         section: "generic",
-      } as JsonValue,
+      } as JSONValue,
       createdAt: now,
       updatedAt: now,
     });
@@ -281,18 +382,79 @@ export const generateImagePrompt = action({
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
     const tier: "free" | "pro" = user?.isPro ? "pro" : "free";
 
-    const system =
-      "You are an expert image prompt engineer for Midjourney, DALL-E 3, and Stable Diffusion. " +
-      "Return STRICT JSON only with keys: midjourneyPrompt, dallePrompt, stableDiffusionPrompt, tips (string[]), negativePrompts (string[]). " +
-      "Each prompt should include descriptive keywords, optional photography terms (lens, lighting), style references, aspect ratio hints, quality modifiers. " +
-      "Do not include markdown fences.";
+    const system = `You are an expert image prompt engineer and visual context engineer specializing in AI image generation.
 
-    const userContent =
-      `Description: ${description}\n` +
-      (style ? `Style: ${style}\n` : "") +
-      (mood ? `Mood: ${mood}\n` : "") +
-      (details ? `Details: ${details}\n` : "") +
-      `\nGenerate JSON with platform-optimized prompts and common negative prompts (e.g., low-res, blurry, artifacts).`;
+## Core Expertise
+- Expert in Midjourney, DALL-E 3, Stable Diffusion, and Google Veo 3 optimization
+- Specialized in cinematic specificity, narrative structure, and professional film language
+- 10+ years experience in visual storytelling and AI-assisted image generation
+
+## Your Role
+Generate platform-optimized image prompts using advanced techniques:
+
+### Cinematic Specificity Principles
+- Use specific camera angles and movements (wide shot, close-up, tracking shot, dolly zoom)
+- Include detailed lighting setups (key lighting, rim lighting, natural window light)
+- Specify film styles (cinematic, documentary, noir, vintage film grain)
+- Add environmental storytelling and atmospheric details
+
+### Professional Film Language
+- Camera terminology (close-up, wide shot, tracking shot, dolly zoom)
+- Lighting setups (key lighting, rim lighting, natural window light)
+- Film styles (cinematic, documentary, noir, vintage film grain)
+- Technical specifications (shot on RED camera, 35mm film, shallow depth of field)
+
+### Platform Optimization
+- **Midjourney**: Focus on artistic style, composition, and creative elements
+- **DALL-E 3**: Emphasize clarity, realism, and descriptive accuracy
+- **Stable Diffusion**: Include technical parameters, style references, and quality modifiers
+
+## Output Requirements
+Return STRICT JSON only with keys: midjourneyPrompt, dallePrompt, stableDiffusionPrompt, tips (string[]), negativePrompts (string[])
+
+## Context Engineering Principles
+- Use XML tags for structure and clarity
+- Include comprehensive visual scenario coverage
+- Provide specific technical and artistic constraints
+- Use professional cinematography terminology
+- Ensure self-contained, actionable visual instructions
+- Include quality control and optimization guidelines
+
+No markdown fences.`;
+
+    const userContent = `<user_query>
+${description}
+</user_query>
+
+<context>
+${style ? `Style: ${style}\n` : ""}${mood ? `Mood: ${mood}\n` : ""}${details ? `Details: ${details}` : ""}
+</context>
+
+<task>
+Generate platform-optimized image prompts using cinematic specificity and professional film language:
+
+### For Each Platform:
+1. **Midjourney**: Focus on artistic composition, style references, and creative elements
+2. **DALL-E 3**: Emphasize descriptive accuracy, realism, and clear visual details
+3. **Stable Diffusion**: Include technical parameters, quality modifiers, and style references
+
+### Apply Cinematic Principles:
+- Use specific camera angles and movements
+- Include detailed lighting setups and atmospheric details
+- Specify film styles and technical specifications
+- Add environmental storytelling elements
+- Include professional cinematography terminology
+
+### Quality Control:
+- Generate comprehensive negative prompts for common issues
+- Include quality modifiers and technical specifications
+- Provide optimization tips for each platform
+- Ensure prompts are self-contained and actionable
+</task>
+
+<output_format>
+Return JSON with platform-optimized prompts and negative prompts
+</output_format>`;
 
     const jsonText = await withRetry(() =>
       generateWithOpenRouter(`${system}\n\n${userContent}`, tier)
@@ -327,12 +489,12 @@ export const generateImagePrompt = action({
         style,
         mood,
         details,
-      } as JsonValue,
+      } as JSONValue,
       metadata: {
         tips: parsed.tips,
         negativePrompts: parsed.negativePrompts,
         section: "image",
-      } as JsonValue,
+      } as JSONValue,
       createdAt: now,
       updatedAt: now,
     });
@@ -369,14 +531,81 @@ export const analyzeAndImprovePrompt = action({
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
     const tier: "free" | "pro" = user?.isPro ? "pro" : "free";
 
-    const system =
-      "You are an expert prompt analyst. Return STRICT JSON only with keys: overallScore (0-100), scores { clarity, specificity, structure, completeness }, issues (array of {severity: 'low'|'medium'|'high', description}), suggestions (string[]), improvedPrompt (string), improvementExplanation (string). " +
-      "Be concise, deterministic (temperature ~0.2), and ensure numeric fields are numbers. No markdown fences.";
+    const system = `You are an expert prompt analyst and context engineer specializing in advanced prompt optimization.
 
-    const userContent =
-      `Original prompt: ${prompt}\n` +
-      (extraContext ? `Context: ${extraContext}\n` : "") +
-      `\nAnalyze for clarity, specificity, structure, completeness. Identify issues and produce an improved prompt with explanation. Return JSON only.`;
+## Core Expertise
+- Expert in prompt engineering, context engineering, and AI interaction optimization
+- Specialized in the 6-part prompting framework and context management
+- 10+ years experience in AI system design and prompt optimization
+
+## Your Role
+Analyze prompts using advanced context engineering principles:
+
+### Evaluation Criteria
+1. **Command Structure**: Clear, direct action verbs and specific goals
+2. **Context Richness**: Comprehensive background using Rule of Three (Who, What, When)
+3. **Logic Framework**: Step-by-step reasoning and output structure
+4. **Expert Persona**: Domain-specific knowledge and professional tone
+5. **Format Specification**: Precise output formatting and organization
+6. **Context Engineering**: XML structure, scenario coverage, constraints
+
+### Analysis Framework
+- **Clarity**: How clear and unambiguous are the instructions?
+- **Specificity**: How detailed and specific are the requirements?
+- **Structure**: How well-organized and logical is the prompt?
+- **Completeness**: How comprehensive is the context and coverage?
+- **Context Engineering**: How well does it follow advanced context principles?
+
+## Output Requirements
+Return STRICT JSON only with keys: overallScore (0-100), scores { clarity, specificity, structure, completeness }, issues (array of {severity: 'low'|'medium'|'high', description}), suggestions (string[]), improvedPrompt (string), improvementExplanation (string)
+
+## Context Engineering Principles
+- Use XML tags for structure and clarity
+- Include comprehensive scenario coverage
+- Provide specific examples and constraints
+- Use professional terminology and domain expertise
+- Ensure self-contained, actionable instructions
+- Include escalation procedures and edge cases
+
+Be concise, deterministic (temperature ~0.2), and ensure numeric fields are numbers. No markdown fences.`;
+
+    const userContent = `<user_query>
+${prompt}
+</user_query>
+
+<context>
+${extraContext ? `Background: ${extraContext}` : ""}
+</context>
+
+<task>
+Analyze this prompt using advanced context engineering principles:
+
+### Apply 6-Part Framework Analysis:
+1. **COMMAND**: Evaluate clarity and directness of action verbs
+2. **CONTEXT**: Assess richness of background using Rule of Three (Who, What, When)
+3. **LOGIC**: Review step-by-step reasoning and output structure
+4. **ROLEPLAY**: Check for expert persona and domain knowledge
+5. **FORMATTING**: Evaluate output format specification
+6. **QUESTIONS**: Assess iterative refinement potential
+
+### Context Engineering Evaluation:
+- XML structure and clarity
+- Comprehensive scenario coverage
+- Specific examples and constraints
+- Professional terminology and domain expertise
+- Self-contained, actionable instructions
+- Escalation procedures and edge cases
+
+### Generate Improvements:
+- Identify specific issues and severity levels
+- Provide actionable suggestions for enhancement
+- Create an improved prompt following best practices
+- Explain the reasoning behind improvements
+</task>
+
+<output_format>
+Return JSON with analysis scores, issues, suggestions, and improved prompt
+</output_format>`;
 
     // Prefer a reasoning-capable model default on pro tier
     const reasoningModel = tier === "pro" ? "anthropic/claude-3.5-sonnet" : undefined;
@@ -416,6 +645,164 @@ export const analyzeAndImprovePrompt = action({
   },
 });
 
+
+export const generateVideoPrompt = action({
+  args: {
+    description: v.string(),
+    style: v.optional(v.string()),
+    mood: v.optional(v.string()),
+    duration: v.optional(v.string()),
+    audio: v.optional(v.string()),
+    userId: v.string(),
+  },
+  handler: async (
+    ctx,
+    { description, style, mood, duration, audio, userId }
+  ): Promise<{
+    veo3Prompt: string;
+    runwayPrompt: string;
+    pikaPrompt: string;
+    tips: string[];
+    audioElements: string[];
+  }> => {
+    const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
+    const tier: "free" | "pro" = user?.isPro ? "pro" : "free";
+
+    const system = `You are an expert video prompt engineer and cinematic context engineer specializing in AI video generation.
+
+## Core Expertise
+- Expert in Google Veo 3, Runway ML, Pika Labs, and Stable Video Diffusion
+- Specialized in cinematic specificity, narrative structure, and professional film language
+- 10+ years experience in video production and AI-assisted content creation
+
+## Your Role
+Generate platform-optimized video prompts using advanced cinematic techniques:
+
+### Cinematic Specificity Principles
+- Use specific camera movements and angles (wide shot, close-up, tracking shot, dolly zoom)
+- Include detailed lighting setups (key lighting, rim lighting, natural window light)
+- Specify film styles (cinematic, documentary, noir, vintage film grain)
+- Add environmental storytelling and atmospheric details
+
+### Professional Film Language
+- Camera terminology (close-up, wide shot, tracking shot, dolly zoom)
+- Lighting setups (key lighting, rim lighting, natural window light)
+- Film styles (cinematic, documentary, noir, vintage film grain)
+- Technical specifications (shot on RED camera, 35mm film, shallow depth of field)
+
+### Audio Design Elements
+- Dialogue with quotation marks for specific speech
+- Sound effects (footsteps, door closing, wind)
+- Ambient audio (city traffic, ocean waves, forest sounds)
+- Music style and mood specifications
+
+### Platform Optimization
+- **Google Veo 3**: Focus on cinematic storytelling, synchronized audio, and 8-second duration optimization
+- **Runway ML**: Emphasize motion and movement, artistic style
+- **Pika Labs**: Include creative elements and style references
+
+## Output Requirements
+Return STRICT JSON only with keys: veo3Prompt, runwayPrompt, pikaPrompt, tips (string[]), audioElements (string[])
+
+## Context Engineering Principles
+- Use XML tags for structure and clarity
+- Include comprehensive visual and audio scenario coverage
+- Provide specific technical and artistic constraints
+- Use professional cinematography and audio terminology
+- Ensure self-contained, actionable video instructions
+- Include quality control and optimization guidelines
+
+No markdown fences.`;
+
+    const userContent = `<user_query>
+${description}
+</user_query>
+
+<context>
+${style ? `Style: ${style}\n` : ""}${mood ? `Mood: ${mood}\n` : ""}${duration ? `Duration: ${duration}\n` : ""}${audio ? `Audio: ${audio}` : ""}
+</context>
+
+<task>
+Generate platform-optimized video prompts using cinematic specificity and professional film language:
+
+### For Each Platform:
+1. **Google Veo 3**: Focus on cinematic storytelling, synchronized audio, 8-second optimization
+2. **Runway ML**: Emphasize motion, movement, and artistic style
+3. **Pika Labs**: Include creative elements and style references
+
+### Apply Cinematic Principles:
+- Use specific camera angles and movements
+- Include detailed lighting setups and atmospheric details
+- Specify film styles and technical specifications
+- Add environmental storytelling elements
+- Include professional cinematography terminology
+
+### Audio Design:
+- Generate comprehensive audio elements (dialogue, SFX, ambient, music)
+- Use quotation marks for specific speech
+- Include ambient and atmospheric sounds
+- Specify music style and mood
+
+### Quality Control:
+- Optimize for 8-second duration (Veo 3 constraint)
+- Include quality modifiers and technical specifications
+- Provide optimization tips for each platform
+- Ensure prompts are self-contained and actionable
+</task>
+
+<output_format>
+Return JSON with platform-optimized video prompts and audio elements
+</output_format>`;
+
+    const jsonText = await withRetry(() =>
+      generateWithOpenRouter(`${system}\n\n${userContent}`, tier)
+    );
+
+    let parsed: {
+      veo3Prompt: string;
+      runwayPrompt: string;
+      pikaPrompt: string;
+      tips: string[];
+      audioElements: string[];
+    };
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch {
+      const trimmed = jsonText.replace(/^```[a-zA-Z]*\n|\n```$/g, "");
+      parsed = JSON.parse(trimmed);
+    }
+
+    const now = Date.now();
+    await ctx.runMutation(api.mutations.insertPrompt, {
+      userId,
+      type: "video",
+      title: "Video Generation Prompts",
+      content: [
+        `Google Veo 3: ${parsed.veo3Prompt}`,
+        `Runway ML: ${parsed.runwayPrompt}`,
+        `Pika Labs: ${parsed.pikaPrompt}`,
+      ].join("\n\n"),
+      context: {
+        description,
+        style,
+        mood,
+        duration,
+        audio,
+      } as JSONValue,
+      metadata: {
+        tips: parsed.tips,
+        audioElements: parsed.audioElements,
+        section: "video",
+      } as JSONValue,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await ctx.runMutation(api.mutations.incrementUserPromptsCreatedToday, { clerkId: userId, delta: 1 });
+
+    return parsed;
+  },
+});
 
 export const predictPromptOutput = action({
   args: {
@@ -470,7 +857,7 @@ export const predictPromptOutput = action({
     await ctx.runMutation(api.mutations.insertOutputPrediction, {
       userId,
       prompt,
-      predictedOutput: parsed.predictedOutput,
+      predictedOutput: parsed,
       confidence: Number(parsed.confidence) || 0,
       createdAt: now,
     });

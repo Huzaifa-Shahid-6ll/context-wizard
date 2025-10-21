@@ -38,7 +38,16 @@ export default function PredictPage() {
     }
   }
 
-  const confidenceColor = !prediction ? "bg-secondary/40" : prediction.confidence >= 75 ? "bg-green-500" : prediction.confidence >= 40 ? "bg-yellow-500" : "bg-red-500";
+  const getConfidence = () => {
+    if (!prediction) return 0;
+    if (typeof prediction.predictedOutput === 'object' && prediction.predictedOutput?.confidence) {
+      return prediction.predictedOutput.confidence;
+    }
+    return prediction.confidence || 0;
+  };
+  
+  const confidence = getConfidence();
+  const confidenceColor = !prediction ? "bg-secondary/40" : confidence >= 75 ? "bg-green-500" : confidence >= 40 ? "bg-yellow-500" : "bg-red-500";
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6">
@@ -87,10 +96,10 @@ export default function PredictPage() {
               <div>
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium">Confidence</div>
-                  <Badge variant="secondary">{prediction.confidence}%</Badge>
+                  <Badge variant="secondary">{confidence}%</Badge>
                 </div>
                 <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-secondary/40">
-                  <div className={`h-3 ${confidenceColor}`} style={{ width: `${prediction.confidence}%` }} />
+                  <div className={`h-3 ${confidenceColor}`} style={{ width: `${confidence}%` }} />
                 </div>
               </div>
 
@@ -98,9 +107,9 @@ export default function PredictPage() {
               <div>
                 <div className="text-sm font-medium">Predicted Output</div>
                 <div className="mt-2 rounded-2xl border border-border bg-secondary/10 p-3">
-                  <ChatBubble>{prediction.predictedOutput}</ChatBubble>
+                  <ChatBubble>{typeof prediction.predictedOutput === 'string' ? prediction.predictedOutput : prediction.predictedOutput?.predictedOutput || "No output predicted"}</ChatBubble>
                   <div className="mt-2 flex justify-end">
-                    <Button variant="outline" size="sm" onClick={async () => { try { await navigator.clipboard.writeText(prediction.predictedOutput); } catch {} }} className="shadow-sm hover:shadow-md">Copy</Button>
+                    <Button variant="outline" size="sm" onClick={async () => { try { await navigator.clipboard.writeText(typeof prediction.predictedOutput === 'string' ? prediction.predictedOutput : prediction.predictedOutput?.predictedOutput || ""); } catch {} }} className="shadow-sm hover:shadow-md">Copy</Button>
                   </div>
                 </div>
               </div>
@@ -109,44 +118,61 @@ export default function PredictPage() {
               <div>
                 <div className="text-sm font-medium">Why the AI will respond this way</div>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-foreground/70">
-                  {prediction.reasoning.split(/\n+/).map((line, idx) => (
-                    <li key={idx}>{line}</li>
-                  ))}
+                  {(() => {
+                    const reasoning = typeof prediction.predictedOutput === 'object' && prediction.predictedOutput?.reasoning 
+                      ? prediction.predictedOutput.reasoning 
+                      : prediction.reasoning;
+                    return reasoning ? reasoning.split(/\n+/).map((line, idx) => (
+                      <li key={idx}>{line}</li>
+                    )) : (
+                      <li>No reasoning provided</li>
+                    );
+                  })()}
                 </ul>
               </div>
 
               {/* Warnings */}
-              {!!prediction.warnings?.length && (
-                <div>
-                  <div className="text-sm font-medium">Warnings</div>
-                  <div className="mt-2 space-y-2">
-                    {prediction.warnings.map((w, i) => (
-                      <AlertItem key={i} text={w} />
-                    ))}
+              {(() => {
+                const warnings = typeof prediction.predictedOutput === 'object' && prediction.predictedOutput?.warnings 
+                  ? prediction.predictedOutput.warnings 
+                  : prediction.warnings;
+                return !!warnings?.length && (
+                  <div>
+                    <div className="text-sm font-medium">Warnings</div>
+                    <div className="mt-2 space-y-2">
+                      {warnings.map((w, i) => (
+                        <AlertItem key={i} text={w} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Alternatives */}
-              {!!prediction.alternatives?.length && (
-                <div>
-                  <div className="text-sm font-medium">Alternative Suggestions</div>
-                  <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    {prediction.alternatives.map((a, i) => (
-                      <Card key={i} className="p-3 shadow-sm ring-1 ring-border">
-                        <div className="text-sm font-medium">Modified prompt</div>
-                        <pre className="mt-1 whitespace-pre-wrap text-sm leading-6">{a.modifiedPrompt}</pre>
-                        <Separator className="my-2" />
-                        <div className="text-xs text-foreground/60">Expected change</div>
-                        <p className="text-sm text-foreground/80">{a.expectedChange}</p>
-                        <div className="mt-2 flex justify-end">
-                          <Button size="sm" variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(a.modifiedPrompt); } catch {} }} className="shadow-sm hover:shadow-md">Try this</Button>
-                        </div>
-                      </Card>
-                    ))}
+              {(() => {
+                const alternatives = typeof prediction.predictedOutput === 'object' && prediction.predictedOutput?.alternatives 
+                  ? prediction.predictedOutput.alternatives 
+                  : prediction.alternatives;
+                return !!alternatives?.length && (
+                  <div>
+                    <div className="text-sm font-medium">Alternative Suggestions</div>
+                    <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+                      {alternatives.map((a, i) => (
+                        <Card key={i} className="p-3 shadow-sm ring-1 ring-border">
+                          <div className="text-sm font-medium">Modified prompt</div>
+                          <pre className="mt-1 whitespace-pre-wrap text-sm leading-6">{a.modifiedPrompt}</pre>
+                          <Separator className="my-2" />
+                          <div className="text-xs text-foreground/60">Expected change</div>
+                          <p className="text-sm text-foreground/80">{a.expectedChange}</p>
+                          <div className="mt-2 flex justify-end">
+                            <Button size="sm" variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(a.modifiedPrompt); } catch {} }} className="shadow-sm hover:shadow-md">Try this</Button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
         </Card>

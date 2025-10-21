@@ -104,7 +104,8 @@ export const insertPrompt = mutation({
       v.literal("cursorrules"),
       v.literal("error-fix"),
       v.literal("generic"),
-      v.literal("image")
+      v.literal("image"),
+      v.literal("video")
     ),
     title: v.string(),
     content: v.string(),
@@ -144,12 +145,15 @@ export const insertOutputPrediction = mutation({
   args: {
     userId: v.string(),
     prompt: v.string(),
-    predictedOutput: v.string(),
+    predictedOutput: v.any(),
     confidence: v.number(),
     createdAt: v.number(),
   },
   handler: async (ctx, args) => {
-    const id = await ctx.db.insert("outputPredictions", args);
+    const id = await ctx.db.insert("outputPredictions", {
+      ...args,
+      predictedOutput: args.predictedOutput as any,
+    });
     return id;
   },
 });

@@ -1,5 +1,6 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
+import { generateWithOpenRouter } from "../src/lib/openrouter";
 
 type RepoData = {
   repoStructure: { path: string; type: string }[]; // simplified structure for prompt
@@ -9,42 +10,6 @@ type RepoData = {
 };
 
 export type GeneratedFile = { name: string; content: string };
-
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY;
-
-async function callAnthropic(prompt: string, maxTokens = 2000): Promise<string> {
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error("Missing ANTHROPIC_API_KEY in environment");
-  }
-  // Using Claude 3.5 Sonnet as default; adjust if needed
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-3-5-sonnet-latest",
-      max_tokens: maxTokens,
-      messages: [
-        { role: "user", content: prompt },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    if (res.status === 429) {
-      throw new Error("Anthropic rate limit exceeded");
-    }
-    const text = await res.text();
-    throw new Error(`Anthropic API error ${res.status}: ${text}`);
-  }
-  const json = await res.json();
-  // Claude response format: { content: [{ type: 'text', text: '...' }], ... }
-  const content: unknown = json?.content?.[0]?.text ?? "";
-  return String(content);
-}
 
 async function withRetries<T>(fn: () => Promise<T>, retries = 2, baseDelayMs = 800): Promise<T> {
   let attempt = 0;
@@ -152,12 +117,13 @@ export const generateContextFiles = action({
       packageJson: v.optional(v.any()),
       readmeContent: v.optional(v.string()),
     }),
+    userTier: v.optional(v.union(v.literal("free"), v.literal("pro"))),
   },
-  handler: async (_ctx, { repoData }): Promise<GeneratedFile[]> => {
+  handler: async (_ctx, { repoData, userTier = "free" }): Promise<GeneratedFile[]> => {
     const prompt = buildPrompt(repoData);
 
     const baseRules = await withRetries(
-      () => callAnthropic(prompt, 2200),
+      () => generateWithOpenRouter(prompt, userTier),
       2,
       800
     );

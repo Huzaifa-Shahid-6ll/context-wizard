@@ -145,30 +145,3 @@ export const getPromptStats = query({
 });
 
 
-// ADD THIS - don't modify existing queries
-export const getOpenRouterHealth = query({
-  args: {},
-  handler: async (ctx) => {
-    const freeHealth = await ctx.db
-      .query("healthChecks")
-      .withIndex("by_service_time", (q) => q.eq("service", "openrouter-free"))
-      .order("desc")
-      .first();
-
-    const proHealth = await ctx.db
-      .query("healthChecks")
-      .withIndex("by_service_time", (q) => q.eq("service", "openrouter-pro"))
-      .order("desc")
-      .first();
-
-    return {
-      free: freeHealth || { status: "unknown" as const, checkedAt: 0 },
-      pro: proHealth || { status: "unknown" as const, checkedAt: 0 },
-      overall:
-        freeHealth?.status === "healthy" && proHealth?.status === "healthy"
-          ? "healthy"
-          : "degraded",
-    };
-  },
-});
-
