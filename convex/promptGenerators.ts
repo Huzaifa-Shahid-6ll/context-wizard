@@ -3,6 +3,33 @@ import { v, JSONValue } from "convex/values";
 import { api } from "./_generated/api";
 import { generateWithOpenRouter } from "../src/lib/openrouter";
 
+// Helper function for robust JSON parsing
+function parseJsonSafely<T>(jsonText: string, fallback: T): T {
+  try {
+    return JSON.parse(jsonText);
+  } catch {
+    try {
+      const trimmed = jsonText.replace(/^```[a-zA-Z]*\n|\n```$/g, "");
+      return JSON.parse(trimmed);
+    } catch {
+      try {
+        // Try to fix common JSON issues
+        let fixedJson = jsonText
+          .replace(/^```[a-zA-Z]*\n|\n```$/g, "")
+          .replace(/\\"/g, '\\"')  // Fix escaped quotes
+          .replace(/\\n/g, '\\n')  // Fix escaped newlines
+          .replace(/\\t/g, '\\t')  // Fix escaped tabs
+          .replace(/\\r/g, '\\r')  // Fix escaped carriage returns
+          .replace(/\\\\/g, '\\\\'); // Fix double backslashes
+        
+        return JSON.parse(fixedJson);
+      } catch {
+        return fallback;
+      }
+    }
+  }
+}
+
 type GeneratedPromptItem = { title: string; prompt: string; order: number };
 type ErrorFixItem = { error: string; fix: string };
 
@@ -318,18 +345,12 @@ Return JSON with optimizedPrompt, explanation, tips, exampleOutput
       generateWithOpenRouter(`${system}\n\n${userContent}`, tier)
     );
 
-    let parsed: {
-      optimizedPrompt: string;
-      explanation: string;
-      tips: string[];
-      exampleOutput: string;
-    };
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch {
-      const trimmed = jsonText.replace(/^```[a-zA-Z]*\n|\n```$/g, "");
-      parsed = JSON.parse(trimmed);
-    }
+    const parsed = parseJsonSafely(jsonText, {
+      optimizedPrompt: jsonText.replace(/^```[a-zA-Z]*\n|\n```$/g, ""),
+      explanation: "Generated prompt (JSON parsing failed)",
+      tips: ["Review the generated prompt for any formatting issues"],
+      exampleOutput: "Example output would be generated here"
+    });
 
     // Persist optimized prompt in prompts table as type "generic"
     const now = Date.now();
