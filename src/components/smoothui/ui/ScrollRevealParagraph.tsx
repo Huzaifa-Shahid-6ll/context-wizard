@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef } from "react"
-import { motion, useScroll, useTransform } from "motion/react"
+import { motion, useScroll, useTransform, MotionValue } from "motion/react"
 
 interface ScrollRevealParagraphProps {
   paragraph: string
@@ -41,7 +41,7 @@ export default function ScrollRevealParagraph({
 
 interface WordProps {
   children: string
-  progress: any
+  progress: MotionValue<number>
   range: [number, number]
 }
 

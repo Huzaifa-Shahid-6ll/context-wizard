@@ -1,7 +1,7 @@
 import { parseGitHubUrl, fetchRepoStructure, detectTechStack } from '../../lib/github';
 import { buildOutputsFromBase } from '@/../convex/generate';
 
-const globalAny: any = global;
+const globalAny: typeof global = global;
 
 describe('E2E: GitHub repository analysis flow (mocked)', () => {
 	beforeEach(() => {
@@ -27,7 +27,7 @@ describe('E2E: GitHub repository analysis flow (mocked)', () => {
 		// Simulate base rules and generate output files
 		const baseRules = '# .cursorrules\n- rules...';
 		const files = buildOutputsFromBase(baseRules, {
-			repoStructure: structure.tree.map((i: any) => ({ path: i.path, type: i.type })),
+			repoStructure: structure.tree.map((i: { path: string; type: string }) => ({ path: i.path, type: i.type })),
 			techStack: tech,
 			packageJson: pkg,
 			readmeContent: '# README',

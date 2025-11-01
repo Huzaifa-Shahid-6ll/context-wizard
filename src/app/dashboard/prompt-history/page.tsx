@@ -4,12 +4,14 @@ import React from "react";
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
+import { Id } from "@/../convex/_generated/dataModel";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select } from "@/components/ui/select";
+import { SearchInput } from "@/components/ui/search-input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,8 +23,8 @@ type PromptItem = {
   type: string;
   title: string;
   content: string;
-  context?: any;
-  metadata?: any;
+  context?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   createdAt: number;
 };
 
@@ -61,7 +63,7 @@ export default function PromptHistoryPage() {
 
   function onDelete(id: string) {
     if (!userId) return;
-    deletePrompt({ id: id as any, userId }).catch(() => {});
+    deletePrompt({ id: id as Id<"prompts">, userId }).catch(() => {});
   }
 
   function downloadText(filename: string, content: string, mime: string) {
@@ -80,27 +82,27 @@ export default function PromptHistoryPage() {
       <Card className="mb-4 p-4 shadow-sm ring-1 ring-border">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <div className="md:col-span-2">
-            <Input placeholder="Search prompts..." value={q} onChange={(e) => setQ(e.target.value)} />
+            <SearchInput placeholder="Search prompts..." value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           <div>
             <Label className="mb-1 block text-xs">Filter by type</Label>
-            <select className="w-full rounded-md border border-border bg-background p-2 text-sm" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <Select className="w-full" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
               {["all","cursor-app","frontend","backend","cursorrules","error-fix","generic","image"].map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <Label className="mb-1 block text-xs">Sort by</Label>
-            <select className="w-full rounded-md border border-border bg-background p-2 text-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
+            <Select className="w-full" value={sortBy} onChange={(e) => setSortBy(e.target.value as "date" | "type" | "score")}>
               <option value="date">date</option>
               <option value="type">type</option>
               <option value="score">score</option>
-            </select>
+            </Select>
           </div>
         </div>
         <div className="mt-3 flex items-center gap-2">
-          <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+          <Tabs value={view} onValueChange={(v) => setView(v as "grid" | "list")}>
             <TabsList>
               <TabsTrigger value="grid">Grid</TabsTrigger>
               <TabsTrigger value="list">List</TabsTrigger>
@@ -143,7 +145,7 @@ export default function PromptHistoryPage() {
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(p.content).catch(() => {}); }}>Copy</Button>
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); downloadText(p.title || "prompt.txt", p.content, "text/plain"); }}>.txt</Button>
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); downloadText((p.title || "prompt") + ".md", p.content, "text/markdown"); }}>.md</Button>
-                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onDelete(p._id as any); }}>Delete</Button>
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onDelete(p._id as Id<"prompts">); }}>Delete</Button>
                       </div>
                     </Card>
                   </motion.div>
@@ -171,7 +173,7 @@ export default function PromptHistoryPage() {
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(p.content).catch(() => {}); }}>Copy</Button>
                         <Button variant="outline" size="sm" className="ml-2" onClick={(e) => { e.stopPropagation(); downloadText(p.title || "prompt.txt", p.content, "text/plain"); }}>.txt</Button>
                         <Button variant="outline" size="sm" className="ml-2" onClick={(e) => { e.stopPropagation(); downloadText((p.title || "prompt") + ".md", p.content, "text/markdown"); }}>.md</Button>
-                        <Button variant="outline" size="sm" className="ml-2" onClick={(e) => { e.stopPropagation(); onDelete(p._id as any); }}>Delete</Button>
+                        <Button variant="outline" size="sm" className="ml-2" onClick={(e) => { e.stopPropagation(); onDelete(p._id as Id<"prompts">); }}>Delete</Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -211,7 +213,7 @@ export default function PromptHistoryPage() {
               <div className="mt-4 flex items-center gap-2">
                 <Button onClick={() => { if (selected) navigator.clipboard.writeText(selected.content).catch(() => {}); }}>Reuse</Button>
                 <Button variant="outline">Edit</Button>
-                <Button variant="outline" onClick={() => { if (selected) onDelete(selected._id as any); setSelected(null); }}>Delete</Button>
+                <Button variant="outline" onClick={() => { if (selected) onDelete(selected._id as Id<"prompts">); setSelected(null); }}>Delete</Button>
               </div>
             </DialogContent>
           </Dialog>

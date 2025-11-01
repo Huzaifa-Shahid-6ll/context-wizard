@@ -1,15 +1,16 @@
 "use client";
 import { useState } from "react";
 import { useAction } from "convex/react";
-import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
+import { SignedIn, SignedOut, SignInButton, SignUpButton } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FileCode, BookOpen, Map, Layers, Code2, Sparkles, Brain, Download, ArrowRight, ChevronDown, Check, X, Gift, XCircle, ShieldCheck, Users, Video, Zap, Target, Lock, UserPlus, GitPullRequest, Bot, GitFork, Star, TrendingUp, Headphones, Award, Shield, Mail, MessageSquare, Calendar, ArrowUp, Clock, User, Code, GitBranch, Workflow, Plug } from "lucide-react";
+import { FileCode, BookOpen, Map, Layers, Code2, Sparkles, Brain, Download, ArrowRight, ChevronDown, Check, X, Gift, XCircle, ShieldCheck, Users, Video, Zap, Target, Lock, UserPlus, GitPullRequest, Bot, GitFork, Star, TrendingUp, Headphones, Award, Shield, Mail, MessageSquare, Calendar, Clock, User, Code, GitBranch, Workflow, Plug } from "lucide-react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination, Navigation, Autoplay } from "swiper/modules";
 import "swiper/css";
@@ -24,88 +25,6 @@ import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { ReadingProgress } from "@/components/landing/ReadingProgress";
 import { motion } from "framer-motion";
 
-const showcaseExamples: {
-  title: string;
-  before: string;
-  after: string;
-  beforeMetric: string;
-  afterMetric: string;
-}[] = [
-  {
-    title: "React Component Generation",
-    before: `function fetchData() {
-  // Fetch data from API
-  // Process data
-  // Update state
-}`,
-    after: `import { useEffect, useState } from 'react';
-
-function useFetchData(url: string) {
-  const [data, setData] = useState<unknown | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchData() {
-      const response = await fetch(url);
-      const result = await response.json();
-      if (isMounted) setData(result);
-    }
-    fetchData();
-    return () => { isMounted = false };
-  }, [url]);
-
-  return data;
-}`,
-    beforeMetric: "32 lines of bugs",
-    afterMetric: "Clean, production-ready",
-  },
-  {
-    title: "API Route Creation",
-    before: `app.get('/data', (req, res) => {
-  // Fetch data from database
-  // Send response
-});`,
-    after: `import express from 'express';
-import { getData } from './controllers/dataController';
-
-const router = express.Router();
-
-router.get('/data', getData);
-
-export default router;`,
-    beforeMetric: "Unstructured handlers",
-    afterMetric: "Typed, modular routing",
-  },
-  {
-    title: "Database Schema Design",
-    before: `const User = {
-  name: String,
-  email: String,
-  password: String,
-  // Additional fields
-};`,
-    after: `import mongoose from 'mongoose';
-
-const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  createdAt: { type: Date, default: Date.now },
-});
-
-export default mongoose.model('User', userSchema);`,
-    beforeMetric: "Missing constraints",
-    afterMetric: "Validated, indexed fields",
-  },
-];
-
-function highlightSimple(code: string): string {
-  // Extremely lightweight highlighting for demo purposes
-  return code
-    .replace(/\b(import|from|export|default|function|const|let|return|async|await|useEffect|useState|new|class|extends|interface|type|if|else|for|while|switch|case|break)\b/g, '<span class="text-emerald-400">$1<\/span>')
-    .replace(/\b(true|false|null|undefined)\b/g, '<span class="text-sky-400">$1<\/span>')
-    .replace(/(["'])(.*?)\1/g, '<span class="text-amber-300">$1$2$1<\/span>');
-}
 
 export default function Home() {
   const previewAction = useAction(api.actions.previewGeneration);
@@ -224,11 +143,11 @@ export default function Home() {
       <Navbar />
       <StickyCtaBar />
       {/* Hero Section */}
-      <section className="relative isolate overflow-hidden bg-gradient-to-b from-background to-card pt-16">
+      <section className="relative isolate overflow-hidden depth-base pt-16">
         {/* Animated gradient background orbs */}
         <div className="absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/20 blur-3xl animate-pulse" />
-          <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-purple-500/20 blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+          <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/20 blur-3xl animate-pulse shadow-depth-lg" />
+          <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-purple-500/20 blur-3xl animate-pulse shadow-depth-lg" style={{ animationDelay: '1s' }} />
         </div>
         
         {/* layered top inner highlight and bottom drop shadow */}
@@ -244,37 +163,40 @@ export default function Home() {
               <Button className="rounded-md">Sign in</Button>
             </SignInButton>
           </SignedOut>
-          <SignedIn>
-            <UserButton afterSignOutUrl="/" />
-          </SignedIn>
         </div>
 
         <div className="mx-auto max-w-6xl px-6 py-20 text-center">
           {/* Badge */}
-          <div className="inline-flex items-center rounded-full bg-secondary/60 px-4 py-1 text-sm font-medium text-foreground shadow-inner ring-1 ring-white/10">
+          <div className="inline-flex items-center rounded-full depth-layer-3 shadow-depth-md text-shadow-sm hover-lift border-0 px-4 py-1 text-sm font-medium text-foreground">
             Free • No Credit Card • Instant Results
           </div>
 
           {/* Headline */}
-          <h1 className="mt-6 text-5xl font-bold leading-tight tracking-tight text-primary">
+          <h1 className="mt-6 text-5xl font-bold leading-tight tracking-tight text-primary text-shadow-md">
             Stop Fighting Cursor with Bad Context
           </h1>
 
           {/* Subheadline */}
-          <p className="mx-auto mt-4 max-w-2xl text-xl font-normal text-foreground/60">
+          <p className="mx-auto mt-4 max-w-2xl text-xl font-normal text-foreground/60 text-shadow-sm">
             Generate perfect context files from any GitHub repo in 30 seconds
           </p>
 
           {/* Two-column feature comparison */}
           <div className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-2">
-            <div className="rounded-xl bg-secondary/30 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_20px_60px_-20px_rgba(0,0,0,0.35)] ring-1 ring-border backdrop-blur-[2px]">
-              <h3 className="text-left text-lg font-semibold text-primary">❌ Without Context</h3>
+            <div className="rounded-xl depth-layer-1 shadow-inset p-6 border border-destructive/20">
+              <div className="flex items-center gap-2 mb-4">
+                <X className="h-5 w-5 text-destructive" />
+                <span className="font-semibold text-destructive">Without Context</span>
+              </div>
               <div className="mt-4 overflow-hidden rounded-lg">
                 <Image src="/window.svg" alt="Messy code example" width={800} height={480} className="h-auto w-full" />
               </div>
             </div>
-            <div className="rounded-xl bg-secondary/30 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_20px_60px_-20px_rgba(0,0,0,0.35)] ring-1 ring-border backdrop-blur-[2px]">
-              <h3 className="text-left text-lg font-semibold text-primary">✅ With Context</h3>
+            <div className="rounded-xl depth-layer-3 shadow-depth-lg hover-lift p-6 border border-primary/20">
+              <div className="flex items-center gap-2 mb-4">
+                <Check className="h-5 w-5 text-primary" />
+                <span className="font-semibold text-primary">With Context</span>
+              </div>
               <div className="mt-4 overflow-hidden rounded-lg">
                 <Image src="/file.svg" alt="Clean code example" width={800} height={480} className="h-auto w-full" />
               </div>
@@ -288,12 +210,12 @@ export default function Home() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://github.com/owner/repo"
-              className="h-12 rounded-lg border border-transparent bg-secondary/40 px-4 text-base shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] focus-visible:border-ring"
+              className="h-12 rounded-lg depth-layer-1 shadow-inset border-0 px-4 text-base focus:depth-layer-2 focus:shadow-depth-sm transition-all duration-200"
             />
             <Button
               onClick={onPreview}
               disabled={!isValid || loading}
-              className="h-12 rounded-lg px-6 shadow-lg transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:shadow-xl"
+              className="h-12 rounded-lg px-6 depth-top shadow-depth-lg hover:shadow-elevated hover:scale-105 transition-all duration-200"
             >
               {loading ? "Generating..." : "Generate Context Files"}
             </Button>
@@ -317,9 +239,247 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Trust Badges and Metrics Section */}
+      <ScrollReveal>
+      <section 
+        className="max-w-7xl mx-auto px-4 py-16
+          depth-layer-1
+          border-y border-border/20"
+      >
+        {/* Heading */}
+        <h2 
+          className="text-3xl font-bold text-center mb-12 text-shadow-sm
+            text-shadow-md"
+        >
+          Trusted by Developers & Teams
+        </h2>
+
+        {/* Metrics Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+          {/* Metric 1 */}
+          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-md border-0 hover-lift">
+            <Users className="h-8 w-8 text-primary mb-4" />
+            <motion.div
+              className="text-4xl font-bold text-shadow-md"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              2,500+
+            </motion.div>
+            <p className="text-lg">Active Developers</p>
+            <p className="text-sm text-green-600">+150% this month</p>
+          </div>
+
+          {/* Metric 2 */}
+          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-md border-0 hover-lift">
+            <GitFork className="h-8 w-8 text-primary mb-4" />
+            <motion.div
+              className="text-4xl font-bold text-shadow-md"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              15,000+
+            </motion.div>
+            <p className="text-lg">Repositories Analyzed</p>
+            <p className="text-sm text-muted-foreground">24/7 uptime</p>
+          </div>
+
+          {/* Metric 3 */}
+          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-md border-0 hover-lift">
+            <FileCode className="h-8 w-8 text-primary mb-4" />
+            <motion.div
+              className="text-4xl font-bold text-shadow-md"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+            >
+              50,000+
+            </motion.div>
+            <p className="text-lg">Context Files Generated</p>
+            <p className="text-sm text-green-600">95%+ accuracy</p>
+          </div>
+
+          {/* Metric 4 */}
+          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-md border-0 hover-lift">
+            <TrendingUp className="h-8 w-8 text-primary mb-4" />
+            <motion.div
+              className="text-4xl font-bold text-shadow-md"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+            >
+              4.9/5
+            </motion.div>
+            <p className="text-lg">Average Rating</p>
+            <p className="text-sm text-muted-foreground">500+ reviews</p>
+          </div>
+        </div>
+
+        {/* Trust Badges Row */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-12">
+          {/* Badge 1 */}
+          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-sm border-0 hover-lift">
+            <Shield className="h-8 w-8 text-primary mb-2" />
+            <p className="font-semibold">SOC 2 Compliant</p>
+            <p className="text-sm text-muted-foreground">Enterprise-grade security</p>
+          </div>
+
+          {/* Badge 2 */}
+          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-sm border-0 hover-lift">
+            <Lock className="h-8 w-8 text-primary mb-2" />
+            <p className="font-semibold">GDPR Ready</p>
+            <p className="text-sm text-muted-foreground">Data privacy compliant</p>
+          </div>
+
+          {/* Badge 3 */}
+          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-sm border-0 hover-lift">
+            <Zap className="h-8 w-8 text-primary mb-2" />
+            <p className="font-semibold">99.9% Uptime</p>
+            <p className="text-sm text-muted-foreground">Reliable infrastructure</p>
+          </div>
+
+          {/* Badge 4 */}
+          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-sm border-0 hover-lift">
+            <Headphones className="h-8 w-8 text-primary mb-2" />
+            <p className="font-semibold">24/7 Support</p>
+            <p className="text-sm text-muted-foreground">Always here to help</p>
+          </div>
+
+          {/* Badge 5 */}
+          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-sm border-0 hover-lift">
+            <Award className="h-8 w-8 text-primary mb-2" />
+            <p className="font-semibold">Developer Approved</p>
+            <p className="text-sm text-muted-foreground">Loved by 2,500+ devs</p>
+          </div>
+
+          {/* Badge 6 */}
+          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-sm border-0 hover-lift">
+            <Shield className="h-8 w-8 text-primary mb-2" />
+            <p className="font-semibold">Money-Back Guarantee</p>
+            <p className="text-sm text-muted-foreground">7-day full refund</p>
+          </div>
+        </div>
+
+        {/* Tech Stack Logos */}
+        <h3 className="text-center mb-6">Works with your favorite tools</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-4">
+          {/* Cursor logo placeholder */}
+          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
+            <span className="text-xs text-muted-foreground">Cursor</span>
+            {/* Replace with actual Cursor logo */}
+          </div>
+
+          {/* VS Code logo placeholder */}
+          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
+            <span className="text-xs text-muted-foreground">VS Code</span>
+            {/* Replace with actual VS Code logo */}
+          </div>
+
+          {/* GitHub Copilot logo placeholder */}
+          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
+            <span className="text-xs text-muted-foreground">Copilot</span>
+            {/* Replace with actual GitHub Copilot logo */}
+          </div>
+
+          {/* Codeium logo placeholder */}
+          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
+            <span className="text-xs text-muted-foreground">Codeium</span>
+            {/* Replace with actual Codeium logo */}
+          </div>
+
+          {/* React logo placeholder */}
+          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
+            <span className="text-xs text-muted-foreground">React</span>
+            {/* Replace with actual React logo */}
+          </div>
+
+          {/* Next.js logo placeholder */}
+          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
+            <span className="text-xs text-muted-foreground">Next.js</span>
+            {/* Replace with actual Next.js logo */}
+          </div>
+
+          {/* Python logo placeholder */}
+          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
+            <span className="text-xs text-muted-foreground">Python</span>
+            {/* Replace with actual Python logo */}
+          </div>
+
+          {/* Node.js logo placeholder */}
+          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
+            <span className="text-xs text-muted-foreground">Node.js</span>
+            {/* Replace with actual Node.js logo */}
+          </div>
+        </div>
+      </section>
+      </ScrollReveal>
+
+      {/* Testimonials - Carousel */}
+      <ScrollReveal>
+      <section className="bg-gradient-to-b from-background to-muted/20">
+        <div className="max-w-7xl mx-auto px-4 py-20">
+          <h2 className="text-4xl font-bold text-center mb-4 text-shadow-sm">Loved by Developers Worldwide</h2>
+          <p className="text-muted-foreground text-center mb-12">See what developers are saying about Context Wizard</p>
+
+          <Swiper
+            modules={[Pagination, Navigation, Autoplay]}
+            spaceBetween={16}
+            slidesPerView={1}
+            pagination={{ clickable: true }}
+            navigation
+            loop
+            autoplay={{ delay: 5000, disableOnInteraction: true, pauseOnMouseEnter: true }}
+            breakpoints={{ 768: { slidesPerView: 2, spaceBetween: 16 }, 1024: { slidesPerView: 3, spaceBetween: 16 } }}
+          >
+            {[
+              { initials: "JD", bg: "bg-blue-500", quote: "Context Wizard cut our onboarding time from 2 weeks to 2 days. New developers can jump right into any project with confidence.", name: "Jane Doe", title: "Engineering Manager", company: "TechCorp Inc." },
+              { initials: "MS", bg: "bg-green-500", quote: "The .cursorrules files are game-changing. Cursor now generates code that matches our style guide perfectly. No more manual corrections!", name: "Michael Smith", title: "Senior Full-Stack Developer", company: "StartupXYZ" },
+              { initials: "AL", bg: "bg-purple-500", quote: "As an open source maintainer, Context Wizard helped me document my project properly. Contributions increased 300% in the first month!", name: "Alex Lee", title: "Open Source Maintainer", company: "GitHub" },
+              { initials: "SK", bg: "bg-amber-500", quote: "Best $9/month I spend. The time I save on documentation alone pays for itself 10x over. Highly recommended for any team.", name: "Sarah Kim", title: "Tech Lead", company: "DevShop" },
+              { initials: "RC", bg: "bg-pink-500", quote: "I was skeptical at first, but after trying it on one project, I now use it for everything. The AI really understands code architecture.", name: "Robert Chen", title: "Freelance Developer", company: "Independent" },
+              { initials: "EP", bg: "bg-teal-500", quote: "Finally, a tool that makes AI coding assistants actually useful. Context Wizard is now part of our standard development setup.", name: "Emily Park", title: "CTO", company: "BuildFast AI" },
+            ].map((t, idx) => (
+              <SwiperSlide key={idx}>
+                <Card 
+                  className="p-6 rounded-xl
+                    depth-layer-2
+                    shadow-depth-lg
+                    border-0
+                    h-full"
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Replace with real photo when available */}
+                    <div className={`h-12 w-12 rounded-full ${t.bg} text-white flex items-center justify-center font-bold`}>{t.initials}</div>
+                    <div className="flex-1">
+                      <div className="font-semibold">{t.name}</div>
+                      <div className="text-sm text-muted-foreground">{t.title} • {t.company}</div>
+                    </div>
+                  </div>
+                  <p className="text-lg mt-4 mb-4">&ldquo;{t.quote}&rdquo;</p>
+                  <div className="text-yellow-500 flex items-center gap-1" aria-label="5 star rating">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                    ))}
+                  </div>
+                </Card>
+              </SwiperSlide>
+            ))}
+          </Swiper>
+
+          <div className="text-center mt-10">
+            <Button asChild>
+              <a href="mailto:reviews@contextwizard.com">Leave a Review</a>
+            </Button>
+          </div>
+        </div>
+      </section>
+      </ScrollReveal>
+
       {/* Integrations Showcase */}
       <section className="max-w-7xl mx-auto px-4 py-20 bg-background">
-        <h2 className="text-4xl font-bold text-center mb-4">Seamless Integration with Your Workflow</h2>
+        <h2 className="text-4xl font-bold text-center mb-4 text-shadow-sm">Seamless Integration with Your Workflow</h2>
         <p className="text-muted-foreground text-center mb-12">Works with the tools you already use</p>
 
         <Tabs defaultValue="ai-assistants" className="w-full">
@@ -352,14 +512,32 @@ export default function Home() {
                 whileHover={{ y: -4, transition: { duration: 0.2 } }}
                 className="group"
               >
-                <Card className="bg-card p-6 rounded-xl hover:shadow-lg transition-shadow duration-300">
+                <Card 
+                  className="depth-layer-2
+                    shadow-depth-md
+                    border-0
+                    hover:depth-layer-3
+                    hover:shadow-elevated
+                    p-6 rounded-xl
+                    transition-all duration-300"
+                >
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="h-16 w-16 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <div 
+                      className="h-16 w-16 rounded-lg
+                        depth-layer-3
+                        shadow-depth-sm
+                        flex items-center justify-center"
+                    >
                       <span className="text-sm font-semibold text-primary">Cursor</span>
                     </div>
                     <div>
                       <h3 className="font-semibold text-lg">Cursor</h3>
-                      <span className="bg-green-500/10 text-green-600 px-2 py-1 rounded-full text-xs font-medium">
+                      <span 
+                        className="depth-layer-3
+                          shadow-depth-sm
+                          border-0
+                          text-green-600 px-2 py-1 rounded-full text-xs font-medium"
+                      >
                         Fully Supported
                       </span>
                     </div>
@@ -392,14 +570,32 @@ export default function Home() {
                 whileHover={{ y: -4, transition: { duration: 0.2 } }}
                 className="group"
               >
-                <Card className="bg-card p-6 rounded-xl hover:shadow-lg transition-shadow duration-300">
+                <Card 
+                  className="depth-layer-2
+                    shadow-depth-md
+                    border-0
+                    hover:depth-layer-3
+                    hover:shadow-elevated
+                    p-6 rounded-xl
+                    transition-all duration-300"
+                >
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="h-16 w-16 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <div 
+                      className="h-16 w-16 rounded-lg
+                        depth-layer-3
+                        shadow-depth-sm
+                        flex items-center justify-center"
+                    >
                       <span className="text-sm font-semibold text-blue-600">Copilot</span>
                     </div>
                     <div>
                       <h3 className="font-semibold text-lg">GitHub Copilot</h3>
-                      <span className="bg-blue-500/10 text-blue-600 px-2 py-1 rounded-full text-xs font-medium">
+                      <span 
+                        className="depth-layer-3
+                          shadow-depth-sm
+                          border-0
+                          text-blue-600 px-2 py-1 rounded-full text-xs font-medium"
+                      >
                         Supported
                       </span>
                     </div>
@@ -432,14 +628,32 @@ export default function Home() {
                 whileHover={{ y: -4, transition: { duration: 0.2 } }}
                 className="group"
               >
-                <Card className="bg-card p-6 rounded-xl hover:shadow-lg transition-shadow duration-300">
+                <Card 
+                  className="depth-layer-2
+                    shadow-depth-md
+                    border-0
+                    hover:depth-layer-3
+                    hover:shadow-elevated
+                    p-6 rounded-xl
+                    transition-all duration-300"
+                >
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="h-16 w-16 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                    <div 
+                      className="h-16 w-16 rounded-lg
+                        depth-layer-3
+                        shadow-depth-sm
+                        flex items-center justify-center"
+                    >
                       <span className="text-sm font-semibold text-purple-600">Codeium</span>
                     </div>
                     <div>
                       <h3 className="font-semibold text-lg">Codeium</h3>
-                      <span className="bg-blue-500/10 text-blue-600 px-2 py-1 rounded-full text-xs font-medium">
+                      <span 
+                        className="depth-layer-3
+                          shadow-depth-sm
+                          border-0
+                          text-blue-600 px-2 py-1 rounded-full text-xs font-medium"
+                      >
                         Supported
                       </span>
                     </div>
@@ -847,262 +1061,103 @@ export default function Home() {
 
         {/* Bottom CTA */}
         <div className="text-center mt-12">
-          <p className="text-muted-foreground mb-4">Don't see your tool?</p>
+          <p className="text-muted-foreground mb-4">Don&apos;t see your tool?</p>
           <Button asChild variant="outline" size="lg">
             <a href="/feedback">Request Integration</a>
           </Button>
-          <p className="text-sm text-muted-foreground mt-4">We're constantly adding new integrations</p>
+          <p className="text-sm text-muted-foreground mt-4">We&apos;re constantly adding new integrations</p>
         </div>
       </section>
-
-      {/* Testimonials - Carousel */}
-      <ScrollReveal>
-      <section className="bg-gradient-to-b from-background to-muted/20">
-        <div className="max-w-7xl mx-auto px-4 py-20">
-          <h2 className="text-4xl font-bold text-center mb-4">Loved by Developers Worldwide</h2>
-          <p className="text-muted-foreground text-center mb-12">See what developers are saying about Context Wizard</p>
-
-          <Swiper
-            modules={[Pagination, Navigation, Autoplay]}
-            spaceBetween={16}
-            slidesPerView={1}
-            pagination={{ clickable: true }}
-            navigation
-            loop
-            autoplay={{ delay: 5000, disableOnInteraction: true, pauseOnMouseEnter: true }}
-            breakpoints={{ 768: { slidesPerView: 2, spaceBetween: 16 }, 1024: { slidesPerView: 3, spaceBetween: 16 } }}
-          >
-            {[
-              { initials: "JD", bg: "bg-blue-500", quote: "Context Wizard cut our onboarding time from 2 weeks to 2 days. New developers can jump right into any project with confidence.", name: "Jane Doe", title: "Engineering Manager", company: "TechCorp Inc." },
-              { initials: "MS", bg: "bg-green-500", quote: "The .cursorrules files are game-changing. Cursor now generates code that matches our style guide perfectly. No more manual corrections!", name: "Michael Smith", title: "Senior Full-Stack Developer", company: "StartupXYZ" },
-              { initials: "AL", bg: "bg-purple-500", quote: "As an open source maintainer, Context Wizard helped me document my project properly. Contributions increased 300% in the first month!", name: "Alex Lee", title: "Open Source Maintainer", company: "GitHub" },
-              { initials: "SK", bg: "bg-amber-500", quote: "Best $9/month I spend. The time I save on documentation alone pays for itself 10x over. Highly recommended for any team.", name: "Sarah Kim", title: "Tech Lead", company: "DevShop" },
-              { initials: "RC", bg: "bg-pink-500", quote: "I was skeptical at first, but after trying it on one project, I now use it for everything. The AI really understands code architecture.", name: "Robert Chen", title: "Freelance Developer", company: "Independent" },
-              { initials: "EP", bg: "bg-teal-500", quote: "Finally, a tool that makes AI coding assistants actually useful. Context Wizard is now part of our standard development setup.", name: "Emily Park", title: "CTO", company: "BuildFast AI" },
-            ].map((t, idx) => (
-              <SwiperSlide key={idx}>
-                <Card className="p-6 rounded-xl shadow-lg h-full">
-                  <div className="flex items-center gap-3">
-                    {/* Replace with real photo when available */}
-                    <div className={`h-12 w-12 rounded-full ${t.bg} text-white flex items-center justify-center font-bold`}>{t.initials}</div>
-                    <div className="flex-1">
-                      <div className="font-semibold">{t.name}</div>
-                      <div className="text-sm text-muted-foreground">{t.title} • {t.company}</div>
-                    </div>
-                  </div>
-                  <p className="text-lg mt-4 mb-4">“{t.quote}”</p>
-                  <div className="text-yellow-500 flex items-center gap-1" aria-label="5 star rating">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                    ))}
-                  </div>
-                </Card>
-              </SwiperSlide>
-            ))}
-          </Swiper>
-
-          <div className="text-center mt-10">
-            <Button asChild>
-              <a href="mailto:reviews@contextwizard.com">Leave a Review</a>
-            </Button>
-          </div>
-        </div>
-      </section>
-      </ScrollReveal>
-
-      {/* Trust Badges and Metrics Section */}
-      <ScrollReveal>
-      <section className="max-w-7xl mx-auto px-4 py-16 bg-muted/30 border-y">
-        {/* Heading */}
-        <h2 className="text-3xl font-bold text-center mb-12">Trusted by Developers & Teams</h2>
-
-        {/* Metrics Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-          {/* Metric 1 */}
-          <div className="flex flex-col items-center text-center p-4 bg-card rounded-lg shadow-md hover:scale-105 transition-transform">
-            <Users className="h-8 w-8 text-primary mb-4" />
-            <motion.div
-              className="text-4xl font-bold"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              2,500+
-            </motion.div>
-            <p className="text-lg">Active Developers</p>
-            <p className="text-sm text-green-600">+150% this month</p>
-          </div>
-
-          {/* Metric 2 */}
-          <div className="flex flex-col items-center text-center p-4 bg-card rounded-lg shadow-md hover:scale-105 transition-transform">
-            <GitFork className="h-8 w-8 text-primary mb-4" />
-            <motion.div
-              className="text-4xl font-bold"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              15,000+
-            </motion.div>
-            <p className="text-lg">Repositories Analyzed</p>
-            <p className="text-sm text-muted-foreground">24/7 uptime</p>
-          </div>
-
-          {/* Metric 3 */}
-          <div className="flex flex-col items-center text-center p-4 bg-card rounded-lg shadow-md hover:scale-105 transition-transform">
-            <FileCode className="h-8 w-8 text-primary mb-4" />
-            <motion.div
-              className="text-4xl font-bold"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-            >
-              50,000+
-            </motion.div>
-            <p className="text-lg">Context Files Generated</p>
-            <p className="text-sm text-green-600">95%+ accuracy</p>
-          </div>
-
-          {/* Metric 4 */}
-          <div className="flex flex-col items-center text-center p-4 bg-card rounded-lg shadow-md hover:scale-105 transition-transform">
-            <TrendingUp className="h-8 w-8 text-primary mb-4" />
-            <motion.div
-              className="text-4xl font-bold"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.6 }}
-            >
-              4.9/5
-            </motion.div>
-            <p className="text-lg">Average Rating</p>
-            <p className="text-sm text-muted-foreground">500+ reviews</p>
-          </div>
-        </div>
-
-        {/* Trust Badges Row */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-12">
-          {/* Badge 1 */}
-          <div className="flex flex-col items-center text-center p-4 bg-card rounded-lg shadow-md">
-            <Shield className="h-8 w-8 text-primary mb-2" />
-            <p className="font-semibold">SOC 2 Compliant</p>
-            <p className="text-sm text-muted-foreground">Enterprise-grade security</p>
-          </div>
-
-          {/* Badge 2 */}
-          <div className="flex flex-col items-center text-center p-4 bg-card rounded-lg shadow-md">
-            <Lock className="h-8 w-8 text-primary mb-2" />
-            <p className="font-semibold">GDPR Ready</p>
-            <p className="text-sm text-muted-foreground">Data privacy compliant</p>
-          </div>
-
-          {/* Badge 3 */}
-          <div className="flex flex-col items-center text-center p-4 bg-card rounded-lg shadow-md">
-            <Zap className="h-8 w-8 text-primary mb-2" />
-            <p className="font-semibold">99.9% Uptime</p>
-            <p className="text-sm text-muted-foreground">Reliable infrastructure</p>
-          </div>
-
-          {/* Badge 4 */}
-          <div className="flex flex-col items-center text-center p-4 bg-card rounded-lg shadow-md">
-            <Headphones className="h-8 w-8 text-primary mb-2" />
-            <p className="font-semibold">24/7 Support</p>
-            <p className="text-sm text-muted-foreground">Always here to help</p>
-          </div>
-
-          {/* Badge 5 */}
-          <div className="flex flex-col items-center text-center p-4 bg-card rounded-lg shadow-md">
-            <Award className="h-8 w-8 text-primary mb-2" />
-            <p className="font-semibold">Developer Approved</p>
-            <p className="text-sm text-muted-foreground">Loved by 2,500+ devs</p>
-          </div>
-
-          {/* Badge 6 */}
-          <div className="flex flex-col items-center text-center p-4 bg-card rounded-lg shadow-md">
-            <Shield className="h-8 w-8 text-primary mb-2" />
-            <p className="font-semibold">Money-Back Guarantee</p>
-            <p className="text-sm text-muted-foreground">7-day full refund</p>
-          </div>
-        </div>
-
-        {/* Tech Stack Logos */}
-        <h3 className="text-center mb-6">Works with your favorite tools</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-4">
-          {/* Cursor logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">Cursor</span>
-            {/* Replace with actual Cursor logo */}
-          </div>
-
-          {/* VS Code logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">VS Code</span>
-            {/* Replace with actual VS Code logo */}
-          </div>
-
-          {/* GitHub Copilot logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">Copilot</span>
-            {/* Replace with actual GitHub Copilot logo */}
-          </div>
-
-          {/* Codeium logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">Codeium</span>
-            {/* Replace with actual Codeium logo */}
-          </div>
-
-          {/* React logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">React</span>
-            {/* Replace with actual React logo */}
-          </div>
-
-          {/* Next.js logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">Next.js</span>
-            {/* Replace with actual Next.js logo */}
-          </div>
-
-          {/* Python logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">Python</span>
-            {/* Replace with actual Python logo */}
-          </div>
-
-          {/* Node.js logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">Node.js</span>
-            {/* Replace with actual Node.js logo */}
-          </div>
-        </div>
-      </section>
-      </ScrollReveal>
 
       {/* Use Cases - Real Scenarios */}
       <ScrollReveal>
-      <section id="use-cases">
+      <section 
+        id="use-cases"
+        className="depth-layer-1"
+      >
         <div className="max-w-7xl mx-auto px-4 py-20">
-          <h2 className="text-4xl font-bold text-center mb-4">Built for Real Development Scenarios</h2>
+          <h2 
+            className="text-4xl font-bold text-center mb-4
+              text-shadow-md"
+          >
+            Built for Real Development Scenarios
+          </h2>
           <p className="text-muted-foreground text-center mb-12">See how developers use Context Wizard every day</p>
 
           <div className="space-y-12">
             {/* Use Case 1 - Onboarding New Developers (Image left, content right) */}
-            <Card className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <Card 
+              className="depth-layer-2
+                shadow-depth-lg
+                border-0
+                overflow-hidden
+                hover:depth-layer-3
+                hover:shadow-elevated
+                transition-all duration-500
+                group"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center p-6">
                 <div className="order-1">
-                  <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-lg h-80 flex items-center justify-center transition-transform duration-300 ease-out hover:scale-[1.01]">
-                    {/* Replace with screenshot of new developer reading PROJECT_OVERVIEW.md */}
+                  <div 
+                    className="depth-layer-1
+                      shadow-inset
+                      h-80
+                      flex items-center justify-center
+                      group-hover:scale-105
+                      transition-transform duration-500"
+                  >
                     <UserPlus className="h-32 w-32 text-muted-foreground" />
                   </div>
                 </div>
                 <div className="order-2">
-                  <div className="inline-flex items-center rounded-full bg-blue-500/10 px-3 py-1 text-sm font-medium text-blue-600">Onboarding</div>
-                  <h3 className="mt-4 text-2xl font-semibold">Get New Team Members Up to Speed Faster</h3>
-                  <p className="mt-2 text-foreground/80">New developers can understand your entire codebase in minutes, not days. Our AI-generated documentation explains your project structure, tech stack, and coding conventions in plain English.</p>
-                  <ul className="mt-4 list-disc pl-5 text-sm text-foreground/80 space-y-1">
-                    <li>Reduce onboarding time by 80%</li>
-                    <li>Standardized documentation for all projects</li>
-                    <li>Always up-to-date with your current codebase</li>
+                  <Badge
+                    className="absolute top-4 left-4 text-shadow-sm
+                      depth-layer-3
+                      shadow-depth-md
+                      border-0
+                      text-shadow-sm
+                      z-10"
+                  >
+                    Onboarding
+                  </Badge>
+                  <h3 
+                    className="text-2xl font-bold mb-4 text-shadow-sm
+                      text-shadow-sm"
+                  >
+                    Get New Team Members Up to Speed Faster
+                  </h3>
+                  <p className="text-foreground/80">New developers can understand your entire codebase in minutes, not days. Our AI-generated documentation explains your project structure, tech stack, and coding conventions in plain English.</p>
+                  <ul className="mt-4 space-y-2">
+                    <li
+                      className="flex items-start gap-2
+                        depth-layer-3
+                        rounded-lg p-3
+                        shadow-depth-sm
+                        hover-lift"
+                    >
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span>Reduce onboarding time by 80%</span>
+                    </li>
+                    <li
+                      className="flex items-start gap-2
+                        depth-layer-3
+                        rounded-lg p-3
+                        shadow-depth-sm
+                        hover-lift"
+                    >
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span>Standardized documentation for all projects</span>
+                    </li>
+                    <li
+                      className="flex items-start gap-2
+                        depth-layer-3
+                        rounded-lg p-3
+                        shadow-depth-sm
+                        hover-lift"
+                    >
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span>Always up-to-date with your current codebase</span>
+                    </li>
                   </ul>
                   <Button className="mt-6">Try It Free</Button>
                 </div>
@@ -1110,22 +1165,77 @@ export default function Home() {
             </Card>
 
             {/* Use Case 2 - Better Code Reviews (Content left, image right) */}
-            <Card className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <Card 
+              className="depth-layer-2
+                shadow-depth-lg
+                border-0
+                overflow-hidden
+                hover:depth-layer-3
+                hover:shadow-elevated
+                transition-all duration-500
+                group"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center p-6">
                 <div className="order-2 md:order-1">
-                  <div className="inline-flex items-center rounded-full bg-green-500/10 px-3 py-1 text-sm font-medium text-green-600">Code Quality</div>
-                  <h3 className="mt-4 text-2xl font-semibold">Supercharge Your Code Reviews</h3>
-                  <p className="mt-2 text-foreground/80">Give reviewers instant context about your project's architecture and conventions. No more asking 'why did you structure it this way?'—the answer is right in the context files.</p>
-                  <ul className="mt-4 list-disc pl-5 text-sm text-foreground/80 space-y-1">
-                    <li>Faster, more thorough code reviews</li>
-                    <li>Consistent code style enforcement</li>
-                    <li>Reduce back-and-forth questions by 60%</li>
+                  <Badge
+                    className="depth-layer-3 text-shadow-sm
+                      shadow-depth-md
+                      border-0
+                      text-shadow-sm
+                      z-10"
+                  >
+                    Code Quality
+                  </Badge>
+                  <h3 
+                    className="text-2xl font-bold mb-4 text-shadow-sm
+                      text-shadow-sm"
+                  >
+                    Supercharge Your Code Reviews
+                  </h3>
+                  <p className="text-foreground/80">Give reviewers instant context about your project&apos;s architecture and conventions. No more asking &apos;why did you structure it this way?&apos;—the answer is right in the context files.</p>
+                  <ul className="mt-4 space-y-2">
+                    <li
+                      className="flex items-start gap-2
+                        depth-layer-3
+                        rounded-lg p-3
+                        shadow-depth-sm
+                        hover-lift"
+                    >
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span>Faster, more thorough code reviews</span>
+                    </li>
+                    <li
+                      className="flex items-start gap-2
+                        depth-layer-3
+                        rounded-lg p-3
+                        shadow-depth-sm
+                        hover-lift"
+                    >
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span>Consistent code style enforcement</span>
+                    </li>
+                    <li
+                      className="flex items-start gap-2
+                        depth-layer-3
+                        rounded-lg p-3
+                        shadow-depth-sm
+                        hover-lift"
+                    >
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span>Reduce back-and-forth questions by 60%</span>
+                    </li>
                   </ul>
                   <Button className="mt-6" variant="outline">See Examples</Button>
                 </div>
                 <div className="order-1 md:order-2">
-                  <div className="bg-gradient-to-br from-green-500/10 to-teal-500/10 rounded-lg h-80 flex items-center justify-center transition-transform duration-300 ease-out hover:scale-[1.01]">
-                    {/* Replace with screenshot of code review with context sidebar */}
+                  <div 
+                    className="depth-layer-1
+                      shadow-inset
+                      h-80
+                      flex items-center justify-center
+                      group-hover:scale-105
+                      transition-transform duration-500"
+                  >
                     <GitPullRequest className="h-32 w-32 text-muted-foreground" />
                   </div>
                 </div>
@@ -1133,22 +1243,77 @@ export default function Home() {
             </Card>
 
             {/* Use Case 3 - AI Pair Programming (Image left, content right) */}
-            <Card className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <Card 
+              className="depth-layer-2
+                shadow-depth-lg
+                border-0
+                overflow-hidden
+                hover:depth-layer-3
+                hover:shadow-elevated
+                transition-all duration-500
+                group"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center p-6">
                 <div className="order-1">
-                  <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-lg h-80 flex items-center justify-center transition-transform duration-300 ease-out hover:scale-[1.01]">
-                    {/* Replace with screenshot of Cursor generating perfect code with .cursorrules */}
+                  <div 
+                    className="depth-layer-1
+                      shadow-inset
+                      h-80
+                      flex items-center justify-center
+                      group-hover:scale-105
+                      transition-transform duration-500"
+                  >
                     <Bot className="h-32 w-32 text-muted-foreground" />
                   </div>
                 </div>
                 <div className="order-2">
-                  <div className="inline-flex items-center rounded-full bg-amber-500/10 px-3 py-1 text-sm font-medium text-amber-600">AI Coding</div>
-                  <h3 className="mt-4 text-2xl font-semibold">Make AI Assistants Understand Your Project</h3>
-                  <p className="mt-2 text-foreground/80">Stop getting generic code suggestions that don't match your style. Our .cursorrules file teaches Cursor, Copilot, and other AI assistants exactly how you write code.</p>
-                  <ul className="mt-4 list-disc pl-5 text-sm text-foreground/80 space-y-1">
-                    <li>10x more relevant AI suggestions</li>
-                    <li>Maintain consistent code style</li>
-                    <li>Save hours of manual prompt crafting</li>
+                  <Badge
+                    className="depth-layer-3 text-shadow-sm
+                      shadow-depth-md
+                      border-0
+                      text-shadow-sm
+                      z-10"
+                  >
+                    AI Coding
+                  </Badge>
+                  <h3 
+                    className="text-2xl font-bold mb-4 text-shadow-sm
+                      text-shadow-sm"
+                  >
+                    Make AI Assistants Understand Your Project
+                  </h3>
+                  <p className="text-foreground/80">Stop getting generic code suggestions that don&apos;t match your style. Our .cursorrules file teaches Cursor, Copilot, and other AI assistants exactly how you write code.</p>
+                  <ul className="mt-4 space-y-2">
+                    <li
+                      className="flex items-start gap-2
+                        depth-layer-3
+                        rounded-lg p-3
+                        shadow-depth-sm
+                        hover-lift"
+                    >
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span>10x more relevant AI suggestions</span>
+                    </li>
+                    <li
+                      className="flex items-start gap-2
+                        depth-layer-3
+                        rounded-lg p-3
+                        shadow-depth-sm
+                        hover-lift"
+                    >
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span>Maintain consistent code style</span>
+                    </li>
+                    <li
+                      className="flex items-start gap-2
+                        depth-layer-3
+                        rounded-lg p-3
+                        shadow-depth-sm
+                        hover-lift"
+                    >
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span>Save hours of manual prompt crafting</span>
+                    </li>
                   </ul>
                   <Button className="mt-6">Start Generating</Button>
                 </div>
@@ -1156,22 +1321,77 @@ export default function Home() {
             </Card>
 
             {/* Use Case 4 - Open Source Contributions (Content left, image right) */}
-            <Card className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <Card 
+              className="depth-layer-2
+                shadow-depth-lg
+                border-0
+                overflow-hidden
+                hover:depth-layer-3
+                hover:shadow-elevated
+                transition-all duration-500
+                group"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center p-6">
                 <div className="order-2 md:order-1">
-                  <div className="inline-flex items-center rounded-full bg-purple-500/10 px-3 py-1 text-sm font-medium text-purple-600">Open Source</div>
-                  <h3 className="mt-4 text-2xl font-semibold">Help Contributors Get Started Instantly</h3>
-                  <p className="mt-2 text-foreground/80">Make your open source project contributor-friendly. Generate comprehensive documentation that helps anyone understand how to contribute, from first-time contributors to experienced maintainers.</p>
-                  <ul className="mt-4 list-disc pl-5 text-sm text-foreground/80 space-y-1">
-                    <li>Increase contributions by 3x</li>
-                    <li>Reduce 'how do I start?' questions</li>
-                    <li>Maintain consistent code quality</li>
+                  <Badge
+                    className="depth-layer-3 text-shadow-sm
+                      shadow-depth-md
+                      border-0
+                      text-shadow-sm
+                      z-10"
+                  >
+                    Open Source
+                  </Badge>
+                  <h3 
+                    className="text-2xl font-bold mb-4 text-shadow-sm
+                      text-shadow-sm"
+                  >
+                    Help Contributors Get Started Instantly
+                  </h3>
+                  <p className="text-foreground/80">Make your open source project contributor-friendly. Generate comprehensive documentation that helps anyone understand how to contribute, from first-time contributors to experienced maintainers.</p>
+                  <ul className="mt-4 space-y-2">
+                    <li
+                      className="flex items-start gap-2
+                        depth-layer-3
+                        rounded-lg p-3
+                        shadow-depth-sm
+                        hover-lift"
+                    >
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span>Increase contributions by 3x</span>
+                    </li>
+                    <li
+                      className="flex items-start gap-2
+                        depth-layer-3
+                        rounded-lg p-3
+                        shadow-depth-sm
+                        hover-lift"
+                    >
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span>Reduce &apos;how do I start?&apos; questions</span>
+                    </li>
+                    <li
+                      className="flex items-start gap-2
+                        depth-layer-3
+                        rounded-lg p-3
+                        shadow-depth-sm
+                        hover-lift"
+                    >
+                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      <span>Maintain consistent code quality</span>
+                    </li>
                   </ul>
                   <Button className="mt-6" variant="outline">Try for OSS</Button>
                 </div>
                 <div className="order-1 md:order-2">
-                  <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-lg h-80 flex items-center justify-center transition-transform duration-300 ease-out hover:scale-[1.01]">
-                    {/* Replace with screenshot of contributor guidelines with context files */}
+                  <div 
+                    className="depth-layer-1
+                      shadow-inset
+                      h-80
+                      flex items-center justify-center
+                      group-hover:scale-105
+                      transition-transform duration-500"
+                  >
                     <GitFork className="h-32 w-32 text-muted-foreground" />
                   </div>
                 </div>
@@ -1182,11 +1402,580 @@ export default function Home() {
       </section>
       </ScrollReveal>
 
+      {/* How It Works - New Section */}
+      <ScrollReveal>
+      <section 
+        id="how-it-works" 
+        className="relative max-w-7xl mx-auto px-4 py-20
+          depth-layer-1
+          border-y border-border/20"
+      >
+        <h2 
+          className="text-4xl font-bold text-center mb-4
+            text-shadow-md"
+        >
+          How It Works
+        </h2>
+        <p className="text-muted-foreground text-center mb-16">Get perfect context files in three simple steps</p>
+
+        {/* Arrows between steps (desktop only) */}
+        <div className="pointer-events-none absolute inset-0 hidden md:block">
+          <ArrowRight className="absolute top-1/2 left-[33.5%] -translate-y-1/2 h-8 w-8 text-muted-foreground/60 animate-pulse" />
+          <ArrowRight className="absolute top-1/2 left-[66.5%] -translate-y-1/2 h-8 w-8 text-muted-foreground/60 animate-pulse" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+          {/* Step 1 */}
+          <div className="relative">
+            <div 
+              className="absolute -top-3 -left-3
+                depth-top
+                shadow-depth-lg
+                w-12 h-12 rounded-full
+                flex items-center justify-center
+                text-lg font-bold
+                text-shadow-sm
+                border-4 border-background"
+            >
+              1
+            </div>
+            <Card 
+              className="relative
+                depth-layer-2
+                shadow-depth-md
+                border-0
+                hover-lift
+                transition-all duration-300"
+            >
+              <div
+                className="depth-layer-1
+                  shadow-inset
+                  rounded-lg h-48
+                  flex items-center justify-center
+                  mb-4"
+              >
+                <FileCode className="h-16 w-16 text-muted-foreground" />
+              </div>
+              <CardHeader>
+                <CardTitle
+                  className="text-xl font-semibold text-shadow-sm
+                    text-shadow-sm"
+                >
+                  Paste GitHub URL
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Enter any public GitHub repository URL. Our AI instantly analyzes the codebase structure, tech stack, and coding patterns.
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">Works with GitHub, GitLab, and Bitbucket</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Step 2 */}
+          <div className="relative">
+            <div 
+              className="absolute -top-3 -left-3
+                depth-top
+                shadow-depth-lg
+                w-12 h-12 rounded-full
+                flex items-center justify-center
+                text-lg font-bold
+                text-shadow-sm
+                border-4 border-background"
+            >
+              2
+            </div>
+            <Card 
+              className="relative
+                depth-layer-2
+                shadow-depth-md
+                border-0
+                hover-lift
+                transition-all duration-300"
+            >
+              <div
+                className="depth-layer-1
+                  shadow-inset
+                  rounded-lg h-48
+                  flex items-center justify-center
+                  mb-4"
+              >
+                <Brain className="h-16 w-16 text-muted-foreground animate-pulse" />
+              </div>
+              <CardHeader>
+                <CardTitle
+                  className="text-xl font-semibold text-shadow-sm
+                    text-shadow-sm"
+                >
+                  AI Analyzes & Generates
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Our advanced AI models process your repository, detecting frameworks, dependencies, and code conventions to create comprehensive context files.
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">Average generation time: 15-30 seconds</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Step 3 */}
+          <div className="relative">
+            <div 
+              className="absolute -top-3 -left-3
+                depth-top
+                shadow-depth-lg
+                w-12 h-12 rounded-full
+                flex items-center justify-center
+                text-lg font-bold
+                text-shadow-sm
+                border-4 border-background"
+            >
+              3
+            </div>
+            <Card 
+              className="relative
+                depth-layer-2
+                shadow-depth-md
+                border-0
+                hover-lift
+                transition-all duration-300"
+            >
+              <div
+                className="depth-layer-1
+                  shadow-inset
+                  rounded-lg h-48
+                  flex items-center justify-center
+                  mb-4"
+              >
+                <Download className="h-16 w-16 text-muted-foreground" />
+              </div>
+              <CardHeader>
+                <CardTitle
+                  className="text-xl font-semibold text-shadow-sm
+                    text-shadow-sm"
+                >
+                  Download & Use
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Get .cursorrules, PROJECT_OVERVIEW.md, ARCHITECTURE.md, and more. Drop them into your project and watch your AI assistant understand everything perfectly.
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">Includes 6+ essential context files</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div className="text-center mt-12">
+          <button
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg inline-flex items-center justify-center mx-auto shadow hover:shadow-lg transition-shadow"
+            onClick={() => {
+              const el = document.querySelector('input[type="url"]') as HTMLInputElement | null;
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                el.focus();
+              } else {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
+          >
+            Ready to try it?
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </button>
+          <p className="text-muted-foreground mt-2">No credit card required • Free tier available</p>
+        </div>
+      </section>
+      </ScrollReveal>
+
+      
+      
+      {result && (
+        <section className="mx-auto max-w-5xl px-6 pb-24">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-shadow-sm">Preview: {result.repoName}</h2>
+            <button className="rounded border px-3 py-1">Sign up to download</button>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">Detected stack: {result.techStack.join(", ") || "Unknown"}</p>
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="font-medium">Files</h3>
+              <ul className="mt-2 space-y-1 text-sm">
+                {result.files.map(f => (
+                  <li key={f.name} className="rounded border px-3 py-2">{f.name}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded border p-3">
+              <h3 className="font-medium">Preview</h3>
+              <pre className="mt-2 max-h-[420px] overflow-auto text-sm whitespace-pre-wrap">{result.files[0]?.content || "Select a file to preview"}</pre>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* See The Difference - Tabbed */}
+      <section className="mx-auto max-w-6xl px-6 py-20">
+        <h2 className="text-center text-3xl font-bold text-primary">See The Difference Context Makes</h2>
+        <Tabs defaultValue="react" className="mt-8">
+          <div className="flex justify-center">
+            <TabsList className="rounded-lg">
+              <TabsTrigger value="react">React Component</TabsTrigger>
+              <TabsTrigger value="api">API Route</TabsTrigger>
+              <TabsTrigger value="db">Database Schema</TabsTrigger>
+            </TabsList>
+          </div>
+
+          {/* Tab: React Component */}
+          <TabsContent value="react" className="mt-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card 
+                className="p-0
+                  depth-layer-2
+                  shadow-depth-md
+                  border-0"
+              >
+                <CardHeader className="flex flex-row items-center gap-2">
+                  <X className="text-red-500" />
+                  <CardTitle className="text-left text-lg text-shadow-sm">Before • Without Context</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div 
+                    className="rounded-lg
+                      depth-layer-1
+                      shadow-inset
+                      p-4 relative"
+                  >
+                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
+                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed text-foreground/70">
+{`function fetchData() {
+  // Fetch data from API
+  // Process data
+  // Update state
+}`}
+                    </pre>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <div className="text-sm text-foreground/70">Lines of bugs: 8</div>
+                </CardFooter>
+              </Card>
+              <Card 
+                className="p-0
+                  depth-layer-2
+                  shadow-depth-md
+                  border-0"
+              >
+                <CardHeader className="flex flex-row items-center gap-2">
+                  <Check className="text-green-600" />
+                  <CardTitle className="text-left text-lg text-shadow-sm">After • With Context</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div 
+                    className="rounded-lg
+                      depth-layer-3
+                      shadow-depth-sm
+                      p-4 relative"
+                  >
+                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
+                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed">
+{`import { useEffect, useState } from 'react';
+
+function useFetchData(url: string) {
+  const [data, setData] = useState<unknown | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchData() {
+      const response = await fetch(url);
+      const result = await response.json();
+      if (isMounted) setData(result);
+    }
+    fetchData();
+    return () => { isMounted = false };
+  }, [url]);
+
+  return data;
+}`}
+                    </pre>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <div className="text-sm font-medium text-primary">Production-ready: ✓</div>
+                </CardFooter>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Tab: API Route */}
+          <TabsContent value="api" className="mt-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="p-0">
+                <CardHeader className="flex flex-row items-center gap-2">
+                  <X className="text-red-500" />
+                  <CardTitle className="text-left text-lg text-shadow-sm">Before • Poor Express Route</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-lg bg-muted/40 p-4 ring-1 ring-border relative">
+                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
+                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed text-foreground/70">
+{`app.get('/data', (req, res) => {
+  // Fetch data from database
+  // Send response
+});`}
+                    </pre>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <div className="text-sm text-foreground/70">Lines of bugs: 8</div>
+                </CardFooter>
+              </Card>
+              <Card className="p-0">
+                <CardHeader className="flex flex-row items-center gap-2">
+                  <Check className="text-green-600" />
+                  <CardTitle className="text-left text-lg text-shadow-sm">After • Next.js API Route</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-lg bg-background p-4 ring-1 ring-border relative">
+                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
+                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed">
+{`import type { NextRequest } from 'next/server';
+export async function GET(req: NextRequest) {
+  try {
+    const data = await fetch('https://api.example.com/data').then(r => r.json());
+    return Response.json({ data }, { status: 200 });
+  } catch (err) {
+    return Response.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}`}
+                    </pre>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <div className="text-sm font-medium text-primary">Production-ready: ✓</div>
+                </CardFooter>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Tab: Database Schema */}
+          <TabsContent value="db" className="mt-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="p-0">
+                <CardHeader className="flex flex-row items-center gap-2">
+                  <X className="text-red-500" />
+                  <CardTitle className="text-left text-lg text-shadow-sm">Before • Inconsistent Model</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-lg bg-muted/40 p-4 ring-1 ring-border relative">
+                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
+                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed text-foreground/70">
+{`const User = {
+  name: String,
+  email: String,
+  password: String,
+  // Additional fields
+};`}
+                    </pre>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <div className="text-sm text-foreground/70">Lines of bugs: 8</div>
+                </CardFooter>
+              </Card>
+              <Card className="p-0">
+                <CardHeader className="flex flex-row items-center gap-2">
+                  <Check className="text-green-600" />
+                  <CardTitle className="text-left text-lg text-shadow-sm">After • Prisma Schema</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-lg bg-background p-4 ring-1 ring-border relative">
+                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
+                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed">
+{`model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  posts     Post[]
+  createdAt DateTime @default(now())
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  createdAt DateTime @default(now())
+}`}
+                    </pre>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <div className="text-sm font-medium text-primary">Production-ready: ✓</div>
+                </CardFooter>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </section>
+
+      {/* What You Get - Feature Grid */}
+      <ScrollReveal>
+      <section 
+        id="features" 
+        className="mx-auto max-w-6xl px-6 py-20 scroll-mt-24
+          depth-layer-1
+          border-y border-border/20"
+      >
+        <h2 
+          className="text-center text-3xl font-bold text-primary
+            text-shadow-md
+            tracking-tight"
+        >
+          What You Get
+        </h2>
+        <p className="mx-auto mt-3 max-w-2xl text-center text-foreground/70">Six focused deliverables that make Cursor understand your repo instantly.</p>
+        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            { icon: FileCode, title: ".cursorrules Generator", desc: "Generate precise, repo-aware instructions for Cursor to follow." },
+            { icon: BookOpen, title: "Project Documentation", desc: "Concise, actionable docs tailored to your codebase." },
+            { icon: Map, title: "Architecture Maps", desc: "Visualize flows, ownership, and key boundaries at a glance." },
+            { icon: Layers, title: "Tech Stack Guide", desc: "Frameworks, libraries, versions, and how they fit together." },
+            { icon: Code2, title: "Code Conventions", desc: "Naming, patterns, file org, and API usage—codified." },
+            { icon: Sparkles, title: "Best Practices", desc: "Opinionated guidance tuned to your repo's constraints." },
+          ].map(({ icon: Icon, title, desc }, i) => (
+            <motion.div
+              key={i}
+              whileHover={{ y: -4 }}
+              className="group"
+            >
+              <Card 
+                className="depth-layer-2
+                  shadow-depth-md
+                  border-0
+                  hover:depth-layer-3
+                  hover:shadow-elevated
+                  transition-all duration-300
+                  overflow-hidden
+                  h-full"
+              >
+                <CardHeader>
+                  <div
+                    className="depth-layer-3
+                      w-12 h-12 rounded-lg
+                      shadow-depth-sm
+                      flex items-center justify-center
+                      group-hover:shadow-depth-md
+                      transition-all duration-300"
+                  >
+                    <Icon className="h-6 w-6 text-primary" />
+                  </div>
+                  <CardTitle
+                    className="text-xl font-semibold mt-4
+                      text-shadow-sm
+                      group-hover:text-primary
+                      transition-colors"
+                  >
+                    {title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">
+                    {desc}
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+      </ScrollReveal>
+
+      {/* Demo - Video Section */}
+      <ScrollReveal>
+      <section id="demo" className="bg-muted/30">
+        <div className="max-w-6xl mx-auto px-4 py-20">
+          <h2 className="text-4xl font-bold text-center mb-4 text-shadow-sm">See Context Wizard in Action</h2>
+          <p className="text-muted-foreground text-center mb-12">Watch how easy it is to generate perfect context files</p>
+
+          {/* Decorative gradient blur orbs */}
+          <div className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
+            <div className="h-80 w-80 rounded-full bg-primary/20 blur-3xl" />
+          </div>
+
+          {/* Video placeholder */}
+          <div className="relative aspect-video rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-muted to-muted/50 shadow-2xl overflow-hidden">
+            {/* Placeholder content */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+              <Video className="h-24 w-24 text-muted-foreground mb-4" />
+              <div className="text-xl font-semibold">Demo Video Coming Soon</div>
+              <div className="text-sm text-muted-foreground">We&apos;re creating an awesome demo video for you!</div>
+
+              {/* Play button overlay */}
+              <button
+                aria-label="Play video"
+                className="absolute inset-0 m-auto h-20 w-20 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors grid place-items-center animate-pulse"
+              >
+                <Video className="h-10 w-10 text-primary" />
+              </button>
+            </div>
+          </div>
+
+          {/* Highlights */}
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card 
+              className="p-6 rounded-lg
+                depth-layer-2
+                shadow-depth-md
+                border-0
+                hover-lift"
+            >
+              <Zap className="h-8 w-8 text-primary mb-2" />
+              <div className="text-lg font-semibold">⚡ Lightning Fast</div>
+              <div className="text-sm text-muted-foreground">Generate context in 30 seconds</div>
+            </Card>
+            <Card 
+              className="p-6 rounded-lg
+                depth-layer-2
+                shadow-depth-md
+                border-0
+                hover-lift"
+            >
+              <Target className="h-8 w-8 text-primary mb-2" />
+              <div className="text-lg font-semibold">🎯 Highly Accurate</div>
+              <div className="text-sm text-muted-foreground">95%+ accuracy in tech stack detection</div>
+            </Card>
+            <Card 
+              className="p-6 rounded-lg
+                depth-layer-2
+                shadow-depth-md
+                border-0
+                hover-lift"
+            >
+              <Lock className="h-8 w-8 text-primary mb-2" />
+              <div className="text-lg font-semibold">🔒 Secure & Private</div>
+              <div className="text-sm text-muted-foreground">Your code stays yours, we never store it</div>
+            </Card>
+          </div>
+        </div>
+      </section>
+      </ScrollReveal>
+
       {/* Mid-Page CTA Section */}
       <section className="max-w-4xl mx-auto px-4 py-16">
-        <div className="bg-gradient-to-r from-primary/10 via-purple-500/10 to-primary/10 border-2 border-primary/20 rounded-2xl shadow-2xl p-8 text-center">
+        <div 
+          className="depth-layer-2
+            shadow-depth-lg
+            border-0
+            rounded-2xl p-8 text-center"
+        >
           <Sparkles className="h-12 w-12 text-primary mx-auto mb-4" />
-          <h2 className="text-3xl font-bold mb-3">Ready to Transform Your Development Workflow?</h2>
+          <h2 className="text-3xl font-bold mb-3 text-shadow-sm">Ready to Transform Your Development Workflow?</h2>
           <p className="text-muted-foreground mb-6">Join 2,500+ developers who already boosted their productivity</p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
@@ -1236,394 +2025,25 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Demo - Video Section */}
-      <ScrollReveal>
-      <section id="demo" className="bg-muted/30">
-        <div className="max-w-6xl mx-auto px-4 py-20">
-          <h2 className="text-4xl font-bold text-center mb-4">See Context Wizard in Action</h2>
-          <p className="text-muted-foreground text-center mb-12">Watch how easy it is to generate perfect context files</p>
-
-          {/* Decorative gradient blur orbs */}
-          <div className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
-            <div className="h-80 w-80 rounded-full bg-primary/20 blur-3xl" />
-          </div>
-
-          {/* Video placeholder */}
-          <div className="relative aspect-video rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-muted to-muted/50 shadow-2xl overflow-hidden">
-            {/* Placeholder content */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
-              <Video className="h-24 w-24 text-muted-foreground mb-4" />
-              <div className="text-xl font-semibold">Demo Video Coming Soon</div>
-              <div className="text-sm text-muted-foreground">We're creating an awesome demo video for you!</div>
-
-              {/* Play button overlay */}
-              <button
-                aria-label="Play video"
-                className="absolute inset-0 m-auto h-20 w-20 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors grid place-items-center animate-pulse"
-              >
-                <Video className="h-10 w-10 text-primary" />
-              </button>
-            </div>
-          </div>
-
-          {/* Highlights */}
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="p-6 rounded-lg">
-              <Zap className="h-8 w-8 text-primary mb-2" />
-              <div className="text-lg font-semibold">⚡ Lightning Fast</div>
-              <div className="text-sm text-muted-foreground">Generate context in 30 seconds</div>
-            </Card>
-            <Card className="p-6 rounded-lg">
-              <Target className="h-8 w-8 text-primary mb-2" />
-              <div className="text-lg font-semibold">🎯 Highly Accurate</div>
-              <div className="text-sm text-muted-foreground">95%+ accuracy in tech stack detection</div>
-            </Card>
-            <Card className="p-6 rounded-lg">
-              <Lock className="h-8 w-8 text-primary mb-2" />
-              <div className="text-lg font-semibold">🔒 Secure & Private</div>
-              <div className="text-sm text-muted-foreground">Your code stays yours, we never store it</div>
-            </Card>
-          </div>
-        </div>
-      </section>
-      </ScrollReveal>
-
-      
-
-      {/* How It Works - New Section */}
-      <ScrollReveal>
-      <section id="how-it-works" className="relative max-w-7xl mx-auto px-4 py-20 bg-gradient-to-b from-background to-muted/20">
-        <h2 className="text-4xl font-bold text-center mb-4">How It Works</h2>
-        <p className="text-muted-foreground text-center mb-16">Get perfect context files in three simple steps</p>
-
-        {/* Arrows between steps (desktop only) */}
-        <div className="pointer-events-none absolute inset-0 hidden md:block">
-          <ArrowRight className="absolute top-1/2 left-[33.5%] -translate-y-1/2 h-8 w-8 text-muted-foreground/60 animate-pulse" />
-          <ArrowRight className="absolute top-1/2 left-[66.5%] -translate-y-1/2 h-8 w-8 text-muted-foreground/60 animate-pulse" />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-          {/* Step 1 */}
-          <div className="relative">
-            <div className="absolute -top-3 -left-3 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold shadow">1</div>
-            <Card className="p-6 text-left transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg">
-              <div className="bg-muted rounded-lg h-48 flex items-center justify-center">
-                {/* Replace with screenshot of pasting GitHub URL */}
-                <FileCode className="h-16 w-16 text-muted-foreground" />
-              </div>
-              <h3 className="font-semibold text-xl mt-4">Paste GitHub URL</h3>
-              <p className="mt-2 text-sm text-foreground/80">Enter any public GitHub repository URL. Our AI instantly analyzes the codebase structure, tech stack, and coding patterns.</p>
-              <p className="mt-2 text-xs text-muted-foreground">Works with GitHub, GitLab, and Bitbucket</p>
-            </Card>
-          </div>
-
-          {/* Step 2 */}
-          <div className="relative">
-            <div className="absolute -top-3 -left-3 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold shadow">2</div>
-            <Card className="p-6 text-left transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg">
-              <div className="bg-muted rounded-lg h-48 flex items-center justify-center">
-                {/* Replace with animated GIF of AI analyzing code */}
-                <Brain className="h-16 w-16 text-muted-foreground animate-pulse" />
-              </div>
-              <h3 className="font-semibold text-xl mt-4">AI Analyzes & Generates</h3>
-              <p className="mt-2 text-sm text-foreground/80">Our advanced AI models process your repository, detecting frameworks, dependencies, and code conventions to create comprehensive context files.</p>
-              <p className="mt-2 text-xs text-muted-foreground">Average generation time: 15-30 seconds</p>
-            </Card>
-          </div>
-
-          {/* Step 3 */}
-          <div className="relative">
-            <div className="absolute -top-3 -left-3 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold shadow">3</div>
-            <Card className="p-6 text-left transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg">
-              <div className="bg-muted rounded-lg h-48 flex items-center justify-center">
-                {/* Replace with screenshot of download dialog with files preview */}
-                <Download className="h-16 w-16 text-muted-foreground" />
-              </div>
-              <h3 className="font-semibold text-xl mt-4">Download & Use</h3>
-              <p className="mt-2 text-sm text-foreground/80">Get .cursorrules, PROJECT_OVERVIEW.md, ARCHITECTURE.md, and more. Drop them into your project and watch your AI assistant understand everything perfectly.</p>
-              <p className="mt-2 text-xs text-muted-foreground">Includes 6+ essential context files</p>
-            </Card>
-          </div>
-        </div>
-
-        {/* CTA */}
-        <div className="text-center mt-12">
-          <button
-            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg inline-flex items-center justify-center mx-auto shadow hover:shadow-lg transition-shadow"
-            onClick={() => {
-              const el = document.querySelector('input[type="url"]') as HTMLInputElement | null;
-              if (el) {
-                el.scrollIntoView({ behavior: "smooth", block: "center" });
-                el.focus();
-              } else {
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }
-            }}
-          >
-            Ready to try it?
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </button>
-          <p className="text-muted-foreground mt-2">No credit card required • Free tier available</p>
-        </div>
-      </section>
-      </ScrollReveal>
-
-      {result && (
-        <section className="mx-auto max-w-5xl px-6 pb-24">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Preview: {result.repoName}</h2>
-            <button className="rounded border px-3 py-1">Sign up to download</button>
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">Detected stack: {result.techStack.join(", ") || "Unknown"}</p>
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="font-medium">Files</h3>
-              <ul className="mt-2 space-y-1 text-sm">
-                {result.files.map(f => (
-                  <li key={f.name} className="rounded border px-3 py-2">{f.name}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="rounded border p-3">
-              <h3 className="font-medium">Preview</h3>
-              <pre className="mt-2 max-h-[420px] overflow-auto text-sm whitespace-pre-wrap">{result.files[0]?.content || "Select a file to preview"}</pre>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* See The Difference - Tabbed */}
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <h2 className="text-center text-3xl font-bold text-primary">See The Difference Context Makes</h2>
-        <Tabs defaultValue="react" className="mt-8">
-          <div className="flex justify-center">
-            <TabsList className="rounded-lg">
-              <TabsTrigger value="react">React Component</TabsTrigger>
-              <TabsTrigger value="api">API Route</TabsTrigger>
-              <TabsTrigger value="db">Database Schema</TabsTrigger>
-            </TabsList>
-          </div>
-
-          {/* Tab: React Component */}
-          <TabsContent value="react" className="mt-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="p-0">
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <X className="text-red-500" />
-                  <CardTitle className="text-left text-lg">Before • Without Context</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-lg bg-muted/40 p-4 ring-1 ring-border relative">
-                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
-                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed text-foreground/70">
-{`function fetchData() {
-  // Fetch data from API
-  // Process data
-  // Update state
-}`}
-                    </pre>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="text-sm text-foreground/70">Lines of bugs: 8</div>
-                </CardFooter>
-              </Card>
-              <Card className="p-0">
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Check className="text-green-600" />
-                  <CardTitle className="text-left text-lg">After • With Context</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-lg bg-background p-4 ring-1 ring-border relative">
-                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
-                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed">
-{`import { useEffect, useState } from 'react';
-
-function useFetchData(url: string) {
-  const [data, setData] = useState<unknown | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchData() {
-      const response = await fetch(url);
-      const result = await response.json();
-      if (isMounted) setData(result);
-    }
-    fetchData();
-    return () => { isMounted = false };
-  }, [url]);
-
-  return data;
-}`}
-                    </pre>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="text-sm font-medium text-primary">Production-ready: ✓</div>
-                </CardFooter>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Tab: API Route */}
-          <TabsContent value="api" className="mt-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="p-0">
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <X className="text-red-500" />
-                  <CardTitle className="text-left text-lg">Before • Poor Express Route</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-lg bg-muted/40 p-4 ring-1 ring-border relative">
-                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
-                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed text-foreground/70">
-{`app.get('/data', (req, res) => {
-  // Fetch data from database
-  // Send response
-});`}
-                    </pre>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="text-sm text-foreground/70">Lines of bugs: 8</div>
-                </CardFooter>
-              </Card>
-              <Card className="p-0">
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Check className="text-green-600" />
-                  <CardTitle className="text-left text-lg">After • Next.js API Route</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-lg bg-background p-4 ring-1 ring-border relative">
-                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
-                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed">
-{`import type { NextRequest } from 'next/server';
-export async function GET(req: NextRequest) {
-  try {
-    const data = await fetch('https://api.example.com/data').then(r => r.json());
-    return Response.json({ data }, { status: 200 });
-  } catch (err) {
-    return Response.json({ error: 'Internal Server Error' }, { status: 500 });
-  }
-}`}
-                    </pre>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="text-sm font-medium text-primary">Production-ready: ✓</div>
-                </CardFooter>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Tab: Database Schema */}
-          <TabsContent value="db" className="mt-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="p-0">
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <X className="text-red-500" />
-                  <CardTitle className="text-left text-lg">Before • Inconsistent Model</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-lg bg-muted/40 p-4 ring-1 ring-border relative">
-                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
-                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed text-foreground/70">
-{`const User = {
-  name: String,
-  email: String,
-  password: String,
-  // Additional fields
-};`}
-                    </pre>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="text-sm text-foreground/70">Lines of bugs: 8</div>
-                </CardFooter>
-              </Card>
-              <Card className="p-0">
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Check className="text-green-600" />
-                  <CardTitle className="text-left text-lg">After • Prisma Schema</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-lg bg-background p-4 ring-1 ring-border relative">
-                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
-                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed">
-{`model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  posts     Post[]
-  createdAt DateTime @default(now())
-}
-
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  String
-  createdAt DateTime @default(now())
-}`}
-                    </pre>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="text-sm font-medium text-primary">Production-ready: ✓</div>
-                </CardFooter>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </section>
-
-      {/* What You Get - Feature Grid */}
-      <ScrollReveal>
-      <section id="features" className="mx-auto max-w-6xl px-6 py-20 scroll-mt-24">
-        <h2 className="text-center text-3xl font-bold text-primary">What You Get</h2>
-        <p className="mx-auto mt-3 max-w-2xl text-center text-foreground/70">Six focused deliverables that make Cursor understand your repo instantly.</p>
-        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { icon: FileCode, title: ".cursorrules Generator", desc: "Generate precise, repo-aware instructions for Cursor to follow." },
-            { icon: BookOpen, title: "Project Documentation", desc: "Concise, actionable docs tailored to your codebase." },
-            { icon: Map, title: "Architecture Maps", desc: "Visualize flows, ownership, and key boundaries at a glance." },
-            { icon: Layers, title: "Tech Stack Guide", desc: "Frameworks, libraries, versions, and how they fit together." },
-            { icon: Code2, title: "Code Conventions", desc: "Naming, patterns, file org, and API usage—codified." },
-            { icon: Sparkles, title: "Best Practices", desc: "Opinionated guidance tuned to your repo’s constraints." },
-          ].map(({ icon: Icon, title, desc }, i) => (
-            <Card key={i} className="group relative overflow-hidden rounded-xl bg-light shine-top ring-1 ring-border shadow-sm transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl">
-              {/* Subtle vertical gradient to emphasize depth */}
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-black/5" />
-              <CardHeader className="relative">
-                <Icon className="h-8 w-8 text-primary" />
-                <CardTitle className="text-primary text-lg font-semibold">{title}</CardTitle>
-              </CardHeader>
-              <CardContent className="relative">
-                <p className="text-secondary text-sm leading-relaxed">{desc}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-      </ScrollReveal>
-
-      
-
-      
       {/* Pricing - Detailed Section (moved above FAQ) */}
       <ScrollReveal>
       <section id="pricing" className="bg-gradient-to-b from-muted/20 to-background">
         <div className="max-w-7xl mx-auto px-4 py-20">
-          <h2 className="text-4xl font-bold text-center mb-4">Simple, Transparent Pricing</h2>
+          <h2 className="text-4xl font-bold text-center mb-4 text-shadow-sm">Simple, Transparent Pricing</h2>
           <p className="text-muted-foreground text-center mb-12">Start free, upgrade when you need more power</p>
 
           {/* Pricing Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Free Plan Card */}
-            <Card className="p-6">
+            <Card 
+              className="p-6
+                depth-layer-2
+                shadow-depth-md
+                border-0
+                hover-lift"
+            >
               <div className="bg-muted text-muted-foreground px-3 py-1 rounded-full text-sm font-semibold mb-4">Forever Free</div>
-              <div className="text-5xl font-bold">$0<span className="text-muted-foreground text-xl">/month</span></div>
+              <div className="text-5xl font-bold text-shadow-md">$0<span className="text-muted-foreground text-xl">/month</span></div>
               <p className="mt-4 mb-6">Perfect for trying Context Wizard</p>
               <ul className="space-y-2">
                 <li className="flex items-center"><Check className="text-green-500 mr-2" />5 generations per day</li>
@@ -1644,9 +2064,15 @@ model Post {
             </Card>
 
             {/* Pro Plan Card */}
-            <Card className="p-6 border-primary shadow-lg">
+            <Card 
+              className="p-6
+                depth-layer-3
+                shadow-depth-lg
+                border-0
+                hover:shadow-elevated"
+            >
               <div className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-semibold mb-4">Most Popular</div>
-              <div className="text-5xl font-bold">$9<span className="text-muted-foreground text-xl">/month</span></div>
+              <div className="text-5xl font-bold text-shadow-md">$9<span className="text-muted-foreground text-xl">/month</span></div>
               <p className="text-sm text-green-600">or $84/year (save $24)</p>
               <p className="mt-4 mb-6">For serious developers and teams</p>
               <ul className="space-y-2">
@@ -1677,7 +2103,7 @@ model Post {
 
           {/* Feature Comparison Table */}
           <div className="mt-16">
-            <h3 className="text-2xl font-bold text-center mb-8">Feature Comparison</h3>
+            <h3 className="text-2xl font-bold text-center mb-8 text-shadow-sm">Feature Comparison</h3>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1776,7 +2202,7 @@ model Post {
       {/* FAQ - Accordion Section (moved below Pricing) */}
       <section id="faq" aria-labelledby="faq-heading" className="bg-background">
         <div className="max-w-4xl mx-auto px-4 py-20">
-          <h2 id="faq-heading" className="text-4xl font-bold text-center mb-4">Frequently Asked Questions</h2>
+          <h2 id="faq-heading" className="text-4xl font-bold text-center mb-4 text-shadow-sm">Frequently Asked Questions</h2>
           <p className="text-muted-foreground text-center mb-12">Everything you need to know about Context Wizard</p>
           <Accordion type="single" collapsible aria-label="Frequently Asked Questions">
             {faqItems.map((item, index) => (
@@ -1807,7 +2233,7 @@ model Post {
 
       {/* Blog/Resources Section */}
       <section id="resources" className="max-w-7xl mx-auto px-4 py-20">
-        <h2 className="text-4xl font-bold text-center mb-4">Latest from Our Blog</h2>
+        <h2 className="text-4xl font-bold text-center mb-4 text-shadow-sm">Latest from Our Blog</h2>
         <p className="text-muted-foreground text-center mb-12">Tips, tutorials, and insights for better development</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
@@ -1971,7 +2397,7 @@ model Post {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             {/* Left Column */}
             <div>
-              <h2 className="text-3xl font-bold mb-3">Still on the Fence?</h2>
+              <h2 className="text-3xl font-bold mb-3 text-shadow-sm">Still on the Fence?</h2>
               <p className="text-lg text-muted-foreground mb-6">Try Context Wizard risk-free for 7 days</p>
               
               <ul className="space-y-3 mb-8">
@@ -2002,8 +2428,8 @@ model Post {
 
             {/* Right Column */}
             <div>
-              <h2 className="text-3xl font-bold mb-3">Have Questions?</h2>
-              <p className="text-muted-foreground mb-6">We're here to help! Talk to our team about your specific use case.</p>
+              <h2 className="text-3xl font-bold mb-3 text-shadow-sm">Have Questions?</h2>
+              <p className="text-muted-foreground mb-6">We&apos;re here to help! Talk to our team about your specific use case.</p>
               
               <div className="space-y-4 mb-8">
                 <div className="flex items-center gap-3">

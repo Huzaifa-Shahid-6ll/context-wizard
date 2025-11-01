@@ -152,7 +152,7 @@ export const insertOutputPrediction = mutation({
   handler: async (ctx, args) => {
     const id = await ctx.db.insert("outputPredictions", {
       ...args,
-      predictedOutput: args.predictedOutput as any,
+      predictedOutput: args.predictedOutput as unknown,
     });
     return id;
   },
@@ -181,6 +181,97 @@ export const incrementPromptViews = mutation({
     const currentViews = typeof meta.views === "number" ? meta.views : Number((meta.views as unknown) ?? 0);
     const views = (currentViews || 0) + 1;
     await ctx.db.patch(id, { metadata: { ...meta, views } as unknown });
+  },
+});
+
+export const saveUserPreferences = mutation({
+  args: { userId: v.string(), featureType: v.string(), formData: v.any(), preferredMode: v.optional(v.union(v.literal("quick"), v.literal("standard"), v.literal("advanced"))) },
+  handler: async (ctx, { userId, featureType, formData, preferredMode }) => {
+    const existing = await ctx.db
+      .query("userPreferences")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+    const match = existing.find((p: any) => String(p.featureType) === featureType);
+    const now = Date.now();
+    if (match) {
+      await ctx.db.patch(match._id, { savedInputs: formData as unknown, preferredMode: (preferredMode as any) ?? match.preferredMode, updatedAt: now });
+      return match._id;
+    }
+    const id = await ctx.db.insert("userPreferences", {
+      userId,
+      featureType,
+      savedInputs: formData as unknown,
+      autoFillEnabled: true,
+      preferredMode: (preferredMode as any) ?? "quick",
+      customTemplates: [],
+      createdAt: now,
+      updatedAt: now,
+    });
+    return id;
+  },
+});
+
+// Prompt Templates CRUD
+export const savePromptTemplate = mutation({
+  args: {
+    userId: v.string(),
+    name: v.string(),
+    description: v.string(),
+    category: v.union(
+      v.literal("generic"),
+      v.literal("image"),
+      v.literal("video"),
+      v.literal("cursor-app"),
+      v.literal("analysis")
+    ),
+    template: v.string(),
+    variables: v.array(v.string()),
+    isPublic: v.optional(v.boolean()),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const id = await ctx.db.insert("promptTemplates", {
+      userId: args.userId,
+      name: args.name,
+      description: args.description,
+      category: args.category,
+      template: args.template,
+      variables: args.variables,
+      metadata: args.metadata as unknown,
+      isPublic: !!args.isPublic,
+      usageCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return id;
+  },
+});
+
+export const updatePromptTemplate = mutation({
+  args: {
+    id: v.id("promptTemplates"),
+    patch: v.object({
+      name: v.optional(v.string()),
+      description: v.optional(v.string()),
+      template: v.optional(v.string()),
+      variables: v.optional(v.array(v.string())),
+      isPublic: v.optional(v.boolean()),
+      metadata: v.optional(v.any()),
+    }),
+  },
+  handler: async (ctx, { id, patch }) => {
+    await ctx.db.patch(id, { ...patch, updatedAt: Date.now() });
+  },
+});
+
+export const deletePromptTemplate = mutation({
+  args: { id: v.id("promptTemplates"), userId: v.string() },
+  handler: async (ctx, { id, userId }) => {
+    const tpl = await ctx.db.get(id);
+    if (!tpl) return;
+    if ((tpl as unknown as { userId?: string }).userId !== userId) throw new Error("Not authorized");
+    await ctx.db.delete(id);
   },
 });
 

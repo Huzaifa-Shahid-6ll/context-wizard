@@ -313,10 +313,13 @@ export const ThemeToggleButton3 = ({
 //..................................................... //
 export const ThemeToggleButton4 = ({
   className = "",
+  isDark = false,
+  onClick,
 }: {
   className?: string;
+  isDark?: boolean;
+  onClick?: () => void;
 }) => {
-  const [isDark, setIsDark] = useState(false);
   return (
     <button
       type="button"
@@ -325,7 +328,7 @@ export const ThemeToggleButton4 = ({
         isDark ? "bg-black text-white" : "bg-white text-black",
         className,
       )}
-      onClick={() => setIsDark(!isDark)}
+      onClick={onClick}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"

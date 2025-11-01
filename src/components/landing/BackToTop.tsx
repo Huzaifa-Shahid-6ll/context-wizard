@@ -31,7 +31,7 @@ export const BackToTop: React.FC = () => {
           exit={{ opacity: 0, scale: 0.8 }}
           transition={{ duration: 0.2 }}
           onClick={handleClick}
-          className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-110 hover:shadow-xl transition-all duration-200 flex items-center justify-center"
+          className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full bg-primary text-primary-foreground depth-top shadow-depth-lg hover:shadow-elevated hover:scale-125 transition-all duration-300 flex items-center justify-center"
           aria-label="Back to top"
         >
           <ArrowUp className="h-6 w-6" />

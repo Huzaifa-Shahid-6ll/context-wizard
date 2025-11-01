@@ -14,7 +14,7 @@ function parseJsonSafely<T>(jsonText: string, fallback: T): T {
     } catch {
       try {
         // Try to fix common JSON issues
-        let fixedJson = jsonText
+        const fixedJson = jsonText
           .replace(/^```[a-zA-Z]*\n|\n```$/g, "")
           .replace(/\\"/g, '\\"')  // Fix escaped quotes
           .replace(/\\n/g, '\\n')  // Fix escaped newlines

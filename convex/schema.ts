@@ -157,6 +157,56 @@ const promptTemplates = defineTable({
   .index("by_isPublic", ["isPublic"])
   .index("by_usageCount", ["usageCount"]);
 
+// Structured Input Templates table schema
+const structuredInputTemplates = defineTable({
+  featureType: v.string(), // "image", "video", "cursor-app", "generic", "analysis"
+  category: v.string(),
+  fields: v.array(v.object({
+    fieldName: v.string(),
+    fieldType: v.string(), // "dropdown", "multi-select", "slider", "textarea", "checkbox"
+    options: v.optional(v.array(v.string())),
+    defaultValue: v.optional(v.any()),
+    tooltip: v.string(),
+    required: v.boolean(),
+    validation: v.optional(v.any()),
+  })),
+  isDefault: v.boolean(),
+  usageCount: v.number(),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+  .index("by_featureType", ["featureType"])
+  .index("by_category", ["category"])
+  .index("by_isDefault", ["isDefault"]);
+
+// User Preferences table schema for auto-fill and personalization
+const userPreferences = defineTable({
+  userId: v.string(),
+  featureType: v.string(),
+  savedInputs: v.any(), // Structured data from previous uses
+  autoFillEnabled: v.boolean(),
+  preferredMode: v.union(v.literal("quick"), v.literal("standard"), v.literal("advanced")),
+  customTemplates: v.array(v.string()), // Template IDs
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+  .index("by_userId", ["userId"])
+  .index("by_featureType", ["featureType"]);
+
+// Form Submissions table schema for tracking structured form usage
+const formSubmissions = defineTable({
+  userId: v.string(),
+  featureType: v.string(),
+  formData: v.any(), // Complete structured form data
+  generatedPrompt: v.string(),
+  quality: v.optional(v.number()), // User rating 1-5
+  feedback: v.optional(v.string()),
+  createdAt: v.number(),
+})
+  .index("by_userId", ["userId"])
+  .index("by_featureType", ["featureType"])
+  .index("by_createdAt", ["createdAt"]);
+
 // Export the schema
 export default defineSchema({
   users,
@@ -168,6 +218,9 @@ export default defineSchema({
   bannedIps,
   contextMemory,
   promptTemplates,
+  structuredInputTemplates,
+  userPreferences,
+  formSubmissions,
 });
 
 // Type helpers generated via convex codegen (imported by consumers):

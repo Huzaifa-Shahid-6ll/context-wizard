@@ -3,7 +3,7 @@ import { v } from "convex/values";
 
 export const testEnvVars = action({
 	args: {},
-	handler: async (ctx) => {
+	handler: async () => {
 		return {
 			hasOpenRouterFree: !!process.env.OPENROUTER_API_KEY_FREE,
 			hasOpenRouterPro: !!process.env.OPENROUTER_API_KEY_PRO,
@@ -15,7 +15,7 @@ export const testEnvVars = action({
 
 export const testCallOpenRouter = action({
 	args: { prompt: v.string(), tier: v.union(v.literal("free"), v.literal("pro")) },
-	handler: async (_ctx, { prompt, tier }) => {
+	handler: async (_ctx, { tier }) => {
 		const key = tier === 'pro' ? process.env.OPENROUTER_API_KEY_PRO : process.env.OPENROUTER_API_KEY_FREE;
 		return {
 			hasKey: !!key,

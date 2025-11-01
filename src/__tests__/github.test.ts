@@ -1,7 +1,7 @@
 import { parseGitHubUrl, fetchRepoStructure, detectTechStack, type RepoStructure } from '../lib/github';
 
 // Mock global fetch
-const globalAny: any = global;
+const globalAny: typeof global = global;
 
 describe('GitHub utilities', () => {
 	beforeEach(() => {

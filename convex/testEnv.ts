@@ -2,7 +2,7 @@ import { action } from "./_generated/server";
 
 export const testEnvironment = action({
   args: {},
-  handler: async (_ctx) => {
+	handler: async () => {
     const openrouterFree = process.env.OPENROUTER_API_KEY_FREE;
     const openrouterPro = process.env.OPENROUTER_API_KEY_PRO;
     const anthropic = process.env.ANTHROPIC_API_KEY;

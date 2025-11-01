@@ -23,6 +23,7 @@ import {
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
+import ThemeToggleButton from "@/components/ui/ThemeToggleButton";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -158,6 +159,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {isSignedIn && (
                 <UsageIndicator remaining={remainingPrompts} breakdown={stats?.promptsTodayByType || {}} isPro={!!stats?.isPro} />
               )}
+              <ThemeToggleButton className="size-8" />
               <UserButton />
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { generateWithOpenRouter, analyzePrompt, predictOutput } from '../lib/openrouter';
 
-const globalAny: any = global;
+const globalAny: typeof global = global;
 
 describe('OpenRouter utilities', () => {
 	const OLD_ENV = process.env;

@@ -1,59 +1,199 @@
-"use client";
-
 import React from "react";
 import { useUser } from "@clerk/nextjs";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useQuery, useMutation } from "convex/react";
+import { recordSubmission } from "@/lib/autofill";
 import { api } from "@/../convex/_generated/api";
-import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { toast } from "sonner";
 import { Video, Play, Camera, Film } from "lucide-react";
+import { TooltipWrapper } from "@/components/forms/TooltipWrapper";
+import { PromptPreview } from "@/components/forms/PromptPreview";
+import { PlatformTargetSelector } from "@/components/forms/PlatformTargetSelector";
+
+type PlatformTarget = "veo3" | "runway" | "pika" | "all";
+type SceneType = "Corporate" | "Cinematic" | "Documentary" | "Educational" | "Lifestyle" | "Creative";
+type SubjectType = "Person" | "Object" | "Abstract" | "Nature";
+
+type FormState = {
+  sceneType: SceneType | "";
+  indoorOutdoor: "Indoor" | "Outdoor" | "";
+  locationType: string;
+  environmentDetails: string;
+  subjectType: SubjectType | "";
+  person?: { role?: string; ageRange?: string };
+  object?: { type?: string; material?: string };
+  nature?: { element?: string };
+  action: string;
+  pacing: "Slow" | "Medium" | "Fast" | "";
+  cameraMovement: string;
+  shotType: string;
+  cameraAngle: string;
+  lightingSetup: string[];
+  timeOfDay: string;
+  colorGrading: string;
+  dialogue: string;
+  soundEffects: string[];
+  ambientSound: string;
+  musicStyle: string;
+  duration: string;
+  frameRate: string;
+  aspectRatio: string;
+  platformTarget: PlatformTarget;
+};
+
+const LOCAL_STORAGE_KEY = "videoPromptStructuredForm.v1";
 
 export default function VideoPromptPage() {
   const { user } = useUser();
   const runGenerate = useAction(api.promptGenerators.generateVideoPrompt);
+  const saveTemplate = useMutation(api.mutations.savePromptTemplate);
   const stats = useQuery(api.users.getUserStats, user?.id ? { userId: user.id } : "skip") as
     | { remainingPrompts: number; isPro: boolean }
     | undefined;
 
-  const [description, setDescription] = React.useState("");
-  const [style, setStyle] = React.useState("");
-  const [mood, setMood] = React.useState("");
-  const [duration, setDuration] = React.useState("8 seconds");
-  const [audio, setAudio] = React.useState("");
+  const [step, setStep] = React.useState(1);
   const [loading, setLoading] = React.useState(false);
-  const [success, setSuccess] = React.useState(false);
-  const [showConfetti, setShowConfetti] = React.useState(false);
-
   const [veo3Prompt, setVeo3Prompt] = React.useState<string | null>(null);
   const [runwayPrompt, setRunwayPrompt] = React.useState<string | null>(null);
   const [pikaPrompt, setPikaPrompt] = React.useState<string | null>(null);
   const [tips, setTips] = React.useState<string[] | null>(null);
   const [audioElements, setAudioElements] = React.useState<string[] | null>(null);
 
+  const [form, setForm] = React.useState<FormState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (saved) return JSON.parse(saved) as FormState;
+      } catch {}
+    }
+    return {
+      sceneType: "",
+      indoorOutdoor: "",
+      locationType: "",
+      environmentDetails: "",
+      subjectType: "",
+      action: "",
+      pacing: "",
+      cameraMovement: "",
+      shotType: "",
+      cameraAngle: "",
+      lightingSetup: [],
+      timeOfDay: "",
+      colorGrading: "",
+      dialogue: "",
+      soundEffects: [],
+      ambientSound: "",
+      musicStyle: "",
+      duration: "8s",
+      frameRate: "24fps",
+      aspectRatio: "16:9",
+      platformTarget: "all",
+    };
+  });
+
+  React.useEffect(() => {
+    try { window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(form)); } catch {}
+  }, [form]);
+
+  function update<K extends keyof FormState>(key: K, value: FormState[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  function toggleArray<K extends keyof FormState>(key: K, value: string) {
+    setForm((f) => {
+      const arr = new Set<string>(Array.isArray(f[key]) ? (f[key] as unknown as string[]) : []);
+      if (arr.has(value)) arr.delete(value); else arr.add(value);
+      return { ...f, [key]: Array.from(arr) } as FormState;
+    });
+  }
+
+  function validateStep(current: number): boolean {
+    if (current === 1) {
+      return form.sceneType !== "" && form.indoorOutdoor !== "" && form.locationType.trim().length > 0;
+    }
+    if (current === 2) {
+      return form.subjectType !== "" && form.action.trim().length > 0 && form.pacing !== "";
+    }
+    return true;
+  }
+
+  function nextStep() {
+    if (!validateStep(step)) {
+      toast.error("Please complete the required fields before continuing.");
+      return;
+    }
+    setStep((s) => Math.min(6, s + 1));
+  }
+
+  function prevStep() {
+    setStep((s) => Math.max(1, s - 1));
+  }
+
+  function buildStructuredDescription(): { description: string; style?: string; mood?: string; duration?: string; audio?: string } {
+    const parts: string[] = [];
+    parts.push(`Scene: ${form.sceneType} — ${form.indoorOutdoor} — ${form.locationType}`);
+    if (form.environmentDetails) parts.push(`Environment: ${form.environmentDetails}`);
+    parts.push(`Subject & Action: ${form.subjectType} — ${form.action} — Pacing: ${form.pacing}`);
+    if (form.subjectType === "Person" && form.person) {
+      const { role, ageRange } = form.person;
+      parts.push(`Person details: ${[role, ageRange].filter(Boolean).join(", ")}`);
+    }
+    if (form.subjectType === "Object" && form.object) {
+      const { type, material } = form.object;
+      parts.push(`Object details: ${[type, material].filter(Boolean).join(", ")}`);
+    }
+    if (form.subjectType === "Nature" && form.nature) {
+      const { element } = form.nature;
+      parts.push(`Nature details: ${[element].filter(Boolean).join(", ")}`);
+    }
+    parts.push(`Camera: ${[form.cameraMovement, form.shotType, form.cameraAngle].filter(Boolean).join(", ")}`);
+    parts.push(`Lighting & Style: ${[form.lightingSetup.join("/"), form.timeOfDay, form.colorGrading].filter(Boolean).join(", ")}`);
+    const audioLine = [
+      form.dialogue ? `Dialogue: "${form.dialogue}"` : undefined,
+      form.soundEffects.length ? `SFX: ${form.soundEffects.join("/")}` : undefined,
+      form.ambientSound ? `Ambience: ${form.ambientSound}` : undefined,
+      form.musicStyle ? `Music: ${form.musicStyle}` : undefined,
+    ].filter(Boolean).join(" | ");
+    if (audioLine) parts.push(`Audio: ${audioLine}`);
+    parts.push(`Technical: Duration ${form.duration}, ${form.frameRate}, AR ${form.aspectRatio}, Target ${form.platformTarget.toUpperCase()}`);
+
+    return {
+      description: parts.join("\n"),
+      style: form.colorGrading || undefined,
+      mood: form.sceneType.toLowerCase(),
+      duration: form.duration,
+      audio: audioLine || undefined,
+    };
+  }
+
   async function onGenerate() {
-    if (!user?.id || !description.trim()) return;
+    if (!user?.id) return;
     if (stats && !stats.isPro && stats.remainingPrompts <= 0) {
       toast.error("Daily limit reached. Please upgrade to continue.");
       return;
     }
+    if (!validateStep(1) || !validateStep(2)) {
+      toast.error("Please complete the first two steps before generating.");
+      setStep(1);
+      return;
+    }
     setLoading(true);
-    setSuccess(false);
     try {
       toast.info("Generating video prompts... This might take a few seconds.");
+      const built = buildStructuredDescription();
       const res = await runGenerate({
-        description: description.trim(),
-        style: style.trim() || undefined,
-        mood: mood.trim() || undefined,
-        duration: duration.trim() || undefined,
-        audio: audio.trim() || undefined,
+        description: built.description,
+        style: built.style,
+        mood: built.mood,
+        duration: built.duration,
+        audio: built.audio,
         userId: user.id,
       });
       const r = res as unknown as { 
@@ -68,40 +208,43 @@ export default function VideoPromptPage() {
       setPikaPrompt(r.pikaPrompt);
       setTips(r.tips);
       setAudioElements(r.audioElements);
-      setSuccess(true);
-      setShowConfetti(true);
       toast.success("Video prompts generated!");
+      recordSubmission("video", {
+        sceneType: form.sceneType,
+        subjectType: form.subjectType,
+        pacing: form.pacing,
+        cameraMovement: form.cameraMovement,
+        timeOfDay: form.timeOfDay,
+        aspectRatio: form.aspectRatio,
+        platformTarget: form.platformTarget,
+      }, user.id);
     } finally {
       setLoading(false);
-      setTimeout(() => setSuccess(false), 1200);
-      setTimeout(() => setShowConfetti(false), 1200);
     }
   }
 
-  function applyTemplate(template: { 
-    description: string; 
-    style?: string; 
-    mood?: string; 
-    duration?: string; 
-    audio?: string 
-  }) {
-    setDescription(template.description);
-    if (template.style) setStyle(template.style);
-    if (template.mood) setMood(template.mood);
-    if (template.duration) setDuration(template.duration);
-    if (template.audio) setAudio(template.audio);
+  function applyTemplate(template: { description: string; duration?: string; audio?: string }) {
+    update("environmentDetails", template.description);
+    if (template.duration) update("duration", template.duration);
+    if (template.audio) update("ambientSound", template.audio);
   }
+
+  const wizardRegionId = "video-prompt-wizard-region";
+  const previewPanelId = "video-prompt-preview-panel";
+  const outputPanelId = "video-prompt-output-panel";
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-6">
       <div className="text-center">
         <div className="flex items-center justify-center gap-3 mb-4">
-          <Video className="h-8 w-8 text-primary" />
+          <Video className="h-8 w-8 text-primary" aria-hidden="true" />
           <h1 className="text-3xl font-bold tracking-tight">Video Prompt Generator</h1>
         </div>
-        <p className="text-lg text-foreground/70 mb-4">
-          Create cinematic video prompts for AI video generation platforms using advanced context engineering
-        </p>
+        <p className="text-lg text-foreground/70 mb-4">Create cinematic video prompts for AI video platforms using advanced context engineering</p>
+        <div className="mt-1 flex justify-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => { setStep(1); }}>Quick Mode</Button>
+          <Button size="sm" onClick={() => { window.location.href = "/dashboard/templates"; }}>Start from Template</Button>
+        </div>
         {stats && !stats.isPro && (
           <Badge variant="outline" className="mt-2">
             {stats.remainingPrompts} prompts remaining today
@@ -109,125 +252,423 @@ export default function VideoPromptPage() {
         )}
       </div>
 
-      {/* Main Input Card */}
-      <Card className="p-6 shadow-lg ring-1 ring-border">
-        <div className="grid grid-cols-1 gap-6">
-          <div>
-            <Label className="mb-3 block text-base font-medium">Video Description</Label>
-            <textarea
-              className="w-full rounded-md border border-border bg-background p-4 text-base"
-              rows={6}
-              placeholder="Describe your video concept with cinematic specificity and professional film language..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-            <p className="mt-2 text-sm text-foreground/60">
-              Include camera angles, lighting, movement, and visual style. Be specific about the scene and action.
-            </p>
+      <Card className="p-6 shadow-lg ring-1 ring-border" role="region" aria-label="Video prompt wizard" id={wizardRegionId}>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="text-sm" id="video-prompt-wizard-h2">Step {step} of 6</div>
+            <div className="flex-1 mx-3 h-2 bg-secondary/30 rounded" style={{ '--progress-width': `${(step/6)*100}%` } as React.CSSProperties}>
+              <div className="h-2 bg-primary rounded" style={{ width: 'var(--progress-width)' }} />
+            </div>
+            <div className="text-xs text-foreground/60">Structured wizard</div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Live preview (shared) */}
+          <PromptPreview id={previewPanelId} ariaLabel="Live video prompt preview">
+              {buildStructuredDescription().description}
+          </PromptPreview>
+
+          {/* Each step: use TooltipWrapper for technical fields */}
+          {step === 1 && (
+            <div className="space-y-4">
+              <Label className="block">
+                <TooltipWrapper content="Describes the style and tone of the video scenario." glossaryTerm="Scene Type">Scene Setup</TooltipWrapper>
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <Label className="mb-2 block">Style</Label>
-              <select
-                className="w-full rounded-md border border-border bg-background p-3 text-sm"
-                value={style}
-                onChange={(e) => setStyle(e.target.value)}
-              >
-                <option value="">Select style...</option>
-                {["cinematic", "documentary", "noir", "vintage", "modern", "artistic", "commercial", "lifestyle"].map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
+                  <Label htmlFor="sceneType" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="Style of story: corporate, cinematic, documentary..." glossaryTerm="Scene Type">Scene Type</TooltipWrapper>
+                  </Label>
+                  <select id="sceneType" title="Select Scene Type" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.sceneType} onChange={(e) => update("sceneType", e.target.value as SceneType)}>
+                    <option value="">Select</option>
+                    {(["Corporate","Cinematic","Documentary","Educational","Lifestyle","Creative"] as SceneType[]).map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
             </div>
             <div>
-              <Label className="mb-2 block">Mood</Label>
-              <select
-                className="w-full rounded-md border border-border bg-background p-3 text-sm"
-                value={mood}
-                onChange={(e) => setMood(e.target.value)}
-              >
-                <option value="">Select mood...</option>
-                {["dramatic", "peaceful", "energetic", "mysterious", "romantic", "tense", "uplifting", "melancholic"].map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
+                  <Label htmlFor="indoorOutdoor" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="Indoor or outdoor?" glossaryTerm="Setting">Indoor/Outdoor</TooltipWrapper>
+                  </Label>
+                  <select id="indoorOutdoor" title="Select Indoor/Outdoor Setting" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.indoorOutdoor} onChange={(e) => update("indoorOutdoor", e.target.value as FormState["indoorOutdoor"])}>
+                    <option value="">Select</option>
+                    <option>Indoor</option>
+                    <option>Outdoor</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <Label className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The specific location or setting where the scene takes place." glossaryTerm="Location">Location/Setting</TooltipWrapper>
+                  </Label>
+                  <Input
+                    className="w-full"
+                    placeholder="e.g., Modern office, City street, Classroom, Studio"
+                    value={form.locationType}
+                    onChange={(e) => update("locationType", e.target.value)}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="Additional details about the environment, such as lighting, decor, or atmosphere." glossaryTerm="Environment">Environmental Details (optional)</TooltipWrapper>
+                  </Label>
+                  <Input
+                className="w-full"
+                    placeholder="e.g., Minimalist, Warm lighting, Plants, Glass walls"
+                    value={form.environmentDetails}
+                    onChange={(e) => update("environmentDetails", e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <div className="text-xs text-foreground/60">Required: Scene type, Indoor/Outdoor, Location</div>
+                <div className="flex gap-2">
+                  <Button variant="outline" tabIndex={0} onClick={onGenerate} disabled={loading || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)} className="focus-visible:ring-2 ring-primary">{loading ? "Generating..." : "Generate Now"}</Button>
+                  <Button tabIndex={0} onClick={nextStep} className="focus-visible:ring-2 ring-primary">Next</Button>
+                </div>
             </div>
           </div>
+          )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {step === 2 && (
+            <div className="space-y-4">
+              <Label className="block">
+                <TooltipWrapper content="Identifies the main subject or object in the scene." glossaryTerm="Subject">Subject & Action</TooltipWrapper>
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <Label className="mb-2 block">Duration</Label>
-              <select
-                className="w-full rounded-md border border-border bg-background p-3 text-sm"
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-              >
-                {["5 seconds", "8 seconds", "10 seconds", "15 seconds", "30 seconds"].map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
+                  <Label htmlFor="subjectType" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="Type of subject: person, object, abstract, or nature." glossaryTerm="Subject">Subject Type</TooltipWrapper>
+                  </Label>
+                  <select id="subjectType" title="Select Subject Type" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.subjectType} onChange={(e) => update("subjectType", e.target.value as SubjectType)}>
+                    <option value="">Select</option>
+                    {(["Person","Object","Abstract","Nature"] as SubjectType[]).map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
             </div>
             <div>
-              <Label className="mb-2 block">Audio Elements</Label>
-              <input
-                className="w-full rounded-md border border-border bg-background p-3 text-sm"
-                placeholder="Dialogue, music, sound effects..."
-                value={audio}
-                onChange={(e) => setAudio(e.target.value)}
+                  <Label className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The action or movement performed by the subject." glossaryTerm="Action">Action/Movement</TooltipWrapper>
+                  </Label>
+              <Input
+                className="w-full"
+                    placeholder="e.g., Walking, Talking, Gesturing, Looking at camera"
+                    value={form.action}
+                    onChange={(e) => update("action", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="pacing" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The pace or speed of the action." glossaryTerm="Pacing">Pacing</TooltipWrapper>
+                  </Label>
+                  <select id="pacing" title="Select Pacing" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.pacing} onChange={(e) => update("pacing", e.target.value as FormState["pacing"])}>
+                    <option value="">Select</option>
+                    <option>Slow</option>
+                    <option>Medium</option>
+                    <option>Fast</option>
+                  </select>
+                </div>
+                {form.subjectType === "Person" && (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:col-span-2">
+                    <div>
+                      <Label className="mb-1 block text-xs text-foreground/60">
+                      <TooltipWrapper content="The role or occupation of the person." glossaryTerm="Role">Role</TooltipWrapper>
+                      </Label>
+                      <Input className="w-full" placeholder="e.g., Teacher, Executive, Athlete"
+                        value={form.person?.role || ""}
+                        onChange={(e) => update("person", { ...(form.person||{}), role: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="personAgeRange" className="mb-1 block text-xs text-foreground/60">
+                      <TooltipWrapper content="The age range of the person." glossaryTerm="Age Range">Age Range</TooltipWrapper>
+                      </Label>
+                      <select id="personAgeRange" title="Select Person Age Range" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                        value={form.person?.ageRange || ""}
+                        onChange={(e) => update("person", { ...(form.person||{}), ageRange: e.target.value })}
+                      >
+                        <option value="">Select</option>
+                        <option>Child</option>
+                        <option>Teen</option>
+                        <option>Adult</option>
+                        <option>Senior</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+                {form.subjectType === "Object" && (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:col-span-2">
+                    <div>
+                      <Label className="mb-1 block text-xs text-foreground/60">
+                      <TooltipWrapper content="The type of object." glossaryTerm="Object Type">Object Type</TooltipWrapper>
+                      </Label>
+                      <Input className="w-full" placeholder="e.g., Smartphone, Chair, Book"
+                        value={form.object?.type || ""}
+                        onChange={(e) => update("object", { ...(form.object||{}), type: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label className="mb-1 block text-xs text-foreground/60">
+                      <TooltipWrapper content="The material or composition of the object." glossaryTerm="Material">Material</TooltipWrapper>
+                      </Label>
+                      <Input className="w-full" placeholder="e.g., Metal, Wood, Glass"
+                        value={form.object?.material || ""}
+                        onChange={(e) => update("object", { ...(form.object||{}), material: e.target.value })}
               />
             </div>
           </div>
+                )}
+                {form.subjectType === "Nature" && (
+                  <div className="md:col-span-2">
+                    <Label className="mb-1 block text-xs text-foreground/60">
+                    <TooltipWrapper content="The natural element or phenomenon." glossaryTerm="Element">Element</TooltipWrapper>
+                    </Label>
+                    <Input className="w-full" placeholder="e.g., Waterfall, Forest, Ocean"
+                      value={form.nature?.element || ""}
+                      onChange={(e) => update("nature", { ...(form.nature||{}), element: e.target.value })}
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <Button variant="outline" tabIndex={0} onClick={prevStep} className="focus-visible:ring-2 ring-primary">Back</Button>
+                <Button tabIndex={0} onClick={nextStep} className="focus-visible:ring-2 ring-primary">Next</Button>
+              </div>
+            </div>
+          )}
 
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={onGenerate} 
-              disabled={loading || !description.trim() || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)}
-              className="h-12 px-8 shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg"
-            >
-              {loading ? (
-                <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Generate Video Prompts
-                </>
-              )}
-            </Button>
-            {stats && !stats.isPro && (
-              <span className={`text-sm ${stats.remainingPrompts <= 0 ? "text-red-600" : stats.remainingPrompts <= 5 ? "text-yellow-600" : "text-foreground/70"}`}>
-                {stats.remainingPrompts <= 0 ? "Limit reached" : `${stats.remainingPrompts} remaining today`}
-              </span>
-            )}
-            {success && (
-              <motion.span
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.25 }}
-                className="text-sm text-green-600"
-              >
-                Success!
-              </motion.span>
-            )}
+          {step === 3 && (
+            <div className="space-y-4">
+              <Label className="block">
+                <TooltipWrapper content="Describes the camera's movement, including static, pan, tilt, tracking, dolly zoom, crane, orbit, etc." glossaryTerm="Camera Movement">Camera Work</TooltipWrapper>
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="cameraMovement" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The movement of the camera itself." glossaryTerm="Camera Movement">Camera Movement</TooltipWrapper>
+                  </Label>
+                  <select id="cameraMovement" title="Select Camera Movement" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.cameraMovement} onChange={(e) => update("cameraMovement", e.target.value)}>
+                    <option value="">Select</option>
+                    <option>Static</option>
+                    <option>Pan</option>
+                    <option>Tilt</option>
+                    <option>Tracking</option>
+                    <option>Dolly zoom</option>
+                    <option>Crane</option>
+                    <option>Orbit</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="shotType" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The type of shot, such as close-up, medium shot, wide shot, establishing shot." glossaryTerm="Shot Type">Shot Type</TooltipWrapper>
+                  </Label>
+                  <select id="shotType" title="Select Shot Type" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.shotType} onChange={(e) => update("shotType", e.target.value)}>
+                    <option value="">Select</option>
+                    <option>Close-up</option>
+                    <option>Medium shot</option>
+                    <option>Wide shot</option>
+                    <option>Establishing shot</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="cameraAngle" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The angle from which the camera views the subject." glossaryTerm="Camera Angle">Camera Angle</TooltipWrapper>
+                  </Label>
+                  <select id="cameraAngle" title="Select Camera Angle" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.cameraAngle} onChange={(e) => update("cameraAngle", e.target.value)}>
+                    <option value="">Select</option>
+                    <option>Eye level</option>
+                    <option>High angle</option>
+                    <option>Low angle</option>
+                    <option>Dutch angle</option>
+                    <option>Bird's eye</option>
+                    <option>Worm's eye</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <Button variant="outline" tabIndex={0} onClick={prevStep} className="focus-visible:ring-2 ring-primary">Back</Button>
+                <Button tabIndex={0} onClick={nextStep} className="focus-visible:ring-2 ring-primary">Next</Button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-4">
+              <Label className="block">
+                <TooltipWrapper content="Details the lighting setup, including natural, studio, backlighting, rim lighting, key lighting, etc." glossaryTerm="Lighting">Lighting & Visual Style</TooltipWrapper>
+              </Label>
+              <div>
+                <Label className="mb-2 block text-xs text-foreground/60">
+                <TooltipWrapper content="The primary method of lighting the scene." glossaryTerm="Lighting Setup">Lighting Setup</TooltipWrapper>
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {["Natural light","Studio lighting","Backlighting","Rim lighting","Key lighting"].map((l) => {
+                    const active = form.lightingSetup.includes(l);
+                    return (
+                      <button key={l} type="button" onClick={() => toggleArray("lightingSetup", l)}
+                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary/20"}`}
+                      >{l}</button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="timeOfDay" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The time of day or period of the day." glossaryTerm="Time of Day">Time of Day</TooltipWrapper>
+                  </Label>
+                  <select id="timeOfDay" title="Select Time of Day" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.timeOfDay} onChange={(e) => update("timeOfDay", e.target.value)}>
+                    <option value="">Select</option>
+                    <option>Morning</option>
+                    <option>Afternoon</option>
+                    <option>Golden hour</option>
+                    <option>Night</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="colorGrading" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The color grading applied to the video." glossaryTerm="Color Grading">Color Grading</TooltipWrapper>
+                  </Label>
+                  <select id="colorGrading" title="Select Color Grading" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.colorGrading} onChange={(e) => update("colorGrading", e.target.value)}>
+                    <option value="">Select</option>
+                    <option>Natural</option>
+                    <option>Warm tones</option>
+                    <option>Cool tones</option>
+                    <option>High contrast</option>
+                    <option>Desaturated</option>
+                    <option>Cinematic</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <Button variant="outline" tabIndex={0} onClick={prevStep} className="focus-visible:ring-2 ring-primary">Back</Button>
+                <Button tabIndex={0} onClick={nextStep} className="focus-visible:ring-2 ring-primary">Next</Button>
+              </div>
+            </div>
+          )}
+
+          {step === 5 && (
+            <div className="space-y-4">
+              <Label className="block">
+                <TooltipWrapper content="Details the dialogue, sound effects, ambient sound, and music style." glossaryTerm="Audio">Audio Design</TooltipWrapper>
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="md:col-span-2">
+                  <Label className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="Optional spoken words or narration." glossaryTerm="Dialogue">Dialogue (optional)</TooltipWrapper>
+                  </Label>
+                  <Input className="w-full" placeholder="e.g., &quot;Welcome to our product demo...&quot;"
+                    value={form.dialogue}
+                    onChange={(e) => update("dialogue", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="Additional sound effects to enhance the scene." glossaryTerm="Sound Effects">Sound Effects</TooltipWrapper>
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {["Footsteps","Door closing","Phone ringing","Wind","Rain"].map((s) => {
+                      const active = form.soundEffects.includes(s);
+                      return (
+                        <button key={s} type="button" onClick={() => toggleArray("soundEffects", s)}
+                          className={`rounded-full border px-3 py-1 text-xs transition-colors ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-secondary/20"}`}
+                        >{s}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="ambientSound" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="Background sounds to create atmosphere." glossaryTerm="Ambient Sound">Ambient Sound</TooltipWrapper>
+                  </Label>
+                  <select id="ambientSound" title="Select Ambient Sound" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.ambientSound} onChange={(e) => update("ambientSound", e.target.value)}>
+                    <option value="">Select</option>
+                    <option>Office ambience</option>
+                    <option>City traffic</option>
+                    <option>Nature sounds</option>
+                    <option>Ocean waves</option>
+                    <option>Forest sounds</option>
+                    <option>None</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="musicStyle" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The style or genre of music to accompany the video." glossaryTerm="Music Style">Music Style</TooltipWrapper>
+                  </Label>
+                  <select id="musicStyle" title="Select Music Style" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.musicStyle} onChange={(e) => update("musicStyle", e.target.value)}>
+                    <option value="">Select</option>
+                    <option>Corporate</option>
+                    <option>Upbeat</option>
+                    <option>Dramatic</option>
+                    <option>Ambient</option>
+                    <option>None</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <Button variant="outline" tabIndex={0} onClick={prevStep} className="focus-visible:ring-2 ring-primary">Back</Button>
+                <Button tabIndex={0} onClick={nextStep} className="focus-visible:ring-2 ring-primary">Next</Button>
+              </div>
+            </div>
+          )}
+
+          {step === 6 && (
+            <div className="space-y-4">
+              <Label className="block">
+                <TooltipWrapper content="Technical details such as duration, frame rate, aspect ratio, and platform target." glossaryTerm="Technical">Technical Specifications</TooltipWrapper>
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="duration" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The total length of the video." glossaryTerm="Duration">Duration</TooltipWrapper>
+                  </Label>
+                  <select id="duration" title="Select Video Duration" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.duration} onChange={(e) => update("duration", e.target.value)}>
+                    {["5s","8s","10s","15s","30s"].map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="frameRate" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The number of frames per second." glossaryTerm="Frame Rate">Frame Rate</TooltipWrapper>
+                  </Label>
+                  <select id="frameRate" title="Select Frame Rate" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.frameRate} onChange={(e) => update("frameRate", e.target.value)}>
+                    {["24fps","25fps","30fps","60fps"].map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="aspectRatio" className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The ratio of width to height of the video frame." glossaryTerm="Aspect Ratio">Aspect Ratio</TooltipWrapper>
+                  </Label>
+                  <select id="aspectRatio" title="Select Aspect Ratio" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary" value={form.aspectRatio} onChange={(e) => update("aspectRatio", e.target.value)}>
+                    {["16:9","9:16","1:1","4:3","21:9"].map((ar) => (
+                      <option key={ar} value={ar}>{ar}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label className="mb-1 block text-xs text-foreground/60">
+                  <TooltipWrapper content="The platform or AI model you are targeting." glossaryTerm="Platform">Platform Target</TooltipWrapper>
+                  </Label>
+                  <PlatformTargetSelector
+                    options={["veo3","runway","pika","all"]}
+                    value={form.platformTarget}
+                    onChange={(p) => update("platformTarget", p as PlatformTarget)}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <Button variant="outline" tabIndex={0} onClick={prevStep} className="focus-visible:ring-2 ring-primary">Back</Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => { try { window.localStorage.removeItem(LOCAL_STORAGE_KEY); toast.success("Cleared saved form"); } catch {} }} tabIndex={0} className="focus-visible:ring-2 ring-primary">Clear Saved</Button>
+                  <Button tabIndex={0} onClick={onGenerate} disabled={loading || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)} className="focus-visible:ring-2 ring-primary">{loading ? "Generating..." : "Generate Prompts"}</Button>
+                </div>
           </div>
+            </div>
+          )}
         </div>
       </Card>
-
-      {showConfetti && (
-        <motion.div 
-          initial={{ opacity: 0 }} 
-          animate={{ opacity: 1 }} 
-          exit={{ opacity: 0 }} 
-          transition={{ duration: 0.2 }} 
-          className="pointer-events-none fixed inset-0 z-50"
-        >
-          {/* lightweight confetti substitute (placeholder) */}
-        </motion.div>
-      )}
 
       {/* Quick Templates */}
       <div>
@@ -250,11 +691,33 @@ export default function VideoPromptPage() {
         </div>
       </div>
 
-      {/* Output Panel */}
+      {/* Output Panel - aria-live region for screen reader accessibility */}
       {veo3Prompt && (
-        <Card className="p-6 shadow-xl ring-1 ring-border">
+        <Card className="p-6 shadow-xl ring-1 ring-border" role="region" aria-label="Video generation output panel" id={outputPanelId} aria-live="polite">
           <h2 className="text-xl font-semibold mb-6">Generated Video Prompts</h2>
-          
+          <div className="-mt-4 mb-2 flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (!user?.id) return;
+                const combined = [
+                  `Google Veo 3:\n${veo3Prompt || ""}`,
+                  `Runway:\n${runwayPrompt || ""}`,
+                  `Pika:\n${pikaPrompt || ""}`,
+                ].join("\n\n");
+                await saveTemplate({
+                  userId: user.id,
+                  name: `Video Template - ${new Date().toLocaleString()}`,
+                  description: "Saved from Video Prompt output",
+                  category: "video",
+                  template: combined,
+                  variables: [],
+                  isPublic: false,
+                });
+              }}
+            >Save as Template</Button>
+          </div>
           <Tabs defaultValue="veo3" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="veo3" className="flex items-center gap-2">
@@ -270,7 +733,6 @@ export default function VideoPromptPage() {
                 Pika Labs
               </TabsTrigger>
             </TabsList>
-            
             <TabsContent value="veo3" className="mt-4">
               <div className="rounded-md border border-border">
                 <Toolbar content={veo3Prompt} />
@@ -281,7 +743,6 @@ export default function VideoPromptPage() {
                 </div>
               </div>
             </TabsContent>
-            
             <TabsContent value="runway" className="mt-4">
               <div className="rounded-md border border-border">
                 <Toolbar content={runwayPrompt || ""} />
@@ -292,7 +753,6 @@ export default function VideoPromptPage() {
                 </div>
               </div>
             </TabsContent>
-            
             <TabsContent value="pika" className="mt-4">
               <div className="rounded-md border border-border">
                 <Toolbar content={pikaPrompt || ""} />
@@ -304,7 +764,6 @@ export default function VideoPromptPage() {
               </div>
             </TabsContent>
           </Tabs>
-
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card className="p-4 shadow-sm ring-1 ring-border">
               <h3 className="text-sm font-medium mb-3">Optimization Tips</h3>
@@ -360,7 +819,6 @@ const templates: Array<{
   label: string; 
   description: string;
   icon: React.ReactNode;
-  description: string; 
   style?: string; 
   mood?: string; 
   duration?: string; 

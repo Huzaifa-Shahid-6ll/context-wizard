@@ -4,10 +4,11 @@ import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
-import { Github, Calendar, Search, Download, Eye, Trash2, Code2, Boxes, Braces, Server } from "lucide-react";
+import { Github, Calendar, Download, Eye, Trash2, Code2, Boxes, Braces, Server } from "lucide-react";
 import JSZip from "jszip";
 import type { Doc, Id } from "@/../convex/_generated/dataModel";
 
@@ -81,9 +82,8 @@ export default function HistoryPage() {
 
       {/* Filters */}
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
-        <div className="col-span-2 flex items-center gap-2 rounded-md bg-light p-2 ring-1 ring-border">
-          <Search className="h-4 w-4 text-primary" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by repository name" className="border-none bg-transparent shadow-none focus-visible:ring-0" />
+        <div className="col-span-2">
+          <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by repository name" />
         </div>
         <div className="flex items-center gap-2 rounded-md bg-light p-2 ring-1 ring-border">
           <Calendar className="h-4 w-4 text-primary" />
@@ -91,9 +91,8 @@ export default function HistoryPage() {
           <span className="text-sm text-foreground/60">to</span>
           <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="border-none bg-transparent shadow-none focus-visible:ring-0" />
         </div>
-        <div className="flex items-center gap-2 rounded-md bg-light p-2 ring-1 ring-border">
-          <Github className="h-4 w-4 text-primary" />
-          <Input placeholder="Filter by tech stack (e.g., React)" value={stackFilter} onChange={(e) => setStackFilter(e.target.value)} className="border-none bg-transparent shadow-none focus-visible:ring-0" />
+        <div>
+          <SearchInput placeholder="Filter by tech stack (e.g., React)" value={stackFilter} onChange={(e) => setStackFilter(e.target.value)} icon={<Github className="h-4 w-4 text-primary" />} />
         </div>
       </div>
 

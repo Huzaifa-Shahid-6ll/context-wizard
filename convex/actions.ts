@@ -3,9 +3,18 @@ import { api } from "./_generated/api";
 import { v } from "convex/values";
 import { parseGitHubUrl, fetchRepoStructure, fetchRepoMetadata } from "../src/lib/github";
 
+export const getTechStack = action({
+  args: { repoUrl: v.string() },
+  handler: async (_ctx, { repoUrl }) => {
+    const { owner, repo } = parseGitHubUrl(repoUrl);
+    const metadata = await fetchRepoMetadata(owner, repo);
+    return { techStack: metadata.techStack, repoName: repo };
+  },
+});
+
 export const processGeneration = action({
-  args: { generationId: v.id("generations") },
-  handler: async (ctx, { generationId }): Promise<void> => {
+  args: { generationId: v.id("generations"), techStack: v.optional(v.array(v.string())) },
+  handler: async (ctx, { generationId, techStack: correctedTechStack }): Promise<void> => {
     // Load generation
     const generation = await ctx.runQuery(api.queries.getGeneration, { id: generationId });
     if (!generation) {
@@ -22,6 +31,8 @@ export const processGeneration = action({
         fetchRepoMetadata(owner, repo),
       ]);
 
+      const techStack = correctedTechStack ?? metadata.techStack;
+
       // Build simplified structure for prompt
       const simplified = structure.tree.map((i: { path: string; type: string }) => ({ path: i.path, type: i.type }));
 
@@ -29,7 +40,7 @@ export const processGeneration = action({
       const files: { name: string; content: string }[] = await ctx.runAction(api.generate.generateContextFiles, {
         repoData: {
           repoStructure: simplified,
-          techStack: metadata.techStack,
+          techStack: techStack,
           packageJson: metadata.packageJson,
           readmeContent: metadata.readme,
         },
@@ -41,7 +52,7 @@ export const processGeneration = action({
         patch: {
           status: "completed",
           files,
-          techStack: metadata.techStack,
+          techStack: techStack,
           repoName: repo,
         },
       });

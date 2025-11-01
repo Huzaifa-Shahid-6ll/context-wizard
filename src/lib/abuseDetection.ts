@@ -1,11 +1,10 @@
 import { checkRateLimit } from "@/lib/rateLimit";
-import { getClientIp, generateFingerprint } from "@/lib/ipTracker";
+import { getClientIp } from "@/lib/ipTracker";
 
 export type AbuseResult = { isAbusive: boolean; reason: string; severity: "low" | "medium" | "high" };
 
-export async function detectAbuse(req: Request, userId?: string): Promise<AbuseResult> {
+export async function detectAbuse(req: Request): Promise<AbuseResult> {
   const ip = getClientIp({ headers: req.headers });
-  const fp = generateFingerprint({ headers: req.headers });
 
   // Heuristic 1: rapid requests (>50/min)
   const { remaining } = checkRateLimit(`abuse:${ip}`, 50, 60_000);

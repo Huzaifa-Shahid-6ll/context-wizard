@@ -1,9 +1,8 @@
 import { action, query } from "./_generated/server";
-import { v } from "convex/values";
 
 export const debugEnvironment = action({
 	args: {},
-	handler: async (ctx) => {
+	handler: async () => {
 		const envKeys = [
 			"OPENROUTER_API_KEY_FREE",
 			"OPENROUTER_API_KEY_PRO",
@@ -40,7 +39,7 @@ export const debugDatabase = query({
 
 export const debugExternalApis = action({
 	args: {},
-	handler: async (_ctx) => {
+	handler: async () => {
 		async function ping(url: string) {
 			const started = Date.now();
 			try {

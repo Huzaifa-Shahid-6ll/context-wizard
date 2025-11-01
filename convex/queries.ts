@@ -39,14 +39,18 @@ export const listPromptsByUser = query({
     type: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, { userId, type, limit }): Promise<Array<any>> => {
+  handler: async (ctx, { userId, type, limit }): Promise<Array<Record<string, unknown>>> => {
     const items = await ctx.db
       .query("prompts")
       .withIndex("by_userId", q => q.eq("userId", userId))
       .collect();
 
-    const filtered = type ? items.filter(i => (i as any).type === type) : items;
-    const sorted = filtered.sort((a, b) => (b as any).createdAt - (a as any).createdAt);
+    const filtered = type ? items.filter(i => (i as Record<string, unknown>).type === type) : items;
+    const sorted = filtered.sort((a, b) => {
+      const bCreatedAt = (b as Record<string, unknown>).createdAt as number;
+      const aCreatedAt = (a as Record<string, unknown>).createdAt as number;
+      return bCreatedAt - aCreatedAt;
+    });
     return limit ? sorted.slice(0, limit) : sorted;
   },
 });
@@ -60,15 +64,60 @@ export const getPrompt = query({
   },
 });
 
+// User Preferences
+export const getUserPreferences = query({
+  args: { userId: v.string(), featureType: v.string() },
+  handler: async (ctx, { userId, featureType }) => {
+    const prefs = await ctx.db
+      .query("userPreferences")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+    // choose most recent matching featureType
+    const forFeature = prefs.filter((p: any) => String(p.featureType) === featureType);
+    if (!forFeature.length) return null as any;
+    forFeature.sort((a: any, b: any) => b.updatedAt - a.updatedAt);
+    return forFeature[0];
+  },
+});
+
+// Prompt Templates
+export const listPromptTemplates = query({
+  args: { userId: v.string(), includePublic: v.optional(v.boolean()), category: v.optional(v.string()) },
+  handler: async (ctx, { userId, includePublic, category }) => {
+    const own = await ctx.db
+      .query("promptTemplates")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+
+    let combined = own;
+    if (includePublic) {
+      const pub = await ctx.db.query("promptTemplates").withIndex("by_isPublic", (q) => q.eq("isPublic", true)).collect();
+      const map = new Map(own.map((t) => [String((t as any)._id), true]));
+      for (const p of pub) {
+        if (!map.has(String((p as any)._id))) combined.push(p);
+      }
+    }
+    if (category) {
+      combined = combined.filter((t) => String((t as any).category) === category);
+    }
+    combined.sort((a, b) => (b as any).updatedAt - (a as any).updatedAt);
+    return combined;
+  },
+});
+
 // Prompt Analyses
 export const listAnalysesByUser = query({
   args: { userId: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { userId, limit }): Promise<Array<any>> => {
+  handler: async (ctx, { userId, limit }): Promise<Array<Record<string, unknown>>> => {
     const items = await ctx.db
       .query("promptAnalyses")
       .withIndex("by_userId", q => q.eq("userId", userId))
       .collect();
-    const sorted = items.sort((a, b) => (b as any).createdAt - (a as any).createdAt);
+    const sorted = items.sort((a, b) => {
+      const bCreatedAt = (b as Record<string, unknown>).createdAt as number;
+      const aCreatedAt = (a as Record<string, unknown>).createdAt as number;
+      return bCreatedAt - aCreatedAt;
+    });
     return limit ? sorted.slice(0, limit) : sorted;
   },
 });
@@ -76,12 +125,16 @@ export const listAnalysesByUser = query({
 // Output Predictions
 export const listPredictionsByUser = query({
   args: { userId: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { userId, limit }): Promise<Array<any>> => {
+  handler: async (ctx, { userId, limit }): Promise<Array<Record<string, unknown>>> => {
     const items = await ctx.db
       .query("outputPredictions")
       .withIndex("by_userId", q => q.eq("userId", userId))
       .collect();
-    const sorted = items.sort((a, b) => (b as any).createdAt - (a as any).createdAt);
+    const sorted = items.sort((a, b) => {
+      const bCreatedAt = (b as Record<string, unknown>).createdAt as number;
+      const aCreatedAt = (a as Record<string, unknown>).createdAt as number;
+      return bCreatedAt - aCreatedAt;
+    });
     return limit ? sorted.slice(0, limit) : sorted;
   },
 });
@@ -110,18 +163,19 @@ export const getPromptStats = query({
     // Totals by type
     const totalsByType: Record<string, number> = {};
     for (const p of prompts as Array<{ type?: string }>) {
-      const t = (p as any).type || "unknown";
+      const t = String((p as Record<string, unknown>).type || "unknown");
       totalsByType[t] = (totalsByType[t] ?? 0) + 1;
     }
 
     // Average analysis score
-    const scores = (analyses as Array<{ score?: number }>).map(a => Number((a as any).score) || 0);
+    const scores = (analyses as Array<{ score?: number }>).map(a => Number((a as Record<string, unknown>).score) || 0);
     const averageAnalysisScore = scores.length ? (scores.reduce((s, n) => s + n, 0) / scores.length) : 0;
 
     // Most used features (using metadata.section if present)
     const sectionCounts: Record<string, number> = {};
-    for (const p of prompts as Array<{ metadata?: any }>) {
-      const section = (p as any).metadata?.section;
+    for (const p of prompts as Array<{ metadata?: Record<string, unknown> }>) {
+      const metadata = (p as Record<string, unknown>).metadata as Record<string, unknown> | undefined;
+      const section = metadata?.section;
       if (typeof section === "string" && section.length) {
         sectionCounts[section] = (sectionCounts[section] ?? 0) + 1;
       }

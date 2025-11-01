@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Loader2, Github } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Github, X } from "lucide-react";
 import GenerationPreview from "@/components/landing/GenerationPreview";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 type GenerationItem = {
   _id: string;
@@ -41,6 +42,12 @@ export default function DashboardHome() {
   const [error, setError] = useState<string | null>(null);
   const [loadingStep, setLoadingStep] = useState<0 | 1 | 2 | 3>(0);
 
+  const [showTechStackModal, setShowTechStackModal] = useState(false);
+  const [correctedTechStack, setCorrectedTechStack] = useState<string[]>([]);
+  const [techStackInput, setTechStackInput] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const getTechStack = useAction(api.actions.getTechStack);
   const createGeneration = useMutation(api.mutations.createGeneration);
   const processGeneration = useAction(api.actions.processGeneration);
   const recent = useQuery(api.queries.listGenerationsByUser, userId ? { userId, limit: 12 } : "skip") as GenerationItem[] | undefined;
@@ -80,20 +87,36 @@ export default function DashboardHome() {
       return;
     }
     setError(null);
-
+    setIsAnalyzing(true);
     try {
-      setLoadingStep(1); // Analyzing repository...
-      const generationId = await createGeneration({ userId, repoUrl: repoUrl.trim() });
-      setLoadingStep(2); // Detecting tech stack...
-      await processGeneration({ generationId });
-      setLoadingStep(3); // Generating context files...
-      // Convex realtime will update the list automatically
+      const { techStack } = await getTechStack({ repoUrl: repoUrl.trim() });
+      setCorrectedTechStack(techStack);
+      setShowTechStackModal(true);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Unknown error";
       if (/not found/i.test(message)) setError("Repository not found");
       else if (/private/i.test(message)) setError("Private repository not supported");
       else if (/rate limit/i.test(message)) setError("Rate limit exceeded");
-      else if (/Daily generation limit/i.test(message)) setError("Daily generation limit reached");
+      else setError(message);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
+
+  async function onConfirmTechStack() {
+    setShowTechStackModal(false);
+    if (!isSignedIn || !userId) return;
+
+    try {
+      setLoadingStep(1); // Analyzing repository...
+      const generationId = await createGeneration({ userId, repoUrl: repoUrl.trim() });
+      setLoadingStep(2); // Detecting tech stack...
+      await processGeneration({ generationId, techStack: correctedTechStack });
+      setLoadingStep(3); // Generating context files...
+      // Convex realtime will update the list automatically
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Unknown error";
+      if (/Daily generation limit/i.test(message)) setError("Daily generation limit reached");
       else setError(message);
       setLoadingStep(0);
     } finally {
@@ -103,11 +126,12 @@ export default function DashboardHome() {
   }
 
   const loadingText = useMemo(() => {
+    if (isAnalyzing) return "Detecting tech stack...";
     if (loadingStep === 1) return "Analyzing repository...";
-    if (loadingStep === 2) return "Detecting tech stack...";
+    if (loadingStep === 2) return "Processing...";
     if (loadingStep === 3) return "Generating context files...";
     return null;
-  }, [loadingStep]);
+  }, [isAnalyzing, loadingStep]);
 
   const progress = loadingStep === 0 ? 0 : loadingStep === 1 ? 33 : loadingStep === 2 ? 66 : 95;
 
@@ -162,7 +186,7 @@ export default function DashboardHome() {
             )}
 
             {/* Progress bar */}
-            {loadingText && (
+            {loadingText && !isAnalyzing && (
               <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-secondary/40">
                 <div className="h-full w-0 animate-[progressGrow_0.3s_ease_out_forwards] rounded-full bg-primary" style={{ width: `${progress}%` }} />
               </div>
@@ -171,6 +195,54 @@ export default function DashboardHome() {
         </CardContent>
       </Card>
 
+      <Dialog open={showTechStackModal} onOpenChange={setShowTechStackModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Review and Correct Tech Stack</DialogTitle>
+            <DialogDescription>
+              We&apos;ve detected the following technologies. Please add or remove any to ensure accuracy.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-wrap gap-2">
+            {correctedTechStack.map((tech) => (
+              <Badge key={tech} variant="secondary" className="flex items-center gap-1">
+                {tech}
+                <button onClick={() => setCorrectedTechStack(correctedTechStack.filter((t) => t !== tech))}>
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              value={techStackInput}
+              onChange={(e) => setTechStackInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && techStackInput.trim()) {
+                  setCorrectedTechStack([...correctedTechStack, techStackInput.trim()]);
+                  setTechStackInput('');
+                }
+              }}
+              placeholder="Add a technology..."
+            />
+            <Button
+              onClick={() => {
+                if (techStackInput.trim()) {
+                  setCorrectedTechStack([...correctedTechStack, techStackInput.trim()]);
+                  setTechStackInput('');
+                }
+              }}
+            >
+              Add
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTechStackModal(false)}>Cancel</Button>
+            <Button onClick={onConfirmTechStack}>Confirm and Generate</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       {/* Quick Action: Cursor App Builder */}
       <div className="mt-6">
         <Card className="p-4 shadow-sm ring-1 ring-border">
@@ -239,7 +311,7 @@ export default function DashboardHome() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-base font-semibold">Generate Cursor Prompts from This Repo</h3>
-                <p className="text-sm text-foreground/70">We’ll pre-fill the builder with the detected tech stack, project structure, and existing patterns.</p>
+                <p className="text-sm text-foreground/70">We&apos;ll pre-fill the builder with the detected tech stack, project structure, and existing patterns.</p>
               </div>
               <Button
                 onClick={() => {

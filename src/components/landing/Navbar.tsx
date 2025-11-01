@@ -2,11 +2,11 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu } from 'lucide-react';
+import ThemeToggleButton from '@/components/ui/ThemeToggleButton';
 
 type NavItem = {
   href: string;
@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
 
 function useActiveSection(ids: string[]): string | null {
   const [active, setActive] = React.useState<string | null>(null);
+  const idsKey = ids.join(',');
 
   React.useEffect(() => {
     const observers: IntersectionObserver[] = [];
@@ -47,26 +48,27 @@ function useActiveSection(ids: string[]): string | null {
     });
 
     return () => observers.forEach((o) => o.disconnect());
-  }, [ids.join(',')]);
+  }, [ids, idsKey]);
 
   return active;
 }
 
 export const Navbar: React.FC = () => {
-  const pathname = usePathname();
   const active = useActiveSection(['features', 'how-it-works', 'pricing', 'faq']);
   const [open, setOpen] = React.useState(false);
 
   function linkClasses(targetHash?: string): string {
     const isActive = targetHash && active === targetHash.replace('#', '');
-    return `transition-colors ${isActive ? 'text-primary' : 'text-foreground/80 hover:text-primary/80'}`;
+    return isActive 
+      ? 'px-4 py-2 rounded-lg depth-layer-3 text-primary shadow-depth-md font-medium transition-all duration-200'
+      : 'px-4 py-2 rounded-lg text-muted-foreground hover:depth-layer-3 hover:text-primary hover:shadow-depth-sm transition-all duration-200';
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/40 backdrop-blur-lg bg-background/80 shine-top">
+    <header className="sticky top-0 z-50 w-full depth-layer-1 shadow-depth-md border-b border-border/40 backdrop-blur-lg transition-all duration-300">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Left: Brand */}
-        <Link href="/" className="flex items-center gap-2" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+        <Link href="/" className="flex items-center gap-2 depth-layer-2 rounded-lg px-3 py-1.5 shadow-depth-sm hover-lift cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
           <span className="text-xl font-bold tracking-tight text-primary">Context Wizard</span>
         </Link>
 
@@ -82,14 +84,15 @@ export const Navbar: React.FC = () => {
         {/* Right: Auth + Mobile */}
         <div className="flex items-center gap-2">
           <div className="hidden md:flex items-center gap-2">
+            <ThemeToggleButton className="size-8" />
             <SignedOut>
               <SignInButton mode="modal">
-                <Button variant="ghost" className="px-3">Sign in</Button>
+                <Button variant="ghost" className="depth-layer-2 shadow-depth-sm hover-lift px-3">Sign in</Button>
               </SignInButton>
             </SignedOut>
             <SignedIn>
               <Link href="/dashboard">
-                <Button className="px-3">Dashboard</Button>
+                <Button className="shadow-depth-md hover:shadow-elevated transition-all duration-200 px-3">Dashboard</Button>
               </Link>
               <UserButton afterSignOutUrl="/" />
             </SignedIn>
@@ -102,27 +105,28 @@ export const Navbar: React.FC = () => {
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="p-0">
+            <SheetContent side="right" className="depth-layer-1 shadow-depth-lg p-0">
               <div className="flex h-full flex-col">
                 <div className="px-6 py-4 border-b border-border/40">
                   <span className="text-lg font-semibold text-primary">Menu</span>
                 </div>
                 <nav className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
                   {navItems.map((item) => (
-                    <Link key={item.href} href={item.href} className="text-base text-foreground/90 hover:text-primary" onClick={() => setOpen(false)}>
+                    <Link key={item.href} href={item.href} className="w-full depth-layer-2 rounded-lg p-4 shadow-depth-sm hover-lift text-base text-foreground/90 hover:text-primary text-left transition-all" onClick={() => setOpen(false)}>
                       {item.label}
                     </Link>
                   ))}
                 </nav>
                 <div className="px-6 py-4 border-t border-border/40 flex items-center gap-2">
+                  <ThemeToggleButton className="size-8" />
                   <SignedOut>
                     <SignInButton mode="modal">
-                      <Button variant="ghost" className="w-full">Sign in</Button>
+                      <Button variant="ghost" className="depth-layer-2 shadow-depth-sm hover-lift w-full">Sign in</Button>
                     </SignInButton>
                   </SignedOut>
                   <SignedIn>
                     <Link href="/dashboard" className="w-full" onClick={() => setOpen(false)}>
-                      <Button className="w-full">Dashboard</Button>
+                      <Button className="shadow-depth-md hover:shadow-elevated transition-all duration-200 w-full">Dashboard</Button>
                     </Link>
                     <UserButton afterSignOutUrl="/" />
                   </SignedIn>

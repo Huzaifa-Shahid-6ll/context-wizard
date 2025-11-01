@@ -9,9 +9,17 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
 
 type Prediction = {
-  predictedOutput: string;
+  predictedOutput: string | { 
+    predictedOutput?: string; 
+    confidence?: number; 
+    reasoning?: string; 
+    warnings?: string[]; 
+    alternatives?: Array<{ modifiedPrompt: string; expectedChange: string }> 
+  };
   confidence: number; // 0-100
   reasoning: string;
   warnings: string[];
@@ -24,6 +32,12 @@ export default function PredictPage() {
 
   const [prompt, setPrompt] = React.useState("");
   const [targetAI, setTargetAI] = React.useState("Generic AI");
+  const [temperature, setTemperature] = React.useState(0.2);
+  const [maxTokens, setMaxTokens] = React.useState(500);
+  const [systemPrompt, setSystemPrompt] = React.useState("");
+  const [expectedType, setExpectedType] = React.useState("Explanation");
+  const [expectedLength, setExpectedLength] = React.useState("Standard (100-500)");
+  const [knownIssues, setKnownIssues] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [prediction, setPrediction] = React.useState<Prediction | null>(null);
 
@@ -31,7 +45,16 @@ export default function PredictPage() {
     if (!user?.id || !prompt.trim()) return;
     setLoading(true);
     try {
-      const res = await runPredict({ prompt: prompt.trim(), targetAI, userId: user.id });
+      const configLines = [
+        `Target AI: ${targetAI}`,
+        `Temperature: ${temperature}`,
+        `Max tokens: ${maxTokens}`,
+        systemPrompt ? `System: ${systemPrompt}` : "",
+        `Expected: ${expectedType}, ${expectedLength}`,
+        knownIssues.length ? `Known issues: ${knownIssues.join(", ")}` : "",
+      ].filter(Boolean).join("\n");
+
+      const res = await runPredict({ prompt: `${prompt.trim()}\n\n${configLines}`, targetAI, userId: user.id });
       setPrediction(res as unknown as Prediction);
     } finally {
       setLoading(false);
@@ -40,8 +63,8 @@ export default function PredictPage() {
 
   const getConfidence = () => {
     if (!prediction) return 0;
-    if (typeof prediction.predictedOutput === 'object' && prediction.predictedOutput?.confidence) {
-      return prediction.predictedOutput.confidence;
+    if (typeof prediction.predictedOutput === 'object' && prediction.predictedOutput && 'confidence' in prediction.predictedOutput) {
+      return (prediction.predictedOutput as { confidence: number }).confidence;
     }
     return prediction.confidence || 0;
   };
@@ -57,25 +80,69 @@ export default function PredictPage() {
           <div className="space-y-4">
             <div>
               <label className="mb-2 block text-sm font-medium">Prompt</label>
-              <textarea
-                className="mt-1 w-full rounded-md border border-border bg-background p-3 text-base"
+              <Textarea
+                className="mt-1 w-full"
                 rows={8}
                 placeholder="Paste or write your prompt here..."
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
               />
             </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium">Target AI</label>
+                <Select className="w-full" value={targetAI} onChange={(e) => setTargetAI(e.target.value)}>
+                  {["GPT-4","Claude","Gemini","Generic AI"].map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium">Temperature</label>
+                <input type="range" min={0} max={1} step={0.1} value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} className="w-full" />
+                <div className="mt-1 text-xs text-foreground/60">Lower = more focused; Higher = more creative ({temperature.toFixed(1)})</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium">Max tokens</label>
+                <Select className="w-full" value={String(maxTokens)} onChange={(e) => setMaxTokens(parseInt(e.target.value))}>
+                  {[{label:"Brief (100)",v:100},{label:"Standard (500)",v:500},{label:"Long (1000)",v:1000},{label:"Very long (2000)",v:2000}].map(p => (
+                    <option key={p.v} value={p.v}>{p.label}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium">System prompt (optional)</label>
+                <Textarea className="w-full" rows={3} placeholder="Instructions that guide the AI's behavior" value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium">Expected output type</label>
+                <Select className="w-full" value={expectedType} onChange={(e) => setExpectedType(e.target.value)}>
+                  {["Explanation","Code","List","JSON","Creative writing","Analysis"].map((t) => <option key={t}>{t}</option>)}
+                </Select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium">Expected length</label>
+                <Select className="w-full" value={expectedLength} onChange={(e) => setExpectedLength(e.target.value)}>
+                  {["Brief (< 100 words)","Standard (100-500)","Long (500-1000)","Very long (1000+)"] .map((t) => <option key={t}>{t}</option>)}
+                </Select>
+              </div>
+            </div>
             <div>
-              <label className="mb-2 block text-sm font-medium">Target AI</label>
-              <select
-                className="w-full rounded-md border border-border bg-background p-2 text-sm"
-                value={targetAI}
-                onChange={(e) => setTargetAI(e.target.value)}
-              >
-                {["GPT-4","Claude","Gemini","Generic AI"].map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+              <label className="mb-2 block text-sm font-medium">Known issues (optional)</label>
+              <div className="flex flex-wrap gap-2">
+                {["Too verbose","Misses key points","Inconsistent format","Wrong tone","Hallucinations"].map((i) => {
+                  const active = knownIssues.includes(i);
+                  return (
+                    <button key={i} type="button" onClick={() => setKnownIssues((arr) => (arr.includes(i) ? arr.filter((x) => x !== i) : [...arr, i]))}
+                      className={"rounded-md border px-2 py-1 text-xs transition-colors " + (active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border")}
+                    >{active && <span className="mr-1">✓</span>}{i}</button>
+                  );
+                })}
+              </div>
             </div>
             <div className="pt-2">
               <Button onClick={onPredict} disabled={loading || !prompt.trim()} className="shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg">
@@ -122,7 +189,7 @@ export default function PredictPage() {
                     const reasoning = typeof prediction.predictedOutput === 'object' && prediction.predictedOutput?.reasoning 
                       ? prediction.predictedOutput.reasoning 
                       : prediction.reasoning;
-                    return reasoning ? reasoning.split(/\n+/).map((line, idx) => (
+                    return reasoning ? reasoning.split(/\n+/).map((line: string, idx: number) => (
                       <li key={idx}>{line}</li>
                     )) : (
                       <li>No reasoning provided</li>
@@ -140,7 +207,7 @@ export default function PredictPage() {
                   <div>
                     <div className="text-sm font-medium">Warnings</div>
                     <div className="mt-2 space-y-2">
-                      {warnings.map((w, i) => (
+                      {warnings.map((w: string, i: number) => (
                         <AlertItem key={i} text={w} />
                       ))}
                     </div>
@@ -157,7 +224,7 @@ export default function PredictPage() {
                   <div>
                     <div className="text-sm font-medium">Alternative Suggestions</div>
                     <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
-                      {alternatives.map((a, i) => (
+                      {alternatives.map((a: { modifiedPrompt: string; expectedChange: string }, i: number) => (
                         <Card key={i} className="p-3 shadow-sm ring-1 ring-border">
                           <div className="text-sm font-medium">Modified prompt</div>
                           <pre className="mt-1 whitespace-pre-wrap text-sm leading-6">{a.modifiedPrompt}</pre>

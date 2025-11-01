@@ -17,7 +17,6 @@ export default function DebugPanel({ enabled }: { enabled: boolean }) {
 			try {
 				const [url, init] = args as [RequestInfo | URL, RequestInit?];
 				const method = init?.method || 'GET';
-				const body = typeof init?.body === 'string' ? init?.body : undefined;
 				let preview = '';
 				try { preview = JSON.stringify(await res.clone().json()).slice(0, 300); } catch {}
 				setApiLogs((prev) => prev.concat(`${method} ${String(url)} [${res.status}] → ${preview}`));

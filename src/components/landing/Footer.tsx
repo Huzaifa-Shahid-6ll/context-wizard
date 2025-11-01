@@ -8,11 +8,11 @@ export const Footer: React.FC = () => {
     <footer className="bg-muted/30 border-t py-12 px-4 text-sm text-muted-foreground">
       {/* Newsletter Signup */}
       <div className="max-w-6xl mx-auto mb-8">
-        <h2 className="text-lg font-bold">Stay Updated</h2>
+        <h2 className="text-lg font-bold text-shadow-sm">Stay Updated</h2>
         <p>Get the latest features and updates delivered to your inbox</p>
         <form className="mt-4 flex flex-col sm:flex-row gap-2" onSubmit={(e) => e.preventDefault()}>
-          <Input type="email" placeholder="Enter your email" className="flex-1" aria-label="Email address" />
-          <Button type="submit">Subscribe</Button>
+          <Input type="email" placeholder="Enter your email" className="flex-1 depth-layer-1 shadow-inset border-0" aria-label="Email address" />
+          <Button type="submit" className="depth-top shadow-depth-md hover:shadow-elevated">Subscribe</Button>
         </form>
         <p className="mt-2 text-xs">No spam. Unsubscribe anytime.</p>
       </div>
@@ -49,7 +49,7 @@ export const Footer: React.FC = () => {
 
         {/* Column 2: Product */}
         <div>
-          <h3 className="font-semibold">Product</h3>
+          <h3 className="font-semibold text-shadow-sm">Product</h3>
           <ul className="mt-2 space-y-2">
             <li><a href="#features" className="hover:text-primary transition-colors">Features</a></li>
             <li><a href="#how-it-works" className="hover:text-primary transition-colors">How It Works</a></li>
@@ -62,7 +62,7 @@ export const Footer: React.FC = () => {
 
         {/* Column 3: Resources */}
         <div>
-          <h3 className="font-semibold">Resources</h3>
+          <h3 className="font-semibold text-shadow-sm">Resources</h3>
           <ul className="mt-2 space-y-2">
             <li><a href="/docs" className="hover:text-primary transition-colors">Documentation</a></li>
             <li><a href="/api-docs" className="hover:text-primary transition-colors">API Reference</a></li>
@@ -75,7 +75,7 @@ export const Footer: React.FC = () => {
 
         {/* Column 4: Legal */}
         <div>
-          <h3 className="font-semibold">Legal</h3>
+          <h3 className="font-semibold text-shadow-sm">Legal</h3>
           <ul className="mt-2 space-y-2">
             <li><a href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</a></li>
             <li><a href="/terms" className="hover:text-primary transition-colors">Terms of Service</a></li>

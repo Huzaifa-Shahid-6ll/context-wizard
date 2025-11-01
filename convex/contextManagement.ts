@@ -300,7 +300,7 @@ export const generateContextualPrompt = mutation({
     ))),
     maxContextLength: v.optional(v.number()),
   },
-  handler: async (ctx, { userId, sessionId, basePrompt, contextTypes, maxContextLength = 2000 }) => {
+  handler: async (ctx, { userId, basePrompt, contextTypes, maxContextLength = 2000 }) => {
     // Get relevant context
     const relevantContext = await ctx.runQuery(api.contextManagement.getRelevantContext, {
       userId,

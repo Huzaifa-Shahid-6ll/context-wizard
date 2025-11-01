@@ -1,7 +1,7 @@
 import { parseGitHubUrl } from '../../lib/github';
 import { generateWithOpenRouter } from '../../lib/openrouter';
 
-const globalAny: any = global;
+const globalAny: typeof global = global;
 
 describe('E2E: Error scenarios (mocked)', () => {
 	beforeEach(() => {
