@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { useAction } from "convex/react";
 import { SignedIn, SignedOut, SignInButton, SignUpButton } from "@clerk/nextjs";
+import React from "react";
+import { initPostHog, trackEvent, trackAuth, trackGenerationEvent } from "@/lib/analytics";
 import { api } from "../../convex/_generated/api";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,10 @@ import { motion } from "framer-motion";
 
 
 export default function Home() {
+  React.useEffect(() => {
+    initPostHog();
+    trackEvent("landing_page_viewed");
+  }, []);
   const previewAction = useAction(api.actions.previewGeneration);
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +43,7 @@ export default function Home() {
   const isValid = /^https?:\/\/github\.com\/[\w.-]+\/[\w.-]+(\/.*)?$/i.test(url);
 
   async function onPreview() {
+    trackEvent("hero_cta_clicked", { button_text: "Generate Context Files" });
     setError(null);
     setResult(null);
     if (!isValid) {
@@ -157,10 +164,10 @@ export default function Home() {
         <div className="absolute right-6 top-6 z-50 flex items-center gap-2">
           <SignedOut>
             <SignUpButton mode="modal">
-              <Button variant="outline" className="rounded-md">Sign up</Button>
+              <Button variant="outline" className="rounded_md" onClick={() => trackAuth("signup_button_clicked", { location: "navbar" })}>Sign up</Button>
             </SignUpButton>
             <SignInButton mode="modal">
-              <Button className="rounded-md">Sign in</Button>
+              <Button className="rounded_md" onClick={() => trackAuth("signin_button_clicked", { location: "navbar" })}>Sign in</Button>
             </SignInButton>
           </SignedOut>
         </div>
@@ -229,7 +236,7 @@ export default function Home() {
           <div className="mt-4">
             <SignedOut>
               <SignInButton mode="modal">
-                <Button variant="outline" className="rounded-md">Sign in to save/download</Button>
+                <Button variant="outline" className="rounded-md" onClick={() => trackAuth("signin_button_clicked", { location: "landing_auth_hint" })}>Sign in to save/download</Button>
               </SignInButton>
             </SignedOut>
             <SignedIn>
@@ -431,6 +438,10 @@ export default function Home() {
             navigation
             loop
             autoplay={{ delay: 5000, disableOnInteraction: true, pauseOnMouseEnter: true }}
+            onSlideChange={(swiper) => {
+              trackEvent('testimonial_viewed', { testimonial_id: swiper.realIndex });
+              trackEngagementEvent('social_proof_viewed', { testimonial_id: swiper.realIndex });
+            }}
             breakpoints={{ 768: { slidesPerView: 2, spaceBetween: 16 }, 1024: { slidesPerView: 3, spaceBetween: 16 } }}
           >
             {[
@@ -1575,6 +1586,7 @@ export default function Home() {
           <button
             className="px-6 py-3 bg-primary text-primary-foreground rounded-lg inline-flex items-center justify-center mx-auto shadow hover:shadow-lg transition-shadow"
             onClick={() => {
+              trackEvent("hero_cta_clicked", { button_text: "Ready to try it?" });
               const el = document.querySelector('input[type="url"]') as HTMLInputElement | null;
               if (el) {
                 el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1853,6 +1865,7 @@ model Post {
               key={i}
               whileHover={{ y: -4 }}
               className="group"
+              onClick={() => trackEvent("feature_card_clicked", { feature_name: title })}
             >
               <Card 
                 className="depth-layer-2
@@ -1920,7 +1933,10 @@ model Post {
               <button
                 aria-label="Play video"
                 className="absolute inset-0 m-auto h-20 w-20 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors grid place-items-center animate-pulse"
-              >
+                onClick={() => {
+                  trackEvent("demo_video_played");
+                  trackEvent("demo_video_completed");
+                }}
                 <Video className="h-10 w-10 text-primary" />
               </button>
             </div>
@@ -1984,18 +2000,8 @@ model Post {
                 Start Free Trial
               </Button>
             </SignUpButton>
-            <Button 
-              variant="outline" 
-              size="lg" 
-              className="w-full sm:w-auto"
-              onClick={() => {
-                const pricingSection = document.getElementById('pricing');
-                if (pricingSection) {
-                  pricingSection.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
-            >
-              See Pricing
+            <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
+              <a href="/pricing">See Pricing</a>
             </Button>
           </div>
           
@@ -2025,179 +2031,7 @@ model Post {
         </div>
       </section>
 
-      {/* Pricing - Detailed Section (moved above FAQ) */}
-      <ScrollReveal>
-      <section id="pricing" className="bg-gradient-to-b from-muted/20 to-background">
-        <div className="max-w-7xl mx-auto px-4 py-20">
-          <h2 className="text-4xl font-bold text-center mb-4 text-shadow-sm">Simple, Transparent Pricing</h2>
-          <p className="text-muted-foreground text-center mb-12">Start free, upgrade when you need more power</p>
-
-          {/* Pricing Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Free Plan Card */}
-            <Card 
-              className="p-6
-                depth-layer-2
-                shadow-depth-md
-                border-0
-                hover-lift"
-            >
-              <div className="bg-muted text-muted-foreground px-3 py-1 rounded-full text-sm font-semibold mb-4">Forever Free</div>
-              <div className="text-5xl font-bold text-shadow-md">$0<span className="text-muted-foreground text-xl">/month</span></div>
-              <p className="mt-4 mb-6">Perfect for trying Context Wizard</p>
-              <ul className="space-y-2">
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />5 generations per day</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />20 AI prompts per day</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Public repositories only</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Basic context files (4 files)</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Standard processing speed</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />30-day generation history</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Community support</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />All core features</li>
-              </ul>
-              <div className="mt-6">
-                <SignUpButton mode="modal">
-                  <Button variant="outline" className="w-full">Get Started Free</Button>
-                </SignUpButton>
-              </div>
-              <p className="text-sm text-center mt-2">No credit card required</p>
-            </Card>
-
-            {/* Pro Plan Card */}
-            <Card 
-              className="p-6
-                depth-layer-3
-                shadow-depth-lg
-                border-0
-                hover:shadow-elevated"
-            >
-              <div className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-semibold mb-4">Most Popular</div>
-              <div className="text-5xl font-bold text-shadow-md">$9<span className="text-muted-foreground text-xl">/month</span></div>
-              <p className="text-sm text-green-600">or $84/year (save $24)</p>
-              <p className="mt-4 mb-6">For serious developers and teams</p>
-              <ul className="space-y-2">
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Unlimited generations</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Unlimited AI prompts</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Private repositories</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Advanced context files (6+ files)</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Priority processing (3x faster)</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Forever generation history</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Premium AI models (GPT-4o, Claude)</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Custom prompt templates</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Image prompt generator</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Prompt analyzer & improver</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Output predictor</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Priority email support</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />API access (coming soon)</li>
-                <li className="flex items-center"><Check className="text-green-500 mr-2" />Team collaboration (coming soon)</li>
-              </ul>
-              <Button asChild className="mt-6 w-full">
-                <a href="/dashboard/settings">Upgrade to Pro</a>
-              </Button>
-              <div className="flex items-center justify-center mt-2">
-                <Gift className="text-green-500 mr-2" />
-                <span className="text-sm">7-day free trial</span>
-              </div>
-            </Card>
-          </div>
-
-          {/* Feature Comparison Table */}
-          <div className="mt-16">
-            <h3 className="text-2xl font-bold text-center mb-8 text-shadow-sm">Feature Comparison</h3>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Feature</TableHead>
-                  <TableHead>Free</TableHead>
-                  <TableHead>Pro</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell>Daily Generations</TableCell>
-                  <TableCell>5</TableCell>
-                  <TableCell>Unlimited</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Daily Prompts</TableCell>
-                  <TableCell>20</TableCell>
-                  <TableCell>Unlimited</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Repository Access</TableCell>
-                  <TableCell>Public only</TableCell>
-                  <TableCell>Public + Private</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Context Files</TableCell>
-                  <TableCell>4 basic files</TableCell>
-                  <TableCell>6+ advanced files</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Processing Speed</TableCell>
-                  <TableCell>Standard</TableCell>
-                  <TableCell>Priority (3x faster)</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>AI Models</TableCell>
-                  <TableCell>Basic</TableCell>
-                  <TableCell>Premium (GPT-4o, Claude)</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Generation History</TableCell>
-                  <TableCell>30 days</TableCell>
-                  <TableCell>Forever</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Prompt Templates</TableCell>
-                  <TableCell><X className="text-muted-foreground" /></TableCell>
-                  <TableCell>50+ templates</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Image Prompts</TableCell>
-                  <TableCell><X className="text-muted-foreground" /></TableCell>
-                  <TableCell><Check className="text-green-500" /></TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Prompt Analyzer</TableCell>
-                  <TableCell><X className="text-muted-foreground" /></TableCell>
-                  <TableCell><Check className="text-green-500" /></TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Support</TableCell>
-                  <TableCell>Community</TableCell>
-                  <TableCell>Priority Email</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>API Access</TableCell>
-                  <TableCell><X className="text-muted-foreground" /></TableCell>
-                  <TableCell>Coming Soon</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>Team Features</TableCell>
-                  <TableCell><X className="text-muted-foreground" /></TableCell>
-                  <TableCell>Coming Soon</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Trust Signals */}
-          <div className="flex justify-center space-x-8 mt-12">
-            <div className="flex items-center"><Gift className="text-green-500 mr-2" /><span>7-Day Free Trial</span></div>
-            <div className="flex items-center"><XCircle className="text-green-500 mr-2" /><span>Cancel Anytime</span></div>
-            <div className="flex items-center"><ShieldCheck className="text-green-500 mr-2" /><span>Money-Back Guarantee</span></div>
-            <div className="flex items-center"><Users className="text-green-500 mr-2" /><span>Used by 1,200+ Developers</span></div>
-          </div>
-
-          {/* Bottom Call to Action */}
-          <div className="text-center mt-16">
-            <p>Not sure which plan is right?</p>
-            <Button asChild className="mt-4"><a href="mailto:sales@contextwizard.com">Contact Sales</a></Button>
-          </div>
-        </div>
-      </section>
-      </ScrollReveal>
+      
 
       {/* FAQ - Accordion Section (moved below Pricing) */}
       <section id="faq" aria-labelledby="faq-heading" className="bg-background">
@@ -2207,10 +2041,7 @@ model Post {
           <Accordion type="single" collapsible aria-label="Frequently Asked Questions">
             {faqItems.map((item, index) => (
               <AccordionItem key={index} value={`item-${index}`}>
-                <AccordionTrigger className="group">
-                  <span>{item.question}</span>
-                  <ChevronDown className="ml-2 h-5 w-5 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                </AccordionTrigger>
+                  <AccordionTrigger onClick={() => trackEvent('faq_item_clicked', { question_id: item.question })}>{item.question}</AccordionTrigger>
                 <AccordionContent>
                   <p className="text-muted-foreground">{item.answer}</p>
                 </AccordionContent>

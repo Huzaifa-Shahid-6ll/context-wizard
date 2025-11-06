@@ -19,8 +19,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Crown,
+  CreditCard,
+  Sparkles,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
+import { initPostHog, trackEvent } from "@/lib/analytics";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import ThemeToggleButton from "@/components/ui/ThemeToggleButton";
@@ -41,11 +44,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const remainingPrompts = stats?.remainingPrompts ?? 0;
 
   React.useEffect(() => {
+    initPostHog();
     if (isSignedIn && user?.id && user?.primaryEmailAddress?.emailAddress) {
       // Best-effort create to avoid missing user records
       getOrCreateUser({ clerkId: user.id, email: user.primaryEmailAddress.emailAddress }).catch(() => {});
     }
   }, [isSignedIn, user?.id, user?.primaryEmailAddress?.emailAddress, getOrCreateUser]);
+
+  React.useEffect(() => {
+    if (!isSignedIn) return;
+    try {
+      const intent = localStorage.getItem('auth_flow');
+      if (intent === 'signin') {
+        trackEvent('signin_completed');
+        localStorage.removeItem('auth_flow');
+      } else if (intent === 'signup') {
+        trackEvent('signup_completed');
+        localStorage.removeItem('auth_flow');
+      }
+    } catch {}
+    try {
+      if (!sessionStorage.getItem('first_session_started')) {
+        trackEvent('first_session_started');
+        sessionStorage.setItem('first_session_started', '1');
+      }
+    } catch {}
+  }, [isSignedIn]);
 
   const navItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     // @dashboard/
@@ -66,6 +90,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/dashboard/prompt-history", label: "Prompt History", icon: Clock },
     // @prompt-studio/
     { href: "/dashboard/prompt-studio", label: "Prompt Studio", icon: BarChart2 },
+    // @billing/
+    { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
     // @settings/
     { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
   ];
@@ -122,9 +148,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
       </div>
       <div className="pt-4">
-        <Button className="w-full gap-2 rounded-md bg-primary text-primary-foreground shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg">
-          <Crown className="h-4 w-4" /> Upgrade to Pro
-        </Button>
+        {!stats?.isPro && (
+          <Link href="/dashboard/billing">
+            <Button className="w-full gap-2 rounded-md bg-gradient-to-r from-primary to-purple-600 text-primary-foreground shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg">
+              <Sparkles className="h-4 w-4" /> Upgrade to Pro
+            </Button>
+          </Link>
+        )}
       </div>
     </aside>
   );
@@ -158,6 +188,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* Usage indicator */}
               {isSignedIn && (
                 <UsageIndicator remaining={remainingPrompts} breakdown={stats?.promptsTodayByType || {}} isPro={!!stats?.isPro} />
+              )}
+              {/* Pro/Free badge */}
+              {isSignedIn && (
+                stats?.isPro ? (
+                  <span className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-yellow-500">
+                    <Crown className="h-3 w-3" /> Pro
+                  </span>
+                ) : (
+                  <span className="rounded-md border border-border px-2 py-1 text-xs text-foreground/70">Free</span>
+                )
               )}
               <ThemeToggleButton className="size-8" />
               <UserButton />
