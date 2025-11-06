@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Context Wizard
 
-## Getting Started
+**Stop fighting AI coding tools with bad context. Generate perfect .cursorrules and context files from any GitHub repo in 30 seconds.**
 
-First, run the development server:
+**Live URL:** [https://www.contextwizard.ai](https://www.contextwizard.ai)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+**Demo:**
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+![Demo GIF of Context Wizard]([DEMO_GIF_OR_VIDEO])
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Context Wizard is a tool that helps you generate context files for your AI coding tools. It analyzes your GitHub repository and creates a `.cursorrules` file that you can use with tools like Cursor to provide better context to the AI.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Features
 
-## Learn More
+*   **Unlimited Generations:** Create as many context files as you need.
+*   **Works with Your Favorite Tools:** Generate context files for Cursor, Windsurf, and other AI coding tools.
+*   **Private Repo Support:** Securely connect your private GitHub repositories.
+*   **Framework-Aware:** Understands popular frameworks and libraries to create more accurate context.
+*   **Easy to Use:** Simple, intuitive interface to get you started in seconds.
 
-To learn more about Next.js, take a look at the following resources:
+## Tech Stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+*   **Frontend:** [Next.js](https://nextjs.org/), [React](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Tailwind CSS](https://tailwindcss.com/)
+*   **Backend:** [Convex](https://www.convex.dev/)
+*   **Authentication:** [Clerk](https://clerk.com/)
+*   **Payments:** [Stripe](https://stripe.com/)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## How It Works
 
-## Deploy on Vercel
+1.  **Connect Your GitHub Account:** Securely connect your GitHub account to give Context Wizard access to your repositories.
+2.  **Select a Repository:** Choose the repository you want to generate a context file for.
+3.  **Generate Context:** Context Wizard will analyze your repository and generate a `.cursorrules` file.
+4.  **Download and Use:** Download the generated file and use it with your favorite AI coding tool.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Contributing
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Contributions are welcome! Please feel free to submit a pull request or open an issue to report a bug or suggest a feature.
+
+1.  Fork the repository.
+2.  Create a new branch (`git checkout -b feature/your-feature`).
+3ai.  Commit your changes (`git commit -am 'Add some feature'`).
+4.  Push to the branch (`git push origin feature/your-feature`).
+5.  Create a new Pull Request.

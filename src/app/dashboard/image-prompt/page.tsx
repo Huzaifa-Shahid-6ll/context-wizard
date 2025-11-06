@@ -511,8 +511,8 @@ export default function ImagePromptPage() {
                       <option>Eye level</option>
                       <option>High angle</option>
                       <option>Low angle</option>
-                      <option>Bird's eye</option>
-                      <option>Worm's eye</option>
+                      <option>Bird&apos;s eye</option>
+                      <option>Worm&apos;s eye</option>
                       <option>Dutch angle</option>
                     </select>
                   </div>

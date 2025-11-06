@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
+import { trackGenerationEvent } from "@/lib/analytics";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -134,7 +135,10 @@ export default function GenerationPreview({ open, onClose, repoName, techStack, 
                     {files.map((f, i) => (
                       <li key={f.name}>
                         <button
-                          onClick={() => setSelected(i)}
+                          onClick={() => {
+                            setSelected(i);
+                            trackGenerationEvent('file_previewed', { file_name: f.name });
+                          }}
                           className={
                             "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors " +
                             (i === selected ? "bg-light shadow-sm" : "hover:bg-secondary/10")

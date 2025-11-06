@@ -13,6 +13,13 @@ const users = defineTable({
   // New fields for prompt tracking
   promptsCreatedToday: v.optional(v.number()),
   lastPromptResetDate: v.optional(v.string()),
+  // Stripe subscription fields
+  stripeCustomerId: v.optional(v.string()),
+  stripeSubscriptionId: v.optional(v.string()),
+  stripePriceId: v.optional(v.string()),
+  subscriptionStatus: v.optional(v.string()),
+  subscriptionCurrentPeriodEnd: v.optional(v.number()),
+  subscriptionCancelAtPeriodEnd: v.optional(v.boolean()),
 }).index("by_clerkId", ["clerkId"]);
 
 // Generations table schema

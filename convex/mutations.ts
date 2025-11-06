@@ -1,6 +1,6 @@
 import { mutation } from "./_generated/server";
 // remove unused api import
-import { v } from "convex/values";
+import { v, JSONValue } from "convex/values";
 
 const DAILY_FREE_LIMIT = 5;
 
@@ -114,7 +114,7 @@ export const insertPrompt = mutation({
     createdAt: v.number(),
     updatedAt: v.number(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<string> => {
     const id = await ctx.db.insert("prompts", {
       ...args,
       // ensure loosely-typed fields are treated as unknown JSON blobs
@@ -135,7 +135,7 @@ export const insertPromptAnalysis = mutation({
     improvedPrompt: v.string(),
     createdAt: v.number(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<string> => {
     const id = await ctx.db.insert("promptAnalyses", args);
     return id;
   },
@@ -160,7 +160,7 @@ export const insertOutputPrediction = mutation({
 
 export const incrementUserPromptsCreatedToday = mutation({
   args: { clerkId: v.string(), delta: v.number() },
-  handler: async (ctx, { clerkId, delta }) => {
+  handler: async (ctx, { clerkId, delta }): Promise<void> => {
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
@@ -173,7 +173,7 @@ export const incrementUserPromptsCreatedToday = mutation({
 
 export const incrementPromptViews = mutation({
   args: { id: v.id("prompts") },
-  handler: async (ctx, { id }) => {
+  handler: async (ctx, { id }): Promise<void> => {
     const p = await ctx.db.get(id);
     if (!p) throw new Error("Prompt not found");
     const metaBase: unknown = p.metadata ?? {};
@@ -186,15 +186,15 @@ export const incrementPromptViews = mutation({
 
 export const saveUserPreferences = mutation({
   args: { userId: v.string(), featureType: v.string(), formData: v.any(), preferredMode: v.optional(v.union(v.literal("quick"), v.literal("standard"), v.literal("advanced"))) },
-  handler: async (ctx, { userId, featureType, formData, preferredMode }) => {
+  handler: async (ctx, { userId, featureType, formData, preferredMode }): Promise<string> => {
     const existing = await ctx.db
       .query("userPreferences")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .collect();
-    const match = existing.find((p: any) => String(p.featureType) === featureType);
+    const match = existing.find((p) => String((p as Record<string, unknown>).featureType) === featureType);
     const now = Date.now();
     if (match) {
-      await ctx.db.patch(match._id, { savedInputs: formData as unknown, preferredMode: (preferredMode as any) ?? match.preferredMode, updatedAt: now });
+      await ctx.db.patch(match._id, { savedInputs: formData as unknown, preferredMode: preferredMode ?? (match as any).preferredMode, updatedAt: now });
       return match._id;
     }
     const id = await ctx.db.insert("userPreferences", {
@@ -202,7 +202,7 @@ export const saveUserPreferences = mutation({
       featureType,
       savedInputs: formData as unknown,
       autoFillEnabled: true,
-      preferredMode: (preferredMode as any) ?? "quick",
+      preferredMode: preferredMode ?? "quick",
       customTemplates: [],
       createdAt: now,
       updatedAt: now,
@@ -229,7 +229,7 @@ export const savePromptTemplate = mutation({
     isPublic: v.optional(v.boolean()),
     metadata: v.optional(v.any()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<string> => {
     const now = Date.now();
     const id = await ctx.db.insert("promptTemplates", {
       userId: args.userId,
@@ -260,14 +260,14 @@ export const updatePromptTemplate = mutation({
       metadata: v.optional(v.any()),
     }),
   },
-  handler: async (ctx, { id, patch }) => {
+  handler: async (ctx, { id, patch }): Promise<void> => {
     await ctx.db.patch(id, { ...patch, updatedAt: Date.now() });
   },
 });
 
 export const deletePromptTemplate = mutation({
   args: { id: v.id("promptTemplates"), userId: v.string() },
-  handler: async (ctx, { id, userId }) => {
+  handler: async (ctx, { id, userId }): Promise<void> => {
     const tpl = await ctx.db.get(id);
     if (!tpl) return;
     if ((tpl as unknown as { userId?: string }).userId !== userId) throw new Error("Not authorized");
@@ -275,4 +275,59 @@ export const deletePromptTemplate = mutation({
   },
 });
 
+
+// Stripe subscription sync mutations
+export const updateUserSubscription = mutation({
+  args: {
+    userId: v.string(),
+    subscriptionId: v.string(),
+    customerId: v.string(),
+    priceId: v.string(),
+    status: v.string(),
+    currentPeriodEnd: v.number(),
+    cancelAtPeriodEnd: v.boolean(),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", args.userId))
+      .unique();
+    if (!user) throw new Error("User not found");
+
+    // Entitlement policy: treat active, trialing, and past_due as pro until cancellation
+    const proStatuses = ["active", "trialing", "past_due"] as const;
+    const isPro = (proStatuses as readonly string[]).includes(args.status);
+
+    await ctx.db.patch(user._id, {
+      stripeSubscriptionId: args.subscriptionId,
+      stripeCustomerId: args.customerId,
+      stripePriceId: args.priceId,
+      subscriptionStatus: args.status,
+      subscriptionCurrentPeriodEnd: args.currentPeriodEnd,
+      subscriptionCancelAtPeriodEnd: args.cancelAtPeriodEnd,
+      isPro,
+    });
+  },
+});
+
+export const cancelUserSubscription = mutation({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }): Promise<void> => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+      .unique();
+    if (!user) throw new Error("User not found");
+
+    await ctx.db.patch(user._id, {
+      stripeSubscriptionId: undefined,
+      stripeCustomerId: undefined,
+      stripePriceId: undefined,
+      subscriptionStatus: "canceled",
+      subscriptionCurrentPeriodEnd: undefined,
+      subscriptionCancelAtPeriodEnd: undefined,
+      isPro: false,
+    });
+  },
+});
 

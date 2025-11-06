@@ -45,14 +45,17 @@ export default function SettingsPage() {
       const raw = localStorage.getItem("cw_settings_prefs");
       if (raw) setPrefs({ ...DEFAULT_PREFS, ...(JSON.parse(raw) as Prefs) });
     } catch {}
+    trackSettingsEvent('settings_page_viewed');
   }, []);
 
   function update<K extends keyof Prefs>(key: K, value: Prefs[K]) {
     setPrefs((p) => ({ ...p, [key]: value }));
+    trackSettingsEvent('preferences_updated', { preference_type: key });
   }
 
   function toggleStack(name: string) {
     setPrefs((p) => ({ ...p, stacks: p.stacks.includes(name) ? p.stacks.filter((s) => s !== name) : [...p.stacks, name] }));
+    trackSettingsEvent('preferences_updated', { preference_type: 'stacks' });
   }
 
   async function save() {
@@ -177,7 +180,13 @@ export default function SettingsPage() {
         <div className="mt-4 flex flex-wrap gap-2">
           <Badge variant="secondary">{stats?.isPro ? "Pro" : "Free"}</Badge>
           {!stats?.isPro && <Button className="h-11">Upgrade to Pro</Button>}
-          <Button variant="outline" className="h-11" onClick={() => { if (confirm("Delete account? This cannot be undone.")) alert("Account deletion not implemented yet."); }}>Delete account</Button>
+          <Button variant="outline" className="h-11" onClick={() => {
+            trackSettingsEvent('account_deleted_clicked');
+            if (confirm("Delete account? This cannot be undone.")) {
+              trackSettingsEvent('account_deletion_confirmed');
+              alert("Account deletion not implemented yet.");
+            }
+          }}>Delete account</Button>
         </div>
       </Card>
 

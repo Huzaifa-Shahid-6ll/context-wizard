@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { initPostHog, trackEvent, trackGenerationEvent, updateUserStage, USER_STAGES, trackMilestone } from "@/lib/analytics";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, Loader2, Github, X } from "lucide-react";
 import GenerationPreview from "@/components/landing/GenerationPreview";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 type GenerationItem = {
   _id: string;
@@ -34,6 +36,8 @@ export default function DashboardHome() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
+    initPostHog();
+    trackEvent("dashboard_viewed");
     inputRef.current?.focus();
   }, []);
 
@@ -63,6 +67,12 @@ export default function DashboardHome() {
     }
   }, [latestCompleted]);
 
+  useEffect(() => {
+    if (loadingStep > 0 && loadingStep < 4) {
+      trackGenerationEvent('generation_processing', { step: loadingStep });
+    }
+  }, [loadingStep]);
+
   function validateOnBlur() {
     setTouched(true);
     if (!repoUrl) {
@@ -78,18 +88,22 @@ export default function DashboardHome() {
 
   async function onAnalyze() {
     setTouched(true);
+    trackGenerationEvent("analyze_button_clicked");
     if (!isSignedIn || !userId) {
       setError("Please sign in to generate context files");
       return;
     }
     if (!isValidGithubUrl(repoUrl)) {
       setError("Invalid GitHub URL. Expected: github.com/owner/repo");
+      trackGenerationEvent("github_url_invalid", { error_type: "validation" });
       return;
     }
+    trackGenerationEvent("github_url_validated");
     setError(null);
     setIsAnalyzing(true);
     try {
       const { techStack } = await getTechStack({ repoUrl: repoUrl.trim() });
+      trackGenerationEvent("tech_stack_detected", { frameworks_found: techStack });
       setCorrectedTechStack(techStack);
       setShowTechStackModal(true);
     } catch (e) {
@@ -108,14 +122,39 @@ export default function DashboardHome() {
     if (!isSignedIn || !userId) return;
 
     try {
+      const start = Date.now();
+      trackGenerationEvent("tech_stack_confirmed");
+      trackGenerationEvent("generation_started", { repo_name: repoUrl, is_private: false, tech_stack: correctedTechStack });
       setLoadingStep(1); // Analyzing repository...
       const generationId = await createGeneration({ userId, repoUrl: repoUrl.trim() });
       setLoadingStep(2); // Detecting tech stack...
       await processGeneration({ generationId, techStack: correctedTechStack });
       setLoadingStep(3); // Generating context files...
+      const duration_seconds = Math.round((Date.now() - start) / 1000);
+      trackGenerationEvent("generation_completed", { repo_name: repoUrl, tech_stack: correctedTechStack, duration_seconds });
+      try {
+        // Best-effort stage updates based on totalGenerations after completion
+        const total = (stats as any)?.totalGenerations as number | undefined;
+        if (isSignedIn && userId) {
+          if (total === 0) {
+            updateUserStage(userId, USER_STAGES.ACTIVATED, { activated_at: new Date().toISOString() });
+            trackMilestone('first_generation_completed', { repo_name: repoUrl });
+          } else if (total === 1) {
+            updateUserStage(userId, USER_STAGES.REPEAT, { became_repeat_at: new Date().toISOString() });
+          } else if (total === 9) {
+            updateUserStage(userId, USER_STAGES.POWER_USER, { became_power_at: new Date().toISOString() });
+          }
+        }
+      } catch {}
       // Convex realtime will update the list automatically
     } catch (e) {
       const message = e instanceof Error ? e.message : "Unknown error";
+      trackGenerationEvent("generation_failed", { error_type: message, repo_name: repoUrl });
+      try {
+        if (/Daily generation limit/i.test(message)) {
+          trackEvent('free_limit_reached', { context: 'dashboard_generation' });
+        }
+      } catch {}
       if (/Daily generation limit/i.test(message)) setError("Daily generation limit reached");
       else setError(message);
       setLoadingStep(0);
@@ -154,6 +193,7 @@ export default function DashboardHome() {
                 value={repoUrl}
                 onChange={(e) => setRepoUrl(e.target.value)}
                 onBlur={validateOnBlur}
+                                onPaste={() => trackGenerationEvent('github_url_pasted')}
                 placeholder="https://github.com/username/repository"
                 className="h-12 flex-1 rounded-md border border-transparent bg-light px-4 text-base shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] focus-visible:border-ring"
               />
@@ -279,7 +319,7 @@ export default function DashboardHome() {
 
                   {/* Actions */}
                   <div className="mt-4 flex items-center gap-2">
-                    <Button variant="outline" size="sm" disabled={g.status !== "completed"} onClick={() => downloadFiles(g)}>
+                    <Button variant="outline" size="sm" disabled={g.status !== "completed"} onClick={() => downloadFiles((g.files || []).map(f => ({ name: f.name, content: f.content || "" })), g.repoName || "context")}>
                       Download
                     </Button>
                     <Button variant="ghost" size="sm" asChild>
@@ -339,7 +379,14 @@ export default function DashboardHome() {
       {latestCompleted && (
         <GenerationPreview
           open={showPreview}
-          onClose={() => setShowPreview(false)}
+          onOpenChange={(isOpen) => {
+            if (isOpen) {
+              trackGenerationEvent('preview_opened');
+            } else {
+              trackGenerationEvent('preview_closed');
+            }
+            setShowPreview(isOpen);
+          }}
           repoName={latestCompleted.repoName || latestCompleted.repoUrl}
           techStack={latestCompleted.techStack || []}
           files={latestCompleted.files || []}
@@ -351,20 +398,32 @@ export default function DashboardHome() {
   );
 }
 
-function downloadFiles(g: GenerationItem) {
-  if (!g.files || g.files.length === 0) return;
-  const zipParts: string[] = [];
-  for (const f of g.files) {
-    const header = `\n\n/* ===== ${f.name} ===== */\n`;
-    zipParts.push(header + (f.content || ""));
+const downloadFiles = async (files: Array<{ name: string; content: string }>, repoName: string) => {
+  try {
+    trackGenerationEvent("download_clicked", { repo_name: repoName, file_count: files.length });
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    // Create folder with repo name
+    const folder = zip.folder(repoName) || zip;
+    // Add all files to folder
+    files.forEach(file => {
+      folder.file(file.name, file.content);
+    });
+    // Generate and download
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${repoName}-context-files.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Files downloaded successfully!');
+    trackGenerationEvent("download_completed");
+  } catch (error) {
+    console.error('Download error:', error);
+    toast.error('Failed to download files');
+    trackGenerationEvent("download_failed");
   }
-  const blob = new Blob(zipParts, { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${g.repoName || "context"}-files.txt`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
+};

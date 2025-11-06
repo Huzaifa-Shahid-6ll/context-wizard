@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { initPostHog, trackEvent } from "@/lib/analytics";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { useAction } from "convex/react";
@@ -41,10 +42,16 @@ export default function PredictPage() {
   const [loading, setLoading] = React.useState(false);
   const [prediction, setPrediction] = React.useState<Prediction | null>(null);
 
+  React.useEffect(() => {
+    initPostHog();
+    trackEvent('output_predictor_opened');
+  }, []);
+
   async function onPredict() {
     if (!user?.id || !prompt.trim()) return;
     setLoading(true);
     try {
+      trackEvent('output_prediction_requested');
       const configLines = [
         `Target AI: ${targetAI}`,
         `Temperature: ${temperature}`,
@@ -56,6 +63,16 @@ export default function PredictPage() {
 
       const res = await runPredict({ prompt: `${prompt.trim()}\n\n${configLines}`, targetAI, userId: user.id });
       setPrediction(res as unknown as Prediction);
+      const cs = (() => {
+        if (!res) return 0;
+        const obj = res as any;
+        if (obj && typeof obj === 'object') {
+          if (typeof obj.confidence === 'number') return obj.confidence;
+          if (obj.predictedOutput && typeof obj.predictedOutput === 'object' && typeof obj.predictedOutput.confidence === 'number') return obj.predictedOutput.confidence;
+        }
+        return 0;
+      })();
+      trackEvent('output_prediction_completed', { confidence_score: cs });
     } finally {
       setLoading(false);
     }

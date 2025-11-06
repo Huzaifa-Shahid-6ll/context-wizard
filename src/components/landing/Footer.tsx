@@ -1,5 +1,4 @@
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics";
 import { Twitter, Github, Linkedin, MessageCircle } from "lucide-react";
 import React from "react";
 
@@ -32,16 +31,16 @@ export const Footer: React.FC = () => {
             projects perfectly.
           </p>
           <div className="flex space-x-4 mt-4">
-            <a href="https://twitter.com/contextwizard" aria-label="Twitter" className="hover:text-primary transition-colors" target="_blank" rel="noreferrer noopener">
+            <a href="https://twitter.com/contextwizard" aria-label="Twitter" className="hover:text-primary transition-colors" target="_blank" rel="noreferrer noopener" onClick={() => trackEvent('footer_link_clicked', { link_name: 'twitter' })}>
               <Twitter className="h-5 w-5" />
             </a>
-            <a href="https://github.com/contextwizard" aria-label="GitHub" className="hover:text-primary transition-colors" target="_blank" rel="noreferrer noopener">
+            <a href="https://github.com/contextwizard" aria-label="GitHub" className="hover:text-primary transition-colors" target="_blank" rel="noreferrer noopener" onClick={() => trackEvent('footer_link_clicked', { link_name: 'github' })}>
               <Github className="h-5 w-5" />
             </a>
-            <a href="https://linkedin.com/company/contextwizard" aria-label="LinkedIn" className="hover:text-primary transition-colors" target="_blank" rel="noreferrer noopener">
+            <a href="https://linkedin.com/company/contextwizard" aria-label="LinkedIn" className="hover:text-primary transition-colors" target="_blank" rel="noreferrer noopener" onClick={() => trackEvent('footer_link_clicked', { link_name: 'linkedin' })}>
               <Linkedin className="h-5 w-5" />
             </a>
-            <a href="https://discord.gg/contextwizard" aria-label="Discord" className="hover:text-primary transition-colors" target="_blank" rel="noreferrer noopener">
+            <a href="https://discord.gg/contextwizard" aria-label="Discord" className="hover:text-primary transition-colors" target="_blank" rel="noreferrer noopener" onClick={() => trackEvent('footer_link_clicked', { link_name: 'discord' })}>
               <MessageCircle className="h-5 w-5" />
             </a>
           </div>
@@ -51,10 +50,10 @@ export const Footer: React.FC = () => {
         <div>
           <h3 className="font-semibold text-shadow-sm">Product</h3>
           <ul className="mt-2 space-y-2">
-            <li><a href="#features" className="hover:text-primary transition-colors">Features</a></li>
-            <li><a href="#how-it-works" className="hover:text-primary transition-colors">How It Works</a></li>
-            <li><a href="#pricing" className="hover:text-primary transition-colors">Pricing</a></li>
-            <li><a href="/dashboard" className="hover:text-primary transition-colors">Dashboard</a></li>
+            <li><a href="#features" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'features' })}>Features</a></li>
+            <li><a href="#how-it-works" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'how_it_works' })}>How It Works</a></li>
+            <li><a href="#pricing" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'pricing' })}>Pricing</a></li>
+            <li><a href="/dashboard" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'dashboard' })}>Dashboard</a></li>
             <li><span className="text-muted-foreground">Changelog (coming soon)</span></li>
             <li><span className="text-muted-foreground">Roadmap (coming soon)</span></li>
           </ul>
@@ -64,12 +63,12 @@ export const Footer: React.FC = () => {
         <div>
           <h3 className="font-semibold text-shadow-sm">Resources</h3>
           <ul className="mt-2 space-y-2">
-            <li><a href="/docs" className="hover:text-primary transition-colors">Documentation</a></li>
-            <li><a href="/api-docs" className="hover:text-primary transition-colors">API Reference</a></li>
-            <li><a href="/blog" className="hover:text-primary transition-colors">Blog</a></li>
-            <li><a href="/tutorials" className="hover:text-primary transition-colors">Tutorials</a></li>
-            <li><a href="https://discord.gg/contextwizard" className="hover:text-primary transition-colors">Community</a></li>
-            <li><a href="mailto:support@contextwizard.com" className="hover:text-primary transition-colors">Support</a></li>
+            <li><a href="/docs" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'documentation' })}>Documentation</a></li>
+            <li><a href="/api-docs" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'api_reference' })}>API Reference</a></li>
+            <li><a href="/blog" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'blog' })}>Blog</a></li>
+            <li><a href="/tutorials" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'tutorials' })}>Tutorials</a></li>
+            <li><a href="https://discord.gg/contextwizard" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'community' })}>Community</a></li>
+            <li><a href="mailto:support@contextwizard.com" className="hover:text-primary transition-colors" onClick={() => { trackEvent('footer_link_clicked', { link_name: 'support' }); trackEvent('support_link_clicked'); }}>Support</a></li>
           </ul>
         </div>
 
@@ -77,10 +76,10 @@ export const Footer: React.FC = () => {
         <div>
           <h3 className="font-semibold text-shadow-sm">Legal</h3>
           <ul className="mt-2 space-y-2">
-            <li><a href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</a></li>
-            <li><a href="/terms" className="hover:text-primary transition-colors">Terms of Service</a></li>
-            <li><a href="/cookies" className="hover:text-primary transition-colors">Cookie Policy</a></li>
-            <li><a href="/gdpr" className="hover:text-primary transition-colors">GDPR Compliance</a></li>
+            <li><a href="/privacy" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'privacy' })}>Privacy Policy</a></li>
+            <li><a href="/terms" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'terms' })}>Terms of Service</a></li>
+            <li><a href="/cookies" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'cookies' })}>Cookie Policy</a></li>
+            <li><a href="/gdpr" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'gdpr' })}>GDPR Compliance</a></li>
           </ul>
         </div>
       </div>

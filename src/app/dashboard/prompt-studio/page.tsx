@@ -17,7 +17,13 @@ import { ToneStyleSelector } from "@/components/forms/ToneStyleSelector";
 import { OutputFormatSelector } from "@/components/forms/OutputFormatSelector";
 import { AudienceSelector } from "@/components/forms/AudienceSelector";
 
+import { initPostHog, trackEvent, trackPromptEvent } from "@/lib/analytics";
+
 export default function PromptStudioPage() {
+  React.useEffect(() => {
+    initPostHog();
+    trackEvent('prompt_studio_viewed');
+  }, []);
   const { user } = useUser();
   const stats = useQuery(api.users.getUserStats, user?.id ? { userId: user.id } : "skip") as
     | { remainingPrompts: number; isPro: boolean }
@@ -91,6 +97,7 @@ export default function PromptStudioPage() {
       });
       setResults({ type: "generic", data: res });
       toast.success("Generic prompt generated!");
+      trackPromptEvent('generic_prompt_generated', { word_count: (res.optimizedPrompt as string).split(' ').length, tone: toneStyleDetails.tone });
     } catch {
       toast.error("Failed to generate prompt");
     } finally {
@@ -115,6 +122,7 @@ export default function PromptStudioPage() {
       });
       setResults({ type: "image", data: res });
       toast.success("Image prompts generated!");
+      trackPromptEvent('image_prompt_generated', { platform: 'unknown', style: imageStyle });
     } catch {
       toast.error("Failed to generate image prompts");
     } finally {
@@ -171,7 +179,11 @@ export default function PromptStudioPage() {
         )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={(value) => {
+        setActiveTab(value);
+        if (value === "generic") trackPromptEvent('generic_prompt_opened');
+        else if (value === "image") trackPromptEvent('image_prompt_opened');
+      }} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="generic">Generic</TabsTrigger>
           <TabsTrigger value="image">Image</TabsTrigger>
@@ -251,7 +263,7 @@ export default function PromptStudioPage() {
                   <select
                     className="w-full rounded-md border border-border bg-background p-2 text-sm"
                     value={imageStyle}
-                    onChange={(e) => setImageStyle(e.target.value)}
+                    onChange={(e) => { setImageStyle(e.target.value); if (e.target.value) trackEvent('image_prompt_style_selected', { style_name: e.target.value }); }}
                   >
                     <option value="">Select style...</option>
                     {["cinematic", "documentary", "noir", "vintage", "modern", "artistic", "commercial", "lifestyle"].map((opt) => (
@@ -403,7 +415,7 @@ export default function PromptStudioPage() {
           {results.type === "generic" && (
             <div className="space-y-4">
               <div className="rounded-md border border-border">
-                <Toolbar content={results.data.optimizedPrompt as string} />
+                <Toolbar content={results.data.optimizedPrompt as string} promptType="generic" promptName="optimized_prompt" />
                 <div className="border-t border-border">
                   <SyntaxHighlighter language="markdown" style={docco} customStyle={{ margin: 0, padding: 16, background: "transparent" }}>
                     {results.data.optimizedPrompt as string}
@@ -442,7 +454,7 @@ export default function PromptStudioPage() {
                 
                 <TabsContent value="midjourney">
                   <div className="rounded-md border border-border">
-                    <Toolbar content={results.data.midjourneyPrompt as string} />
+                    <Toolbar content={results.data.midjourneyPrompt as string} promptType="image" promptName="midjourney_prompt" />
                     <div className="border-t border-border">
                       <SyntaxHighlighter language="markdown" style={docco} customStyle={{ margin: 0, padding: 16, background: "transparent" }}>
                         {results.data.midjourneyPrompt as string}
@@ -453,7 +465,7 @@ export default function PromptStudioPage() {
                 
                 <TabsContent value="dalle">
                   <div className="rounded-md border border-border">
-                    <Toolbar content={results.data.dallePrompt as string} />
+                    <Toolbar content={results.data.dallePrompt as string} promptType="image" promptName="dalle_prompt" />
                     <div className="border-t border-border">
                       <SyntaxHighlighter language="markdown" style={docco} customStyle={{ margin: 0, padding: 16, background: "transparent" }}>
                         {results.data.dallePrompt as string}
@@ -464,7 +476,7 @@ export default function PromptStudioPage() {
                 
                 <TabsContent value="stable">
                   <div className="rounded-md border border-border">
-                    <Toolbar content={results.data.stableDiffusionPrompt as string} />
+                    <Toolbar content={results.data.stableDiffusionPrompt as string} promptType="image" promptName="stable_diffusion_prompt" />
                     <div className="border-t border-border">
                       <SyntaxHighlighter language="markdown" style={docco} customStyle={{ margin: 0, padding: 16, background: "transparent" }}>
                         {results.data.stableDiffusionPrompt as string}
@@ -533,7 +545,7 @@ export default function PromptStudioPage() {
               </div>
               
               <div className="rounded-md border border-border">
-                <Toolbar content={results.data.improvedPrompt as string} />
+                <Toolbar content={results.data.improvedPrompt as string} promptType="analysis" promptName="improved_prompt" />
                 <div className="border-t border-border">
                   <SyntaxHighlighter language="markdown" style={docco} customStyle={{ margin: 0, padding: 16, background: "transparent" }}>
                     {results.data.improvedPrompt as string}
@@ -553,9 +565,20 @@ export default function PromptStudioPage() {
   );
 }
 
-function Toolbar({ content }: { content: string }) {
+function Toolbar({ content, promptType, promptName }: { content: string; promptType: string; promptName?: string }) {
   async function onCopy() {
-    try { await navigator.clipboard.writeText(content); } catch {}
+    try {
+      await navigator.clipboard.writeText(content);
+      trackPromptEvent('prompt_copied_to_clipboard', { prompt_type: promptType, prompt_name: promptName });
+      trackEvent('prompt_copied_to_clipboard', { prompt_type: promptType, prompt_id: promptName });
+      if (promptType === 'generic') {
+        trackEvent('generic_prompt_copied');
+      } else if (promptType === 'image') {
+        trackEvent('image_prompt_copied');
+      }
+    } catch {
+      // ignore
+    }
   }
   function onDownload() {
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });

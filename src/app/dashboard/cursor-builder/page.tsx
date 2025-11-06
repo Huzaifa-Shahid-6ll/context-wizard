@@ -13,13 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import JSZip from "jszip";
+import { initPostHog, trackEvent, trackPromptEvent } from "@/lib/analytics";
 import { toast } from "sonner";
 import { TooltipWrapper } from "@/components/forms/TooltipWrapper";
 import { recordSubmission } from "@/lib/autofill";
 import { PromptPreview } from "@/components/forms/PromptPreview";
 import { AudienceSelector } from "@/components/forms/AudienceSelector";
 import { TechnicalDetailsBuilder } from "@/components/forms/TechnicalDetailsBuilder";
-import { TemplateLibrary } from "@/components/templates/TemplateLibrary";
+import { TemplateLibrary, type Template } from "@/components/templates/TemplateLibrary";
 
 type GeneratedItem = { title: string; prompt: string; order: number };
 type GenerationResult = {
@@ -52,6 +53,11 @@ export default function CursorBuilderPage() {
     | { remainingPrompts: number; isPro: boolean }
     | undefined;
 
+  React.useEffect(() => {
+    initPostHog();
+    trackEvent('cursor_builder_opened');
+  }, []);
+
   const [currentStep, setCurrentStep] = React.useState<number>(0);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
@@ -65,7 +71,7 @@ export default function CursorBuilderPage() {
   const [oneSentence, setOneSentence] = React.useState("");
 
   // Audience
-  const [audienceSummary, setAudienceSummary] = React.useState("");
+  const [audienceSummary, setAudienceSummary] = React.useState<{ ageRange: string; profession: string; expertiseLevel: string; industry: string; useCase: string; }>({ ageRange: '', profession: '', expertiseLevel: '', industry: '', useCase: '' });
 
   // Problem & Goals
   const [problemStatement, setProblemStatement] = React.useState("");
@@ -140,7 +146,7 @@ export default function CursorBuilderPage() {
       setProjectDescription(data.projectDescription || "");
       setProjectType(data.projectType || "web app");
       setOneSentence(data.oneSentence || "");
-      setAudienceSummary(data.audienceSummary || "");
+      setAudienceSummary(data.audienceSummary || { ageRange: '', profession: '', expertiseLevel: '', industry: '', useCase: '' });
       setProblemStatement(data.problemStatement || "");
       setPrimaryGoal(data.primaryGoal || "");
       setSuccessCriteria(Array.isArray(data.successCriteria) ? data.successCriteria : []);
@@ -180,7 +186,11 @@ export default function CursorBuilderPage() {
       toast.error("Please specify the core problem and a primary goal.");
       return;
     }
-    setCurrentStep((s) => Math.min(s + 1, steps.length - 1));
+    setCurrentStep((s) => {
+      const nextStep = Math.min(s + 1, steps.length - 1);
+      trackEvent('cursor_builder_step_completed', { step_number: nextStep });
+      return nextStep;
+    });
   }
   function prev() {
     setCurrentStep((s) => Math.max(s - 1, 0));
@@ -239,6 +249,7 @@ export default function CursorBuilderPage() {
       toast.info("Generating... This might take a few seconds.");
       const techStack = [frontend, backend, database, ...tools.filter(Boolean), projectType].filter(Boolean);
       const featureList = features.map((f) => f.name);
+      trackEvent('cursor_builder_submitted', { tech_stack: techStack.join(', '), feature_count: featureList.length });
 
       // Build rich projectDescription aligned to 6-part framework
       const lines: string[] = [];
@@ -246,7 +257,15 @@ export default function CursorBuilderPage() {
       lines.push(`Type: ${projectType}`);
       if (oneSentence) lines.push(`One-liner: ${oneSentence}`);
       if (projectDescription) lines.push(`Overview: ${projectDescription}`);
-      if (audienceSummary) lines.push(`Audience: ${audienceSummary}`);
+      if (audienceSummary) {
+        const summaryString = Object.entries(audienceSummary)
+          .filter(([, value]) => value)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(', ');
+        if (summaryString) {
+          lines.push(`Audience: ${summaryString}`);
+        }
+      }
       if (problemStatement) lines.push(`Problem: ${problemStatement}`);
       if (primaryGoal) lines.push(`Primary Goal: ${primaryGoal}`);
       if (successCriteria.length) lines.push(`Success Criteria: ${successCriteria.filter(Boolean).join("; ")}`);
@@ -272,7 +291,7 @@ export default function CursorBuilderPage() {
         projectDescription: lines.join("\n"),
         techStack,
         features: featureList,
-        targetAudience: audienceSummary || undefined,
+        targetAudience: audienceSummary ? Object.values(audienceSummary).filter(Boolean).join(', ') : undefined,
         userId: user.id,
       });
       setProgress(80);
@@ -280,6 +299,9 @@ export default function CursorBuilderPage() {
       setProgress(100);
       setShowConfetti(true);
       toast.success("Prompt set generated!");
+      const techStack = [frontend, backend, database, ...tools.filter(Boolean), projectType].filter(Boolean);
+      const promptCount = (generated.frontendPrompts?.length || 0) + (generated.backendPrompts?.length || 0) + (generated.errorFixPrompts?.length || 0) + (generated.cursorRules ? 1 : 0);
+      trackEvent('cursor_prompts_generated', { prompt_count: promptCount, tech_stack: techStack.join(', ') });
       // Save to autofill history
       recordSubmission("cursor-app", {
         projectType,
@@ -347,19 +369,21 @@ export default function CursorBuilderPage() {
     // Add more static templates here
   ];
 
-  function applyTemplate(template) {
+  function applyTemplate(template: Template) {
+    try { trackEvent('generic_prompt_template_selected', { template_name: template.name }); } catch {}
     // Set state for all known fields from the template.fields
-    setProjectName(template.fields.projectName || '');
-    setProjectType(template.fields.projectType || 'web app');
-    setOneSentence(template.fields.oneSentence || '');
-    setAudienceSummary(template.fields.audienceSummary || '');
-    setProblemStatement(template.fields.problemStatement || '');
-    setPrimaryGoal(template.fields.primaryGoal || '');
-    setFeatures(Array.isArray(template.fields.features) ? template.fields.features : []);
-    setFrontend(template.fields.frontend || 'React');
-    setBackend(template.fields.backend || 'Node.js');
-    setDatabase(template.fields.database || 'PostgreSQL');
-    setTools(Array.isArray(template.fields.tools) ? template.fields.tools : []);
+    setProjectName(String(template.fields.projectName || ''));
+    setProjectType(String(template.fields.projectType || 'web app'));
+    setOneSentence(String(template.fields.oneSentence || ''));
+    setAudienceSummary(template.fields.audienceSummary as { ageRange: string; profession: string; expertiseLevel: string; industry: string; useCase: string; } || { ageRange: "", profession: "", expertiseLevel: "", industry: "", useCase: "" });
+    setProblemStatement(String(template.fields.problemStatement || ''));
+    setPrimaryGoal(String(template.fields.primaryGoal || ''));
+    type FeatureItem = { id: string; name: string; description: string };
+    setFeatures(Array.isArray(template.fields.features) ? (template.fields.features as FeatureItem[]) : []);
+    setFrontend(String(template.fields.frontend || 'React'));
+    setBackend(String(template.fields.backend || 'Node.js'));
+    setDatabase(String(template.fields.database || 'PostgreSQL'));
+    setTools(Array.isArray(template.fields.tools) ? template.fields.tools as string[] : []);
     // Set more as needed...
   }
 
@@ -393,8 +417,7 @@ export default function CursorBuilderPage() {
             setProjectName(data.projectName || "");
             setProjectDescription(data.projectDescription || "");
             setProjectType(data.projectType || "web app");
-            setOneSentence(data.oneSentence || "");
-            setAudienceSummary(data.audienceSummary || "");
+            setAudienceSummary(data.audienceSummary || { ageRange: '', profession: '', expertiseLevel: '', industry: '', useCase: '' });
             setProblemStatement(data.problemStatement || "");
             setPrimaryGoal(data.primaryGoal || "");
             setSuccessCriteria(Array.isArray(data.successCriteria) ? data.successCriteria : []);
@@ -790,7 +813,7 @@ export default function CursorBuilderPage() {
               <li><span className="text-foreground/60">Name:</span> {projectName || "—"}</li>
               <li><span className="text-foreground/60">Type:</span> {projectType}</li>
               <li><span className="text-foreground/60">One-liner:</span> {oneSentence || "—"}</li>
-              <li><span className="text-foreground/60">Audience:</span> {audienceSummary || "—"}</li>
+              <li><span className="text-foreground/60">Audience:</span> {Object.values(audienceSummary).filter(Boolean).join(', ') || "—"}</li>
               <li><span className="text-foreground/60">Frontend:</span> {frontend}</li>
               <li><span className="text-foreground/60">Backend:</span> {backend}</li>
               <li><span className="text-foreground/60">Database:</span> {database}</li>
@@ -825,6 +848,7 @@ export default function CursorBuilderPage() {
                   variables: [],
                   isPublic: false,
                 });
+                trackEvent('prompt_saved_to_history');
               }}
             >Save as Template</Button>
           </div>
@@ -838,7 +862,7 @@ export default function CursorBuilderPage() {
             </TabsList>
 
             <TabsContent value="requirements" className="space-y-3">
-              <ResultToolbar filename="PROJECT_REQUIREMENTS.md" content={result.projectRequirements} />
+              <ResultToolbar filename="PROJECT_REQUIREMENTS.md" content={result.projectRequirements} promptType="project_requirements" />
               <PreBlock>{result.projectRequirements}</PreBlock>
             </TabsContent>
 
@@ -847,7 +871,7 @@ export default function CursorBuilderPage() {
                 <div key={item.title} className="rounded-md border border-border">
                   <div className="flex items-center justify-between px-3 py-2">
                     <div className="text-sm font-medium">{item.title}</div>
-                    <ResultToolbar filename={`${item.title}.md`} content={item.prompt} compact />
+                    <ResultToolbar filename={`${item.title}.md`} content={item.prompt} compact promptType="frontend_prompt" />
                   </div>
                   <PreBlock className="border-t border-border">{item.prompt}</PreBlock>
                 </div>
@@ -859,7 +883,7 @@ export default function CursorBuilderPage() {
                 <div key={item.title} className="rounded-md border border-border">
                   <div className="flex items-center justify-between px-3 py-2">
                     <div className="text-sm font-medium">{item.title}</div>
-                    <ResultToolbar filename={`${item.title}.md`} content={item.prompt} compact />
+                    <ResultToolbar filename={`${item.title}.md`} content={item.prompt} compact promptType="backend_prompt" />
                   </div>
                   <PreBlock className="border-t border-border">{item.prompt}</PreBlock>
                 </div>
@@ -867,7 +891,7 @@ export default function CursorBuilderPage() {
             </TabsContent>
 
             <TabsContent value="rules" className="space-y-3">
-              <ResultToolbar filename=".cursorrules" content={result.cursorRules} />
+              <ResultToolbar filename=".cursorrules" content={result.cursorRules} promptType="cursor_rules" />
               <PreBlock>{result.cursorRules}</PreBlock>
             </TabsContent>
 
@@ -876,7 +900,7 @@ export default function CursorBuilderPage() {
                 <div key={ef.error} className="rounded-md border border-border">
                   <div className="flex items-center justify-between px-3 py-2">
                     <div className="text-sm font-medium">{ef.error}</div>
-                    <ResultToolbar filename={`${ef.error}.md`} content={ef.fix} compact />
+                    <ResultToolbar filename={`${ef.error}.md`} content={ef.fix} compact promptType="error_fix_prompt" />
                   </div>
                   <PreBlock className="border-t border-border">{ef.fix}</PreBlock>
                 </div>
@@ -887,6 +911,7 @@ export default function CursorBuilderPage() {
           {/* Export ZIP */}
           <div className="mt-4 flex justify-end">
             <Button variant="outline" onClick={async () => {
+              trackEvent('cursor_prompts_downloaded');
               const zip = new JSZip();
               // README
               zip.file("README.txt", "Import these prompts into your workflow. Edit as needed.\n");
@@ -922,9 +947,14 @@ export default function CursorBuilderPage() {
   );
 }
 
-function ResultToolbar({ content, filename, compact }: { content: string; filename: string; compact?: boolean }) {
+function ResultToolbar({ content, filename, compact, promptType }: { content: string; filename: string; compact?: boolean; promptType: string }) {
   async function copy() {
-    try { await navigator.clipboard.writeText(content); } catch {}
+    try {
+      await navigator.clipboard.writeText(content);
+      trackPromptEvent('prompt_copied_to_clipboard', { prompt_type: promptType, prompt_name: filename });
+    } catch {
+      // ignore
+    }
   }
   function download() {
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });

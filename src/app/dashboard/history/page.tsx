@@ -14,9 +14,15 @@ import type { Doc, Id } from "@/../convex/_generated/dataModel";
 
 type Generation = Doc<"generations">;
 
+import { initPostHog, trackEvent } from "@/lib/analytics";
+
 const PAGE_SIZE = 10;
 
 export default function HistoryPage() {
+  React.useEffect(() => {
+    initPostHog();
+    trackEvent('history_page_viewed');
+  }, []);
   const { user } = useUser();
   const userId = user?.id;
   const all = useQuery(api.queries.listGenerationsByUser, userId ? { userId } : "skip") as Generation[] | undefined;
@@ -29,7 +35,23 @@ export default function HistoryPage() {
   const [stackFilter, setStackFilter] = useState<string>("");
   const [sort, setSort] = useState<"date-desc" | "date-asc" | "status">("date-desc");
 
-  const [page, setPage] = useState(1);
+  const handleFilterChange = (filterType: string, value: string) => {
+    trackEvent('history_filtered', { filter_type: filterType });
+    switch (filterType) {
+      case 'search':
+        setSearch(value);
+        break;
+      case 'startDate':
+        setStartDate(value);
+        break;
+      case 'endDate':
+        setEndDate(value);
+        break;
+      case 'stackFilter':
+        setStackFilter(value);
+        break;
+    }
+  };
 
   const filtered = useMemo(() => {
     let list = (all || []).slice();
@@ -59,8 +81,10 @@ export default function HistoryPage() {
 
   async function onDelete(id: string) {
     if (!userId) return;
+    trackHistoryEvent('history_delete_clicked', { generation_id: id });
     const confirmed = window.confirm("Delete this generation? This cannot be undone.");
     if (!confirmed) return;
+    trackHistoryEvent('history_delete_confirmed', { generation_id: id });
     await deleteGeneration({ id: id as Id<"generations">, userId });
   }
 
@@ -83,24 +107,24 @@ export default function HistoryPage() {
       {/* Filters */}
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
         <div className="col-span-2">
-          <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by repository name" />
+          <SearchInput value={search} onChange={(e) => handleFilterChange('search', e.target.value)} placeholder="Search by repository name" />
         </div>
         <div className="flex items-center gap-2 rounded-md bg-light p-2 ring-1 ring-border">
           <Calendar className="h-4 w-4 text-primary" />
-          <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="border-none bg-transparent shadow-none focus-visible:ring-0" />
+          <Input type="date" value={startDate} onChange={(e) => handleFilterChange('startDate', e.target.value)} className="border-none bg-transparent shadow-none focus-visible:ring-0" />
           <span className="text-sm text-foreground/60">to</span>
-          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="border-none bg-transparent shadow-none focus-visible:ring-0" />
+          <Input type="date" value={endDate} onChange={(e) => handleFilterChange('endDate', e.target.value)} className="border-none bg-transparent shadow-none focus-visible:ring-0" />
         </div>
         <div>
-          <SearchInput placeholder="Filter by tech stack (e.g., React)" value={stackFilter} onChange={(e) => setStackFilter(e.target.value)} icon={<Github className="h-4 w-4 text-primary" />} />
+          <SearchInput placeholder="Filter by tech stack (e.g., React)" value={stackFilter} onChange={(e) => handleFilterChange('stackFilter', e.target.value)} icon={<Github className="h-4 w-4 text-primary" />} />
         </div>
       </div>
 
       {/* Sorting */}
       <div className="mt-3 flex items-center gap-2">
-        <Button variant={sort === "date-desc" ? "default" : "outline"} onClick={() => setSort("date-desc")}>Newest</Button>
-        <Button variant={sort === "date-asc" ? "default" : "outline"} onClick={() => setSort("date-asc")}>Oldest</Button>
-        <Button variant={sort === "status" ? "default" : "outline"} onClick={() => setSort("status")}>Status</Button>
+        <Button variant={sort === "date-desc" ? "default" : "outline"} onClick={() => { setSort("date-desc"); trackEvent('history_sorted', { sort_by: 'date-desc' }); }}>Newest</Button>
+        <Button variant={sort === "date-asc" ? "default" : "outline"} onClick={() => { setSort("date-asc"); trackEvent('history_sorted', { sort_by: 'date-asc' }); }}>Oldest</Button>
+        <Button variant={sort === "status" ? "default" : "outline"} onClick={() => { setSort("status"); trackEvent('history_sorted', { sort_by: 'status' }); }}>Status</Button>
       </div>
 
       {/* Table */}
@@ -131,23 +155,26 @@ export default function HistoryPage() {
               )}
 
               {all !== undefined && pageItems.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5}>
-                    <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-                      <Github className="h-8 w-8 text-foreground/40" />
-                      <div className="text-sm text-foreground/60">No generations yet</div>
-                      <Button asChild className="mt-2">
-                        <a href="/dashboard">Generate your first context files</a>
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                <>
+                  {React.useEffect(() => { trackEvent('history_empty_state_viewed'); }, [])}
+                  <TableRow>
+                    <TableCell colSpan={5}>
+                      <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+                        <Github className="h-8 w-8 text-foreground/40" />
+                        <div className="text-sm text-foreground/60">No generations yet</div>
+                        <Button asChild className="mt-2">
+                          <a href="/dashboard">Generate your first context files</a>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </>
               )}
 
               {pageItems.map((g, idx) => (
                 <TableRow key={g._id} className={(idx % 2 ? "bg-secondary/20 " : "") + "transition-all hover:-translate-y-0.5 hover:shadow-sm"}>
                   <TableCell>
-                    <a href={`/dashboard/history?id=${g._id}`} className="flex items-center gap-2">
+                    <a href={`/dashboard/history?id=${g._id}`} className="flex items-center gap-2" onClick={() => trackEvent('history_item_clicked', { generation_id: g._id })}>
                       <Github className="h-4 w-4" />
                       <span className="font-semibold">{g.repoName || g.repoUrl}</span>
                     </a>
@@ -171,9 +198,9 @@ export default function HistoryPage() {
                   <TableCell className="text-right">
                     <div className="ml-auto inline-flex items-center gap-1">
                       <Button size="icon" variant="outline" asChild>
-                        <a href={`/dashboard/history?id=${g._id}`} title="View"><Eye className="h-4 w-4" /></a>
+                        <a href={`/dashboard/history?id=${g._id}`} title="View" onClick={() => trackEvent('history_item_clicked', { generation_id: g._id })}><Eye className="h-4 w-4" /></a>
                       </Button>
-                      <Button size="icon" variant="outline" onClick={() => downloadOneZip(g)} title="Download"><Download className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="outline" onClick={() => { trackEvent('download_clicked', { repo_name: g.repoName || g.repoUrl, file_count: (g.files || []).length }); downloadOneZip(g); trackEvent('history_download_clicked', { generation_id: g._id }); }} title="Download"><Download className="h-4 w-4" /></Button>
                       <Button size="icon" variant="outline" onClick={() => onDelete(g._id)} title="Delete"><Trash2 className="h-4 w-4 text-red-600" /></Button>
                     </div>
                   </TableCell>
@@ -201,20 +228,26 @@ export default function HistoryPage() {
 // removed unused downloadOne helper
 
 async function downloadOneZip(g: Generation) {
-  const zip = new JSZip();
-  const folder = zip.folder(`${g.repoName || "context"}-context-files`)!;
-  for (const f of g.files || []) {
-    folder.file(f.name, f.content || "");
+  try {
+    const zip = new JSZip();
+    const folder = zip.folder(`${g.repoName || "context"}-context-files`)!;
+    for (const f of g.files || []) {
+      folder.file(f.name, f.content || "");
+    }
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${g.repoName || "context"}-context-files.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    try { (window as any)?.posthog ? (window as any).posthog.capture('download_completed') : undefined; } catch {}
+  } catch (e) {
+    try { (window as any)?.posthog ? (window as any).posthog.capture('download_failed') : undefined; } catch {}
+    throw e;
   }
-  const blob = await zip.generateAsync({ type: "blob" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${g.repoName || "context"}-context-files.zip`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
 
 function getStackIcon(name: string) {

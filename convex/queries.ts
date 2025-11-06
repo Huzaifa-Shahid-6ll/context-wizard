@@ -73,9 +73,9 @@ export const getUserPreferences = query({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .collect();
     // choose most recent matching featureType
-    const forFeature = prefs.filter((p: any) => String(p.featureType) === featureType);
-    if (!forFeature.length) return null as any;
-    forFeature.sort((a: any, b: any) => b.updatedAt - a.updatedAt);
+    const forFeature = prefs.filter((p) => String((p as Record<string, unknown>).featureType) === featureType);
+    if (!forFeature.length) return null as unknown as null;
+    forFeature.sort((a, b) => (b as Record<string, unknown>).updatedAt as number - (a as Record<string, unknown>).updatedAt as number);
     return forFeature[0];
   },
 });
@@ -92,15 +92,15 @@ export const listPromptTemplates = query({
     let combined = own;
     if (includePublic) {
       const pub = await ctx.db.query("promptTemplates").withIndex("by_isPublic", (q) => q.eq("isPublic", true)).collect();
-      const map = new Map(own.map((t) => [String((t as any)._id), true]));
+      const map = new Map(own.map((t) => [String((t as Record<string, unknown>)._id), true]));
       for (const p of pub) {
-        if (!map.has(String((p as any)._id))) combined.push(p);
+        if (!map.has(String((p as Record<string, unknown>)._id))) combined.push(p);
       }
     }
     if (category) {
-      combined = combined.filter((t) => String((t as any).category) === category);
+      combined = combined.filter((t) => String((t as Record<string, unknown>).category) === category);
     }
-    combined.sort((a, b) => (b as any).updatedAt - (a as any).updatedAt);
+    combined.sort((a, b) => (b as Record<string, unknown>).updatedAt as number - (a as Record<string, unknown>).updatedAt as number);
     return combined;
   },
 });

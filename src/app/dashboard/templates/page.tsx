@@ -8,11 +8,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TemplateLibrary, Template } from "@/components/templates/TemplateLibrary";
+const CATEGORY_MAP = { generic: true, image: true, video: true, "cursor-app": true, analysis: true } as const;
 
 export default function TemplatesPage() {
   const { user } = useUser();
   const userId = user?.id || "";
-  const templates = useQuery(api.queries.listPromptTemplates, userId ? { userId, includePublic: true } : "skip") as any[] | undefined;
+  const templates = useQuery(api.queries.listPromptTemplates, userId ? { userId, includePublic: true } : "skip") as Array<Record<string, unknown>> | undefined;
   const saveTemplate = useMutation(api.mutations.savePromptTemplate);
 
   const [name, setName] = React.useState("");
@@ -26,7 +27,7 @@ export default function TemplatesPage() {
       userId,
       name,
       description: description || name,
-      category: category as any,
+      category: category as keyof typeof CATEGORY_MAP,
       template,
       variables: [],
       isPublic: false,
@@ -34,15 +35,19 @@ export default function TemplatesPage() {
     setName(""); setDescription(""); setTemplate("");
   }
 
-  const libTemplates: Template[] = (templates || []).map((t: any) => ({
-    id: String(t._id),
-    name: t.name,
-    description: t.description,
-    fields: { category: t.category, variables: t.variables },
-    preview: <span className="text-xs text-foreground/60">{t.template.slice(0, 100)}{t.template.length > 100 ? "…" : ""}</span>,
-  }));
+  type TemplateDoc = { _id: string; name: string; description: string; category: string; variables: string[]; template: string };
+  const libTemplates: Template[] = (templates || []).map((t) => {
+    const doc = t as TemplateDoc;
+    return {
+      id: String(doc._id),
+      name: doc.name,
+      description: doc.description,
+      fields: { category: doc.category, variables: doc.variables },
+      preview: <span className="text-xs text-foreground/60">{doc.template.slice(0, 100)}{doc.template.length > 100 ? "…" : ""}</span>,
+    };
+  });
 
-  function applyTemplate(t: Template) {
+  function applyTemplate(_t: Template) {
     // No-op here; this page is for browsing/saving; consumers apply within generators
   }
 
@@ -58,7 +63,7 @@ export default function TemplatesPage() {
           <div>
             <div className="text-sm font-medium mb-1">Category</div>
             <select className="w-full rounded-md border border-border bg-background p-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)}>
-              {(["generic","image","video","cursor-app","analysis"] as const).map((c) => <option key={c}>{c}</option>)}
+              {Object.keys(CATEGORY_MAP).map((c) => <option key={c}>{c}</option>)}
             </select>
           </div>
           <div className="sm:col-span-2">
@@ -67,7 +72,7 @@ export default function TemplatesPage() {
           </div>
           <div className="sm:col-span-2">
             <div className="text-sm font-medium mb-1">Template</div>
-            <textarea className="w-full rounded-md border border-border bg-background p-2 text-sm" rows={6} value={template} onChange={(e) => setTemplate(e.target.value)} placeholder{"Use {{variable}} syntax if desired"} />
+            <textarea className="w-full rounded-md border border-border bg-background p-2 text-sm" rows={6} value={template} onChange={(e) => setTemplate(e.target.value)} placeholder="Use {{variable}} syntax if desired" />
           </div>
         </div>
         <div className="mt-3 flex justify-end">

@@ -23,7 +23,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
-import { initPostHog, trackEvent } from "@/lib/analytics";
+import { initPostHog, trackEvent, identify } from "@/lib/analytics";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import ThemeToggleButton from "@/components/ui/ThemeToggleButton";
@@ -48,6 +48,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (isSignedIn && user?.id && user?.primaryEmailAddress?.emailAddress) {
       // Best-effort create to avoid missing user records
       getOrCreateUser({ clerkId: user.id, email: user.primaryEmailAddress.emailAddress }).catch(() => {});
+      try {
+        identify(user.id, { email: user.primaryEmailAddress.emailAddress });
+      } catch {}
     }
   }, [isSignedIn, user?.id, user?.primaryEmailAddress?.emailAddress, getOrCreateUser]);
 
@@ -247,10 +250,19 @@ function UsageIndicator({ remaining, breakdown, isPro }: { remaining: number; br
     if (remaining < 5) color = "text-red-600";
     else if (remaining <= 10) color = "text-yellow-600";
   }
+  React.useEffect(() => {
+    try {
+      if (isPro) {
+        (window as any)?.posthog?.capture('pro_unlimited_accessed');
+      } else if (remaining <= 5) {
+        (window as any)?.posthog?.capture('free_limit_warning_shown', { remaining_count: remaining });
+      }
+    } catch {}
+  }, [isPro, remaining]);
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => { try { (window as any)?.posthog?.capture('quota_viewed', { used: (breakdown.generic||0)+(breakdown.image||0), remaining, limit: isPro ? Number.MAX_SAFE_INTEGER : 20 }); } catch {}; setOpen(true); }}
         className={`min-h-11 min-w-11 rounded-md border border-border px-3 py-2 text-sm ${color}`}
         title="Daily prompt usage"
       >

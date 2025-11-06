@@ -46,7 +46,7 @@ export default function GenericPromptPage() {
   });
 
   // Shared
-  const [outputConfig, setOutputConfig] = React.useState<{ format: string; length: string; structure: string[]; constraints: {} }>({
+  const [outputConfig, setOutputConfig] = React.useState<{ format: string; length: string; structure: string[]; constraints: Record<string, unknown> }>({
     format: "text",
     length: "standard",
     structure: [],
@@ -104,7 +104,7 @@ export default function GenericPromptPage() {
   const [example, setExample] = React.useState<string | null>(null);
 
   // Autofill suggestion state
-  const autofillFields = React.useRef<Record<string, any> | null>(null);
+  const autofillFields = React.useRef<Record<string, unknown> | null>(null);
   const [showAutofill, setShowAutofill] = React.useState(false);
 
   // Local storage persistence
@@ -336,11 +336,12 @@ export default function GenericPromptPage() {
     if (template.tone) setToneConfig(prev => ({ ...prev, tone: template.tone || prev.tone }));
   }
 
-  const userPrefs = useQuery(api.queries.getUserPreferences, user?.id ? { userId: user.id, featureType: "generic" } : "skip") as any;
+  const userPrefs = useQuery(api.queries.getUserPreferences, user?.id ? { userId: user.id, featureType: "generic" } : "skip") as Record<string, unknown> | null | undefined;
   const savePrefs = useMutation(api.mutations.saveUserPreferences);
   React.useEffect(() => {
-    if (userPrefs && userPrefs.preferredMode && (userPrefs.preferredMode === "quick" || userPrefs.preferredMode === "standard" || userPrefs.preferredMode === "advanced")) {
-      setMode(userPrefs.preferredMode as Mode);
+    const pref = userPrefs as { preferredMode?: string } | null | undefined;
+    if (pref && (pref.preferredMode === "quick" || pref.preferredMode === "standard" || pref.preferredMode === "advanced")) {
+      setMode(pref.preferredMode as Mode);
     }
   }, [userPrefs]);
   React.useEffect(() => {
@@ -348,7 +349,7 @@ export default function GenericPromptPage() {
       localStorage.setItem('mode:genericPrompt', mode);
       savePrefs({ userId: user.id, featureType: "generic", formData: {}, preferredMode: mode }).catch(() => {});
     }
-  }, [mode, user?.id]);
+  }, [mode, savePrefs, user?.id]);
 
   // Mode configs: which fields are shown in which mode
   type ModeConfig = {

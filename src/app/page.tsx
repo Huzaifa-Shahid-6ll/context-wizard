@@ -440,7 +440,7 @@ export default function Home() {
             autoplay={{ delay: 5000, disableOnInteraction: true, pauseOnMouseEnter: true }}
             onSlideChange={(swiper) => {
               trackEvent('testimonial_viewed', { testimonial_id: swiper.realIndex });
-              trackEngagementEvent('social_proof_viewed', { testimonial_id: swiper.realIndex });
+              trackEvent('social_proof_viewed', { testimonial_id: swiper.realIndex });
             }}
             breakpoints={{ 768: { slidesPerView: 2, spaceBetween: 16 }, 1024: { slidesPerView: 3, spaceBetween: 16 } }}
           >
