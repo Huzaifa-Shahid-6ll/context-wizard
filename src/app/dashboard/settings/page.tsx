@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useUser } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import DebugPanel from "@/components/DebugPanel";
+import OnboardingModal from "@/components/onboarding/OnboardingModal";
 
 type Prefs = {
   model: string;
@@ -39,6 +40,17 @@ export default function SettingsPage() {
   const [saving, setSaving] = React.useState(false);
   const [debugEnabled, setDebugEnabled] = React.useState<boolean>(false);
   const [debugInfo, setDebugInfo] = React.useState<unknown>(null);
+  const [showReOnboarding, setShowReOnboarding] = React.useState(false);
+  const resetOnboarding = useMutation(api.onboarding.resetOnboarding);
+
+  // Analytics tracking function
+  function trackSettingsEvent(eventName: string, properties?: Record<string, any>) {
+    try {
+      (window as any)?.posthog?.capture?.(eventName, properties);
+    } catch (e) {
+      console.warn('PostHog tracking failed:', e);
+    }
+  }
 
   React.useEffect(() => {
     try {
@@ -190,6 +202,29 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      {/* Onboarding */}
+      <Card className="p-4 shadow-sm ring-1 ring-border">
+        <h2 className="text-base font-semibold">Onboarding</h2>
+        <div className="mt-4">
+          <p className="text-sm text-muted-foreground mb-3">Retake the onboarding survey to update your preferences and get new recommendations.</p>
+          <Button 
+            variant="outline" 
+            className="h-11" 
+            onClick={async () => {
+              if (user?.id) {
+                trackSettingsEvent('re_onboarding_clicked');
+                // Reset onboarding status first
+                await resetOnboarding({ userId: user.id });
+                // Then show the modal
+                setShowReOnboarding(true);
+              }
+            }}
+          >
+            Retake Onboarding Survey
+          </Button>
+        </div>
+      </Card>
+
       {/* Integrations */}
       <Card className="p-4 shadow-sm ring-1 ring-border">
         <h2 className="text-base font-semibold">Integrations (coming soon)</h2>
@@ -197,6 +232,22 @@ export default function SettingsPage() {
           <IntegrationCard name="Cursor" />
           <IntegrationCard name="GitHub" />
           <IntegrationCard name="Image Generators" />
+        </div>
+      </Card>
+
+      {/* Tools We Use */}
+      <Card className="p-4 shadow-sm ring-1 ring-border">
+        <h2 className="text-base font-semibold">Tools We Use</h2>
+        <div className="mt-4">
+          <p className="text-sm text-muted-foreground mb-3">
+            Check out the tools we personally use and recommend to enhance your AI development workflow.
+          </p>
+          <a 
+            href="/tools" 
+            className="inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Explore Recommended Tools →
+          </a>
         </div>
       </Card>
 
@@ -220,6 +271,17 @@ export default function SettingsPage() {
         <Button onClick={save} disabled={saving} className="h-11">{saving ? "Saving..." : "Save Preferences"}</Button>
       </div>
       <DebugPanel enabled={debugEnabled} />
+      
+      {/* Re-onboarding modal */}
+      {showReOnboarding && user?.id && (
+        <OnboardingModal
+          userId={user.id}
+          onComplete={() => {
+            trackSettingsEvent('re_onboarding_completed');
+            setShowReOnboarding(false);
+          }}
+        />
+      )}
     </div>
   );
 }

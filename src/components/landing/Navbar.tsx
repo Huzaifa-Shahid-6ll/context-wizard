@@ -16,8 +16,9 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: '/#features', label: 'Features', hash: '#features' },
   { href: '/#how-it-works', label: 'How It Works', hash: '#how-it-works' },
+  { href: '/#features', label: 'Features', hash: '#features' },
+  { href: '/tools', label: 'Tools' },
   { href: '/pricing', label: 'Pricing' },
   { href: '/#faq', label: 'FAQ', hash: '#faq' },
 ];
@@ -55,7 +56,7 @@ function useActiveSection(ids: string[]): string | null {
 }
 
 export const Navbar: React.FC = () => {
-  const active = useActiveSection(['features', 'how-it-works', 'faq']);
+  const active = useActiveSection(['how-it-works', 'features', 'faq']);
   const [open, setOpen] = React.useState(false);
 
   function linkClasses(targetHash?: string): string {
@@ -75,11 +76,17 @@ export const Navbar: React.FC = () => {
 
         {/* Center: Desktop nav */}
         <nav className="hidden md:flex items-center gap-6">
-          {navItems.map((item) => (
-            <Link key={item.href} href={item.href} className={linkClasses(item.hash)} onClick={() => { setOpen(false); trackEvent('footer_link_clicked', { link_name: item.label.toLowerCase() }); }}>
-              {item.label}
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const isActive = item.hash ? active === item.hash.replace('#', '') : false;
+            const linkClass = isActive 
+              ? 'px-4 py-2 rounded-lg depth-layer-3 text-primary shadow-depth-md font-medium transition-all duration-200'
+              : 'px-4 py-2 rounded-lg text-muted-foreground hover:depth-layer-3 hover:text-primary hover:shadow-depth-sm transition-all duration-200';
+            return (
+              <Link key={item.href} href={item.href} className={linkClass} onClick={() => { setOpen(false); trackEvent('footer_link_clicked', { link_name: item.label.toLowerCase() }); }}>
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Right: Auth + Mobile */}
@@ -126,11 +133,17 @@ export const Navbar: React.FC = () => {
                   <span className="text-lg font-semibold text-primary">Menu</span>
                 </div>
                 <nav className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
-                  {navItems.map((item) => (
-                    <Link key={item.href} href={item.href} className="w-full depth-layer-2 rounded-lg p-4 shadow-depth-sm hover-lift text-base text-foreground/90 hover:text-primary text-left transition-all" onClick={() => { setOpen(false); trackEvent('footer_link_clicked', { link_name: item.label.toLowerCase() }); }}>
-                      {item.label}
-                    </Link>
-                  ))}
+                  {navItems.map((item) => {
+                    const isActive = item.hash ? active === item.hash.replace('#', '') : false;
+                    const linkClass = isActive
+                      ? 'w-full depth-layer-3 rounded-lg p-4 shadow-depth-md text-primary text-base font-medium text-left transition-all'
+                      : 'w-full depth-layer-2 rounded-lg p-4 shadow-depth-sm hover-lift text-base text-foreground/90 hover:text-primary text-left transition-all';
+                    return (
+                      <Link key={item.href} href={item.href} className={linkClass} onClick={() => { setOpen(false); trackEvent('footer_link_clicked', { link_name: item.label.toLowerCase() }); }}>
+                        {item.label}
+                      </Link>
+                    );
+                  })}
                 </nav>
                 <div className="px-6 py-4 border-t border-border/40 flex items-center gap-2">
                   <ThemeToggleButton className="size-8" />

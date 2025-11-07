@@ -3,22 +3,19 @@ import { useState } from "react";
 import { useAction } from "convex/react";
 import { SignedIn, SignedOut, SignInButton, SignUpButton } from "@clerk/nextjs";
 import React from "react";
+import Link from "next/link";
 import { initPostHog, trackEvent, trackAuth, trackGenerationEvent } from "@/lib/analytics";
 import { api } from "../../convex/_generated/api";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FileCode, BookOpen, Map, Layers, Code2, Sparkles, Brain, Download, ArrowRight, ChevronDown, Check, X, Gift, XCircle, ShieldCheck, Users, Video, Zap, Target, Lock, UserPlus, GitPullRequest, Bot, GitFork, Star, TrendingUp, Headphones, Award, Shield, Mail, MessageSquare, Calendar, Clock, User, Code, GitBranch, Workflow, Plug } from "lucide-react";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Pagination, Navigation, Autoplay } from "swiper/modules";
-import "swiper/css";
-import "swiper/css/pagination";
-import "swiper/css/navigation";
+import { FileCode, BookOpen, Map, Layers, Code2, Sparkles, Brain, Download, ArrowRight, ChevronDown, Check, X, Gift, XCircle, ShieldCheck, Users, Video, Zap, Target, Lock, UserPlus, GitPullRequest, Bot, GitFork, Star, TrendingUp, Headphones, Award, Shield, Mail, MessageSquare, Calendar, Clock, User, Code, GitBranch, Workflow, Plug, DollarSign, AlertCircle } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Navbar } from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { StickyCtaBar } from "@/components/landing/StickyCtaBar";
@@ -63,6 +60,31 @@ export default function Home() {
 
   const faqItems = [
     {
+      question: "Does this work with private repositories?",
+      answer:
+        "Yes! Pro users can analyze private repositories by connecting their GitHub account. Free tier users can analyze public repositories without authentication. Your code is processed securely and we never store your source code—only the generated context files.",
+    },
+    {
+      question: "Do I need to know how to code?",
+      answer:
+        "Not at all! Context Wizard is designed to work for everyone. You just need to paste your GitHub repository URL, and our AI does the rest. The generated context files help both experienced developers and beginners work better with AI coding assistants like Cursor.",
+    },
+    {
+      question: "What if my repo is huge/complex?",
+      answer:
+        "Context Wizard handles repositories of all sizes efficiently. Our AI analyzes your repository structure, dependencies, and key patterns to generate comprehensive context files. For very large repositories, Pro users get priority processing. If you have concerns about a specific repository, contact us at support@contextwizard.com.",
+    },
+    {
+      question: "Can I use this with Windsurf/other tools?",
+      answer:
+        "Absolutely! Context Wizard files work with all major AI coding assistants including Cursor, Windsurf, GitHub Copilot, Codeium, Tabnine, and any IDE that supports .cursorrules files. The markdown documentation files are also helpful for onboarding new developers to your project.",
+    },
+    {
+      question: "How is this different from just using Cursor?",
+      answer:
+        "Cursor alone doesn't understand your project structure, coding conventions, or architecture. Context Wizard analyzes your entire codebase and generates .cursorrules and documentation files that teach Cursor exactly how your project works. This means Cursor generates code that matches your style, uses correct dependencies, and follows your patterns—instead of generic code that doesn't fit.",
+    },
+    {
       question: "What context files does Context Wizard generate?",
       answer:
         "We generate 6+ essential files including .cursorrules (AI coding guidelines), PROJECT_OVERVIEW.md (project description), ARCHITECTURE.md (folder structure), STACK.md (tech stack documentation), CONVENTIONS.md (coding patterns), and ERROR_FIXES.md (common issues and solutions). Each file is tailored to your specific tech stack and project structure.",
@@ -71,16 +93,6 @@ export default function Home() {
       question: "How does Context Wizard analyze my repository?",
       answer:
         "Our AI analyzes your repository structure, package.json dependencies, README files, code patterns, and framework configurations. We use GPT-4o and Claude 3.5 Sonnet to understand your codebase and generate accurate, helpful context files that make AI coding assistants work better.",
-    },
-    {
-      question: "Can I use Context Wizard with private repositories?",
-      answer:
-        "Yes! Pro users can analyze private repositories by connecting their GitHub account. Free tier users can analyze public repositories without authentication. Your code is processed securely and we never store your source code—only the generated context files.",
-    },
-    {
-      question: "Which AI coding assistants work with these context files?",
-      answer:
-        "Context Wizard files work with all major AI coding assistants including Cursor, GitHub Copilot, Codeium, Tabnine, and any IDE that supports .cursorrules files. The markdown documentation files are also helpful for onboarding new developers to your project.",
     },
     {
       question: "What's the difference between Free and Pro plans?",
@@ -120,7 +132,7 @@ export default function Home() {
     {
       question: "Do you offer refunds?",
       answer:
-        "Yes, we offer a 7-day money-back guarantee for Pro subscriptions. If you're not satisfied, email support@contextwizard.com within 7 days of your purchase for a full refund.",
+        "Yes, we offer a 30-day money-back guarantee for Pro subscriptions. If you're not satisfied, email support@contextwizard.com within 30 days of your purchase for a full refund.",
     },
   ] as const;
 
@@ -160,83 +172,152 @@ export default function Home() {
         {/* layered top inner highlight and bottom drop shadow */}
         <div className="pointer-events-none absolute inset-0 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white/30 before:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-32 after:bg-black/20 after:blur-3xl after:content-['']" />
 
-        {/* Top-right auth buttons */}
-        <div className="absolute right-6 top-6 z-50 flex items-center gap-2">
-          <SignedOut>
-            <SignUpButton mode="modal">
-              <Button variant="outline" className="rounded_md" onClick={() => trackAuth("signup_button_clicked", { location: "navbar" })}>Sign up</Button>
-            </SignUpButton>
-            <SignInButton mode="modal">
-              <Button className="rounded_md" onClick={() => trackAuth("signin_button_clicked", { location: "navbar" })}>Sign in</Button>
-            </SignInButton>
-          </SignedOut>
-        </div>
+
 
         <div className="mx-auto max-w-6xl px-6 py-20 text-center">
+          {/* Social Proof Bar */}
+          <div className="mb-6 overflow-x-auto">
+            <div className="inline-flex items-center gap-2 rounded-full depth-layer-2 shadow-depth-sm border-0 px-4 py-2 text-sm font-medium text-foreground/80 whitespace-nowrap">
+              <div className="flex items-center gap-1">
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+              </div>
+              <span>4.9/5 from 500+ developers</span>
+              <span className="text-foreground/50">|</span>
+              <span className="text-primary">#1 Product of the Day on Product Hunt</span>
+            </div>
+          </div>
+
           {/* Badge */}
           <div className="inline-flex items-center rounded-full depth-layer-3 shadow-depth-md text-shadow-sm hover-lift border-0 px-4 py-1 text-sm font-medium text-foreground">
             Free • No Credit Card • Instant Results
           </div>
 
           {/* Headline */}
-          <h1 className="mt-6 text-5xl font-bold leading-tight tracking-tight text-primary text-shadow-md">
-            Stop Fighting Cursor with Bad Context
+          <h1 className="mt-6 text-3xl sm:text-4xl md:text-5xl font-bold leading-tight tracking-tight text-primary text-shadow-md">
+            Stop Getting Garbage Code from AI Tools
           </h1>
 
           {/* Subheadline */}
-          <p className="mx-auto mt-4 max-w-2xl text-xl font-normal text-foreground/60 text-shadow-sm">
-            Generate perfect context files from any GitHub repo in 30 seconds
+          <p className="mx-auto mt-4 max-w-3xl text-lg sm:text-xl font-normal text-foreground/60 text-shadow-sm">
+            AI coding tools fail because they don't understand your project. Context Wizard analyzes any GitHub repo and generates the perfect .cursorrules and documentation files—so Cursor actually works.
           </p>
 
           {/* Two-column feature comparison */}
-          <div className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-2">
-            <div className="rounded-xl depth-layer-1 shadow-inset p-6 border border-destructive/20">
-              <div className="flex items-center gap-2 mb-4">
-                <X className="h-5 w-5 text-destructive" />
-                <span className="font-semibold text-destructive">Without Context</span>
+          <div className="mx-auto mt-10 max-w-5xl">
+            {/* Comparison Label */}
+            <p className="mb-4 text-sm font-medium text-foreground/70">Same Prompt, Different Results</p>
+            
+            {/* Desktop: Side-by-side, Mobile: Tabs */}
+            <div className="hidden md:grid grid-cols-2 gap-6">
+              <div className="rounded-xl depth-layer-1 shadow-inset p-6 border border-destructive/20">
+                <div className="flex items-center gap-2 mb-4">
+                  <X className="h-5 w-5 text-destructive" />
+                  <span className="font-semibold text-destructive">Without Context</span>
+                </div>
+                <div className="mt-4 overflow-hidden rounded-lg">
+                  <Image src="/window.svg" alt="Messy code example" width={800} height={480} className="h-auto w-full" />
+                </div>
               </div>
-              <div className="mt-4 overflow-hidden rounded-lg">
-                <Image src="/window.svg" alt="Messy code example" width={800} height={480} className="h-auto w-full" />
+              <div className="rounded-xl depth-layer-3 shadow-depth-lg hover-lift p-6 border border-primary/20">
+                <div className="flex items-center gap-2 mb-4">
+                  <Check className="h-5 w-5 text-primary" />
+                  <span className="font-semibold text-primary">With Context</span>
+                </div>
+                <div className="mt-4 overflow-hidden rounded-lg">
+                  <Image src="/file.svg" alt="Clean code example" width={800} height={480} className="h-auto w-full" />
+                </div>
               </div>
             </div>
-            <div className="rounded-xl depth-layer-3 shadow-depth-lg hover-lift p-6 border border-primary/20">
-              <div className="flex items-center gap-2 mb-4">
-                <Check className="h-5 w-5 text-primary" />
-                <span className="font-semibold text-primary">With Context</span>
-              </div>
-              <div className="mt-4 overflow-hidden rounded-lg">
-                <Image src="/file.svg" alt="Clean code example" width={800} height={480} className="h-auto w-full" />
-              </div>
+
+            {/* Mobile: Tabs */}
+            <div className="md:hidden">
+              <Tabs defaultValue="without" className="w-full">
+                <TabsList className="w-full mb-4">
+                  <TabsTrigger value="without" className="flex-1">
+                    <X className="h-4 w-4 mr-2" />
+                    Without Context
+                  </TabsTrigger>
+                  <TabsTrigger value="with" className="flex-1">
+                    <Check className="h-4 w-4 mr-2" />
+                    With Context
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="without" className="mt-0">
+                  <div className="rounded-xl depth-layer-1 shadow-inset p-6 border border-destructive/20">
+                    <div className="mt-4 overflow-hidden rounded-lg">
+                      <Image src="/window.svg" alt="Messy code example" width={800} height={480} className="h-auto w-full" />
+                    </div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="with" className="mt-0">
+                  <div className="rounded-xl depth-layer-3 shadow-depth-lg p-6 border border-primary/20">
+                    <div className="mt-4 overflow-hidden rounded-lg">
+                      <Image src="/file.svg" alt="Clean code example" width={800} height={480} className="h-auto w-full" />
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
 
+          {/* Trust Indicators */}
+          <div className="mx-auto mt-10 flex max-w-2xl flex-wrap items-center justify-center gap-2">
+            <Badge variant="outline" className="px-3 py-1 text-sm">
+              <Check className="h-3 w-3 mr-1" />
+              Free to try
+            </Badge>
+            <Badge variant="outline" className="px-3 py-1 text-sm">
+              <Check className="h-3 w-3 mr-1" />
+              No credit card
+            </Badge>
+            <Badge variant="outline" className="px-3 py-1 text-sm">
+              <Check className="h-3 w-3 mr-1" />
+              1,247+ repos analyzed
+            </Badge>
+          </div>
+
           {/* URL input + CTA */}
-          <div className="mx-auto mt-10 flex max-w-2xl flex-col items-stretch gap-3 sm:flex-row">
+          <div className="mx-auto mt-6 flex max-w-2xl flex-col items-stretch gap-3 sm:flex-row">
             <Input
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://github.com/owner/repo"
-              className="h-12 rounded-lg depth-layer-1 shadow-inset border-0 px-4 text-base focus:depth-layer-2 focus:shadow-depth-sm transition-all duration-200"
+              placeholder="https://github.com/your-username/your-repo"
+              className="h-14 sm:h-16 rounded-lg depth-layer-1 shadow-inset border-0 px-4 text-base focus:depth-layer-2 focus:shadow-depth-sm transition-all duration-200"
             />
             <Button
               onClick={onPreview}
               disabled={!isValid || loading}
-              className="h-12 rounded-lg px-6 depth-top shadow-depth-lg hover:shadow-elevated hover:scale-105 transition-all duration-200"
+              className="h-14 sm:h-16 rounded-lg px-8 text-base sm:text-lg font-semibold depth-top shadow-depth-lg hover:shadow-elevated hover:scale-105 transition-all duration-200"
             >
-              {loading ? "Generating..." : "Generate Context Files"}
+              {loading ? "Generating..." : "Analyze My Repo — Free"}
             </Button>
           </div>
+          
+          {/* Helper text below input */}
+          <p className="mt-3 text-sm text-foreground/60">
+            <Check className="h-3 w-3 inline mr-1" />
+            Works with public and private repos (with token)
+          </p>
+
           {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
-          {/* Small text */}
-          <p className="mt-3 text-sm text-foreground/60">No signup required for preview</p>
+          {/* Risk Reversal Text */}
+          <p className="mt-3 text-sm text-foreground/60">
+            No signup required for preview | See results before committing
+          </p>
 
-          {/* Auth hint */}
-          <div className="mt-4">
+          {/* Auth hint - Simplified and less prominent */}
+          <div className="mt-6">
             <SignedOut>
               <SignInButton mode="modal">
-                <Button variant="outline" className="rounded-md" onClick={() => trackAuth("signin_button_clicked", { location: "landing_auth_hint" })}>Sign in to save/download</Button>
+                <Button variant="ghost" className="text-sm text-foreground/60 hover:text-foreground" onClick={() => trackAuth("signin_button_clicked", { location: "landing_auth_hint" })}>
+                  Sign in to save/download
+                </Button>
               </SignInButton>
             </SignedOut>
             <SignedIn>
@@ -246,1360 +327,250 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Trust Badges and Metrics Section */}
+      {/* SECTION 2: SOCIAL PROOF BAR (Immediate Trust) */}
+      <section className="w-full bg-muted/20 py-6 border-y border-border/20">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Trusted by developers at:</span>
+            <div className="flex items-center gap-6 overflow-x-auto pb-2">
+              {/* Placeholder for company logos - replace with actual logos */}
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background border border-border/40 whitespace-nowrap">
+                <span className="text-xs font-semibold text-foreground/70">Company Logo</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background border border-border/40 whitespace-nowrap">
+                <span className="text-xs font-semibold text-foreground/70">Company Logo</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background border border-border/40 whitespace-nowrap">
+                <span className="text-xs font-semibold text-foreground/70">Company Logo</span>
+              </div>
+            </div>
+            <span className="hidden sm:inline text-foreground/50">|</span>
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-xs sm:text-sm">
+              <span className="font-medium text-foreground">1,247 repos analyzed</span>
+              <span className="text-foreground/50">•</span>
+              <span className="font-medium text-foreground">12,583 context files generated</span>
+              <span className="text-foreground/50">•</span>
+              <span className="font-medium text-foreground">847 developers building better</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 3: THE PROBLEM (Emotional Connection) */}
       <ScrollReveal>
-      <section 
-        className="max-w-7xl mx-auto px-4 py-16
-          depth-layer-1
-          border-y border-border/20"
-      >
-        {/* Heading */}
-        <h2 
-          className="text-3xl font-bold text-center mb-12 text-shadow-sm
-            text-shadow-md"
-        >
-          Trusted by Developers & Teams
+      <section id="problem" className="max-w-7xl mx-auto px-4 py-20">
+        <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-primary text-shadow-md">
+          Why AI Coding Tools Keep Failing You
         </h2>
+        <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+          Every developer knows the frustration. Here's what's really going wrong.
+        </p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+          {/* Column 1: Broken Code */}
+          <Card className="depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="depth-layer-3 shadow-depth-sm w-12 h-12 rounded-lg flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-destructive" />
+              </div>
+              <h3 className="text-xl font-semibold text-shadow-sm">Cursor Generates Broken Code</h3>
+            </div>
+            <p className="text-muted-foreground text-base leading-relaxed">
+              You paste a prompt and get code that doesn't match your project structure, uses wrong dependencies, or completely misses your architecture.
+            </p>
+          </Card>
 
-        {/* Metrics Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-          {/* Metric 1 */}
-          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-md border-0 hover-lift">
-            <Users className="h-8 w-8 text-primary mb-4" />
-            <motion.div
-              className="text-4xl font-bold text-shadow-md"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              2,500+
-            </motion.div>
-            <p className="text-lg">Active Developers</p>
-            <p className="text-sm text-green-600">+150% this month</p>
-          </div>
+          {/* Column 2: Hours Wasted */}
+          <Card className="depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="depth-layer-3 shadow-depth-sm w-12 h-12 rounded-lg flex items-center justify-center">
+                <Clock className="h-6 w-6 text-amber-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-shadow-sm">Hours Wasted on Setup</h3>
+            </div>
+            <p className="text-muted-foreground text-base leading-relaxed">
+              Every new project means manually writing .cursorrules, creating documentation, and explaining your codebase to AI—over and over again.
+            </p>
+          </Card>
 
-          {/* Metric 2 */}
-          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-md border-0 hover-lift">
-            <GitFork className="h-8 w-8 text-primary mb-4" />
-            <motion.div
-              className="text-4xl font-bold text-shadow-md"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              15,000+
-            </motion.div>
-            <p className="text-lg">Repositories Analyzed</p>
-            <p className="text-sm text-muted-foreground">24/7 uptime</p>
-          </div>
-
-          {/* Metric 3 */}
-          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-md border-0 hover-lift">
-            <FileCode className="h-8 w-8 text-primary mb-4" />
-            <motion.div
-              className="text-4xl font-bold text-shadow-md"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-            >
-              50,000+
-            </motion.div>
-            <p className="text-lg">Context Files Generated</p>
-            <p className="text-sm text-green-600">95%+ accuracy</p>
-          </div>
-
-          {/* Metric 4 */}
-          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-md border-0 hover-lift">
-            <TrendingUp className="h-8 w-8 text-primary mb-4" />
-            <motion.div
-              className="text-4xl font-bold text-shadow-md"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.6 }}
-            >
-              4.9/5
-            </motion.div>
-            <p className="text-lg">Average Rating</p>
-            <p className="text-sm text-muted-foreground">500+ reviews</p>
-          </div>
-        </div>
-
-        {/* Trust Badges Row */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-12">
-          {/* Badge 1 */}
-          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-sm border-0 hover-lift">
-            <Shield className="h-8 w-8 text-primary mb-2" />
-            <p className="font-semibold">SOC 2 Compliant</p>
-            <p className="text-sm text-muted-foreground">Enterprise-grade security</p>
-          </div>
-
-          {/* Badge 2 */}
-          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-sm border-0 hover-lift">
-            <Lock className="h-8 w-8 text-primary mb-2" />
-            <p className="font-semibold">GDPR Ready</p>
-            <p className="text-sm text-muted-foreground">Data privacy compliant</p>
-          </div>
-
-          {/* Badge 3 */}
-          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-sm border-0 hover-lift">
-            <Zap className="h-8 w-8 text-primary mb-2" />
-            <p className="font-semibold">99.9% Uptime</p>
-            <p className="text-sm text-muted-foreground">Reliable infrastructure</p>
-          </div>
-
-          {/* Badge 4 */}
-          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-sm border-0 hover-lift">
-            <Headphones className="h-8 w-8 text-primary mb-2" />
-            <p className="font-semibold">24/7 Support</p>
-            <p className="text-sm text-muted-foreground">Always here to help</p>
-          </div>
-
-          {/* Badge 5 */}
-          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-sm border-0 hover-lift">
-            <Award className="h-8 w-8 text-primary mb-2" />
-            <p className="font-semibold">Developer Approved</p>
-            <p className="text-sm text-muted-foreground">Loved by 2,500+ devs</p>
-          </div>
-
-          {/* Badge 6 */}
-          <div className="flex flex-col items-center text-center p-4 depth-layer-2 shadow-depth-sm border-0 hover-lift">
-            <Shield className="h-8 w-8 text-primary mb-2" />
-            <p className="font-semibold">Money-Back Guarantee</p>
-            <p className="text-sm text-muted-foreground">7-day full refund</p>
-          </div>
-        </div>
-
-        {/* Tech Stack Logos */}
-        <h3 className="text-center mb-6">Works with your favorite tools</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-4">
-          {/* Cursor logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">Cursor</span>
-            {/* Replace with actual Cursor logo */}
-          </div>
-
-          {/* VS Code logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">VS Code</span>
-            {/* Replace with actual VS Code logo */}
-          </div>
-
-          {/* GitHub Copilot logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">Copilot</span>
-            {/* Replace with actual GitHub Copilot logo */}
-          </div>
-
-          {/* Codeium logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">Codeium</span>
-            {/* Replace with actual Codeium logo */}
-          </div>
-
-          {/* React logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">React</span>
-            {/* Replace with actual React logo */}
-          </div>
-
-          {/* Next.js logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">Next.js</span>
-            {/* Replace with actual Next.js logo */}
-          </div>
-
-          {/* Python logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">Python</span>
-            {/* Replace with actual Python logo */}
-          </div>
-
-          {/* Node.js logo placeholder */}
-          <div className="flex items-center justify-center h-16 w-16 sm:h-20 sm:w-20 bg-muted/50 border border-border/40 rounded-lg hover:grayscale-0 transition-all">
-            <span className="text-xs text-muted-foreground">Node.js</span>
-            {/* Replace with actual Node.js logo */}
-          </div>
+          {/* Column 3: Burning Credits */}
+          <Card className="depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="depth-layer-3 shadow-depth-sm w-12 h-12 rounded-lg flex items-center justify-center">
+                <DollarSign className="h-6 w-6 text-red-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-shadow-sm">Burning API Credits</h3>
+            </div>
+            <p className="text-muted-foreground text-base leading-relaxed">
+              Bad context means more back-and-forth, more regenerations, and hundreds of wasted tokens trying to get AI to understand your project.
+            </p>
+          </Card>
         </div>
       </section>
       </ScrollReveal>
 
-      {/* Testimonials - Carousel */}
-      <ScrollReveal>
-      <section className="bg-gradient-to-b from-background to-muted/20">
-        <div className="max-w-7xl mx-auto px-4 py-20">
-          <h2 className="text-4xl font-bold text-center mb-4 text-shadow-sm">Loved by Developers Worldwide</h2>
-          <p className="text-muted-foreground text-center mb-12">See what developers are saying about Context Wizard</p>
-
-          <Swiper
-            modules={[Pagination, Navigation, Autoplay]}
-            spaceBetween={16}
-            slidesPerView={1}
-            pagination={{ clickable: true }}
-            navigation
-            loop
-            autoplay={{ delay: 5000, disableOnInteraction: true, pauseOnMouseEnter: true }}
-            onSlideChange={(swiper) => {
-              trackEvent('testimonial_viewed', { testimonial_id: swiper.realIndex });
-              trackEvent('social_proof_viewed', { testimonial_id: swiper.realIndex });
-            }}
-            breakpoints={{ 768: { slidesPerView: 2, spaceBetween: 16 }, 1024: { slidesPerView: 3, spaceBetween: 16 } }}
-          >
-            {[
-              { initials: "JD", bg: "bg-blue-500", quote: "Context Wizard cut our onboarding time from 2 weeks to 2 days. New developers can jump right into any project with confidence.", name: "Jane Doe", title: "Engineering Manager", company: "TechCorp Inc." },
-              { initials: "MS", bg: "bg-green-500", quote: "The .cursorrules files are game-changing. Cursor now generates code that matches our style guide perfectly. No more manual corrections!", name: "Michael Smith", title: "Senior Full-Stack Developer", company: "StartupXYZ" },
-              { initials: "AL", bg: "bg-purple-500", quote: "As an open source maintainer, Context Wizard helped me document my project properly. Contributions increased 300% in the first month!", name: "Alex Lee", title: "Open Source Maintainer", company: "GitHub" },
-              { initials: "SK", bg: "bg-amber-500", quote: "Best $9/month I spend. The time I save on documentation alone pays for itself 10x over. Highly recommended for any team.", name: "Sarah Kim", title: "Tech Lead", company: "DevShop" },
-              { initials: "RC", bg: "bg-pink-500", quote: "I was skeptical at first, but after trying it on one project, I now use it for everything. The AI really understands code architecture.", name: "Robert Chen", title: "Freelance Developer", company: "Independent" },
-              { initials: "EP", bg: "bg-teal-500", quote: "Finally, a tool that makes AI coding assistants actually useful. Context Wizard is now part of our standard development setup.", name: "Emily Park", title: "CTO", company: "BuildFast AI" },
-            ].map((t, idx) => (
-              <SwiperSlide key={idx}>
-                <Card 
-                  className="p-6 rounded-xl
-                    depth-layer-2
-                    shadow-depth-lg
-                    border-0
-                    h-full"
-                >
-                  <div className="flex items-center gap-3">
-                    {/* Replace with real photo when available */}
-                    <div className={`h-12 w-12 rounded-full ${t.bg} text-white flex items-center justify-center font-bold`}>{t.initials}</div>
-                    <div className="flex-1">
-                      <div className="font-semibold">{t.name}</div>
-                      <div className="text-sm text-muted-foreground">{t.title} • {t.company}</div>
-                    </div>
-                  </div>
-                  <p className="text-lg mt-4 mb-4">&ldquo;{t.quote}&rdquo;</p>
-                  <div className="text-yellow-500 flex items-center gap-1" aria-label="5 star rating">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                    ))}
-                  </div>
-                </Card>
-              </SwiperSlide>
-            ))}
-          </Swiper>
-
-          <div className="text-center mt-10">
-            <Button asChild>
-              <a href="mailto:reviews@contextwizard.com">Leave a Review</a>
-            </Button>
-          </div>
-        </div>
-      </section>
-      </ScrollReveal>
-
-      {/* Integrations Showcase */}
-      <section className="max-w-7xl mx-auto px-4 py-20 bg-background">
-        <h2 className="text-4xl font-bold text-center mb-4 text-shadow-sm">Seamless Integration with Your Workflow</h2>
-        <p className="text-muted-foreground text-center mb-12">Works with the tools you already use</p>
-
-        <Tabs defaultValue="ai-assistants" className="w-full">
-          <div className="flex justify-center mb-8">
-            <TabsList className="grid w-full max-w-2xl grid-cols-2 md:grid-cols-4">
-              <TabsTrigger value="ai-assistants" className="flex items-center gap-2">
-                <Code className="h-4 w-4" />
-                <span className="hidden sm:inline">AI Assistants</span>
-              </TabsTrigger>
-              <TabsTrigger value="version-control" className="flex items-center gap-2">
-                <GitBranch className="h-4 w-4" />
-                <span className="hidden sm:inline">Version Control</span>
-              </TabsTrigger>
-              <TabsTrigger value="dev-tools" className="flex items-center gap-2">
-                <Workflow className="h-4 w-4" />
-                <span className="hidden sm:inline">Dev Tools</span>
-              </TabsTrigger>
-              <TabsTrigger value="cicd" className="flex items-center gap-2">
-                <Plug className="h-4 w-4" />
-                <span className="hidden sm:inline">CI/CD</span>
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          {/* AI Coding Assistants Tab */}
-          <TabsContent value="ai-assistants">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Cursor */}
-              <motion.div
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group"
-              >
-                <Card 
-                  className="depth-layer-2
-                    shadow-depth-md
-                    border-0
-                    hover:depth-layer-3
-                    hover:shadow-elevated
-                    p-6 rounded-xl
-                    transition-all duration-300"
-                >
-                  <div className="flex items-center gap-4 mb-4">
-                    <div 
-                      className="h-16 w-16 rounded-lg
-                        depth-layer-3
-                        shadow-depth-sm
-                        flex items-center justify-center"
-                    >
-                      <span className="text-sm font-semibold text-primary">Cursor</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">Cursor</h3>
-                      <span 
-                        className="depth-layer-3
-                          shadow-depth-sm
-                          border-0
-                          text-green-600 px-2 py-1 rounded-full text-xs font-medium"
-                      >
-                        Fully Supported
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    Native .cursorrules support for perfect code generation
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Auto-loads .cursorrules files
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Understands project context
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Generates style-matched code
-                    </li>
-                  </ul>
-                  <Button asChild variant="outline" className="w-full">
-                    <a href="/integrations/cursor">View Integration Guide</a>
-                  </Button>
-                </Card>
-              </motion.div>
-
-              {/* GitHub Copilot */}
-              <motion.div
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group"
-              >
-                <Card 
-                  className="depth-layer-2
-                    shadow-depth-md
-                    border-0
-                    hover:depth-layer-3
-                    hover:shadow-elevated
-                    p-6 rounded-xl
-                    transition-all duration-300"
-                >
-                  <div className="flex items-center gap-4 mb-4">
-                    <div 
-                      className="h-16 w-16 rounded-lg
-                        depth-layer-3
-                        shadow-depth-sm
-                        flex items-center justify-center"
-                    >
-                      <span className="text-sm font-semibold text-blue-600">Copilot</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">GitHub Copilot</h3>
-                      <span 
-                        className="depth-layer-3
-                          shadow-depth-sm
-                          border-0
-                          text-blue-600 px-2 py-1 rounded-full text-xs font-medium"
-                      >
-                        Supported
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    Works with context files in your repository
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Reads markdown documentation
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Better context understanding
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Improved suggestions
-                    </li>
-                  </ul>
-                  <Button asChild variant="outline" className="w-full">
-                    <a href="/integrations/copilot">View Guide</a>
-                  </Button>
-                </Card>
-              </motion.div>
-
-              {/* Codeium */}
-              <motion.div
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group"
-              >
-                <Card 
-                  className="depth-layer-2
-                    shadow-depth-md
-                    border-0
-                    hover:depth-layer-3
-                    hover:shadow-elevated
-                    p-6 rounded-xl
-                    transition-all duration-300"
-                >
-                  <div className="flex items-center gap-4 mb-4">
-                    <div 
-                      className="h-16 w-16 rounded-lg
-                        depth-layer-3
-                        shadow-depth-sm
-                        flex items-center justify-center"
-                    >
-                      <span className="text-sm font-semibold text-purple-600">Codeium</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">Codeium</h3>
-                      <span 
-                        className="depth-layer-3
-                          shadow-depth-sm
-                          border-0
-                          text-blue-600 px-2 py-1 rounded-full text-xs font-medium"
-                      >
-                        Supported
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    Enhanced with context file integration
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Context-aware suggestions
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Project-specific patterns
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Style consistency
-                    </li>
-                  </ul>
-                  <Button asChild variant="outline" className="w-full">
-                    <a href="/integrations/codeium">Learn More</a>
-                  </Button>
-                </Card>
-              </motion.div>
-            </div>
-          </TabsContent>
-
-          {/* Version Control Tab */}
-          <TabsContent value="version-control">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* GitHub */}
-              <motion.div
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group"
-              >
-                <Card className="bg-card p-6 rounded-xl hover:shadow-lg transition-shadow duration-300">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-16 w-16 rounded-lg bg-gray-900 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-white">GitHub</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">GitHub</h3>
-                      <span className="bg-green-500/10 text-green-600 px-2 py-1 rounded-full text-xs font-medium">
-                        Native Integration
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    Direct repository analysis and context file generation
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Public repo analysis
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Private repo support (Pro)
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Automatic file detection
-                    </li>
-                  </ul>
-                  <Button asChild variant="outline" className="w-full">
-                    <a href="/integrations/github">Learn More</a>
-                  </Button>
-                </Card>
-              </motion.div>
-
-              {/* GitLab */}
-              <motion.div
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group"
-              >
-                <Card className="bg-card p-6 rounded-xl hover:shadow-lg transition-shadow duration-300">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-16 w-16 rounded-lg bg-orange-500 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-white">GitLab</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">GitLab</h3>
-                      <span className="bg-blue-500/10 text-blue-600 px-2 py-1 rounded-full text-xs font-medium">
-                        Supported
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    Full support for GitLab repositories and CI/CD
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Repository analysis
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      CI/CD integration
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Merge request context
-                    </li>
-                  </ul>
-                  <Button asChild variant="outline" className="w-full">
-                    <a href="/integrations/gitlab">Learn More</a>
-                  </Button>
-                </Card>
-              </motion.div>
-
-              {/* Bitbucket */}
-              <motion.div
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group"
-              >
-                <Card className="bg-card p-6 rounded-xl hover:shadow-lg transition-shadow duration-300">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-16 w-16 rounded-lg bg-blue-600 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-white">Bitbucket</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">Bitbucket</h3>
-                      <span className="bg-yellow-500/10 text-yellow-600 px-2 py-1 rounded-full text-xs font-medium">
-                        Coming Soon
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    Atlassian Bitbucket integration in development
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Repository analysis
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Jira integration
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Team collaboration
-                    </li>
-                  </ul>
-                  <Button asChild variant="outline" className="w-full" disabled>
-                    <a href="#">Request Early Access</a>
-                  </Button>
-                </Card>
-              </motion.div>
-            </div>
-          </TabsContent>
-
-          {/* Development Tools Tab */}
-          <TabsContent value="dev-tools">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* VS Code */}
-              <motion.div
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group"
-              >
-                <Card className="bg-card p-6 rounded-xl hover:shadow-lg transition-shadow duration-300">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-16 w-16 rounded-lg bg-blue-500 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-white">VS Code</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">VS Code</h3>
-                      <span className="bg-green-500/10 text-green-600 px-2 py-1 rounded-full text-xs font-medium">
-                        Extension Available
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    Official extension for seamless integration
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Auto-generate context files
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Real-time updates
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      IntelliSense integration
-                    </li>
-                  </ul>
-                  <Button asChild variant="outline" className="w-full">
-                    <a href="/integrations/vscode">Install Extension</a>
-                  </Button>
-                </Card>
-              </motion.div>
-
-              {/* IntelliJ IDEA */}
-              <motion.div
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group"
-              >
-                <Card className="bg-card p-6 rounded-xl hover:shadow-lg transition-shadow duration-300">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-16 w-16 rounded-lg bg-orange-500 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-white">IDEA</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">IntelliJ IDEA</h3>
-                      <span className="bg-yellow-500/10 text-yellow-600 px-2 py-1 rounded-full text-xs font-medium">
-                        Plugin Coming Soon
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    JetBrains IDE integration in development
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Context file generation
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Project analysis
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Code completion
-                    </li>
-                  </ul>
-                  <Button asChild variant="outline" className="w-full" disabled>
-                    <a href="#">Request Beta Access</a>
-                  </Button>
-                </Card>
-              </motion.div>
-
-              {/* Vim/Neovim */}
-              <motion.div
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group"
-              >
-                <Card className="bg-card p-6 rounded-xl hover:shadow-lg transition-shadow duration-300">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-16 w-16 rounded-lg bg-green-600 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-white">Vim</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">Vim/Neovim</h3>
-                      <span className="bg-blue-500/10 text-blue-600 px-2 py-1 rounded-full text-xs font-medium">
-                        Manual Setup
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    Manual setup guide for Vim and Neovim users
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Configuration guide
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Plugin integration
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Custom keybindings
-                    </li>
-                  </ul>
-                  <Button asChild variant="outline" className="w-full">
-                    <a href="/integrations/vim">View Setup Guide</a>
-                  </Button>
-                </Card>
-              </motion.div>
-            </div>
-          </TabsContent>
-
-          {/* CI/CD Tab */}
-          <TabsContent value="cicd">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* GitHub Actions */}
-              <motion.div
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group"
-              >
-                <Card className="bg-card p-6 rounded-xl hover:shadow-lg transition-shadow duration-300">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-16 w-16 rounded-lg bg-gray-900 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-white">Actions</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">GitHub Actions</h3>
-                      <span className="bg-green-500/10 text-green-600 px-2 py-1 rounded-full text-xs font-medium">
-                        Workflow Templates
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    Automated context file generation in CI/CD
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Pre-built workflows
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Auto-update on changes
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      PR integration
-                    </li>
-                  </ul>
-                  <Button asChild variant="outline" className="w-full">
-                    <a href="/integrations/github-actions">View Templates</a>
-                  </Button>
-                </Card>
-              </motion.div>
-
-              {/* GitLab CI */}
-              <motion.div
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group"
-              >
-                <Card className="bg-card p-6 rounded-xl hover:shadow-lg transition-shadow duration-300">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-16 w-16 rounded-lg bg-orange-500 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-white">GitLab</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">GitLab CI</h3>
-                      <span className="bg-green-500/10 text-green-600 px-2 py-1 rounded-full text-xs font-medium">
-                        Pipeline Examples
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    GitLab CI/CD pipeline integration examples
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Pipeline templates
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Merge request triggers
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Artifact generation
-                    </li>
-                  </ul>
-                  <Button asChild variant="outline" className="w-full">
-                    <a href="/integrations/gitlab-ci">View Examples</a>
-                  </Button>
-                </Card>
-              </motion.div>
-
-              {/* Jenkins */}
-              <motion.div
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group"
-              >
-                <Card className="bg-card p-6 rounded-xl hover:shadow-lg transition-shadow duration-300">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-16 w-16 rounded-lg bg-red-600 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-white">Jenkins</span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">Jenkins</h3>
-                      <span className="bg-yellow-500/10 text-yellow-600 px-2 py-1 rounded-full text-xs font-medium">
-                        Plugin Coming Soon
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    Jenkins plugin for automated context generation
-                  </p>
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Build integration
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Pipeline support
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-500" />
-                      Notification hooks
-                    </li>
-                  </ul>
-                  <Button asChild variant="outline" className="w-full" disabled>
-                    <a href="#">Request Beta Access</a>
-                  </Button>
-                </Card>
-              </motion.div>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        {/* Bottom CTA */}
-        <div className="text-center mt-12">
-          <p className="text-muted-foreground mb-4">Don&apos;t see your tool?</p>
-          <Button asChild variant="outline" size="lg">
-            <a href="/feedback">Request Integration</a>
-          </Button>
-          <p className="text-sm text-muted-foreground mt-4">We&apos;re constantly adding new integrations</p>
-        </div>
-      </section>
-
-      {/* Use Cases - Real Scenarios */}
-      <ScrollReveal>
-      <section 
-        id="use-cases"
-        className="depth-layer-1"
-      >
-        <div className="max-w-7xl mx-auto px-4 py-20">
-          <h2 
-            className="text-4xl font-bold text-center mb-4
-              text-shadow-md"
-          >
-            Built for Real Development Scenarios
-          </h2>
-          <p className="text-muted-foreground text-center mb-12">See how developers use Context Wizard every day</p>
-
-          <div className="space-y-12">
-            {/* Use Case 1 - Onboarding New Developers (Image left, content right) */}
-            <Card 
-              className="depth-layer-2
-                shadow-depth-lg
-                border-0
-                overflow-hidden
-                hover:depth-layer-3
-                hover:shadow-elevated
-                transition-all duration-500
-                group"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center p-6">
-                <div className="order-1">
-                  <div 
-                    className="depth-layer-1
-                      shadow-inset
-                      h-80
-                      flex items-center justify-center
-                      group-hover:scale-105
-                      transition-transform duration-500"
-                  >
-                    <UserPlus className="h-32 w-32 text-muted-foreground" />
-                  </div>
-                </div>
-                <div className="order-2">
-                  <Badge
-                    className="absolute top-4 left-4 text-shadow-sm
-                      depth-layer-3
-                      shadow-depth-md
-                      border-0
-                      text-shadow-sm
-                      z-10"
-                  >
-                    Onboarding
-                  </Badge>
-                  <h3 
-                    className="text-2xl font-bold mb-4 text-shadow-sm
-                      text-shadow-sm"
-                  >
-                    Get New Team Members Up to Speed Faster
-                  </h3>
-                  <p className="text-foreground/80">New developers can understand your entire codebase in minutes, not days. Our AI-generated documentation explains your project structure, tech stack, and coding conventions in plain English.</p>
-                  <ul className="mt-4 space-y-2">
-                    <li
-                      className="flex items-start gap-2
-                        depth-layer-3
-                        rounded-lg p-3
-                        shadow-depth-sm
-                        hover-lift"
-                    >
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span>Reduce onboarding time by 80%</span>
-                    </li>
-                    <li
-                      className="flex items-start gap-2
-                        depth-layer-3
-                        rounded-lg p-3
-                        shadow-depth-sm
-                        hover-lift"
-                    >
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span>Standardized documentation for all projects</span>
-                    </li>
-                    <li
-                      className="flex items-start gap-2
-                        depth-layer-3
-                        rounded-lg p-3
-                        shadow-depth-sm
-                        hover-lift"
-                    >
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span>Always up-to-date with your current codebase</span>
-                    </li>
-                  </ul>
-                  <Button className="mt-6">Try It Free</Button>
-                </div>
-              </div>
-            </Card>
-
-            {/* Use Case 2 - Better Code Reviews (Content left, image right) */}
-            <Card 
-              className="depth-layer-2
-                shadow-depth-lg
-                border-0
-                overflow-hidden
-                hover:depth-layer-3
-                hover:shadow-elevated
-                transition-all duration-500
-                group"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center p-6">
-                <div className="order-2 md:order-1">
-                  <Badge
-                    className="depth-layer-3 text-shadow-sm
-                      shadow-depth-md
-                      border-0
-                      text-shadow-sm
-                      z-10"
-                  >
-                    Code Quality
-                  </Badge>
-                  <h3 
-                    className="text-2xl font-bold mb-4 text-shadow-sm
-                      text-shadow-sm"
-                  >
-                    Supercharge Your Code Reviews
-                  </h3>
-                  <p className="text-foreground/80">Give reviewers instant context about your project&apos;s architecture and conventions. No more asking &apos;why did you structure it this way?&apos;—the answer is right in the context files.</p>
-                  <ul className="mt-4 space-y-2">
-                    <li
-                      className="flex items-start gap-2
-                        depth-layer-3
-                        rounded-lg p-3
-                        shadow-depth-sm
-                        hover-lift"
-                    >
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span>Faster, more thorough code reviews</span>
-                    </li>
-                    <li
-                      className="flex items-start gap-2
-                        depth-layer-3
-                        rounded-lg p-3
-                        shadow-depth-sm
-                        hover-lift"
-                    >
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span>Consistent code style enforcement</span>
-                    </li>
-                    <li
-                      className="flex items-start gap-2
-                        depth-layer-3
-                        rounded-lg p-3
-                        shadow-depth-sm
-                        hover-lift"
-                    >
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span>Reduce back-and-forth questions by 60%</span>
-                    </li>
-                  </ul>
-                  <Button className="mt-6" variant="outline">See Examples</Button>
-                </div>
-                <div className="order-1 md:order-2">
-                  <div 
-                    className="depth-layer-1
-                      shadow-inset
-                      h-80
-                      flex items-center justify-center
-                      group-hover:scale-105
-                      transition-transform duration-500"
-                  >
-                    <GitPullRequest className="h-32 w-32 text-muted-foreground" />
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Use Case 3 - AI Pair Programming (Image left, content right) */}
-            <Card 
-              className="depth-layer-2
-                shadow-depth-lg
-                border-0
-                overflow-hidden
-                hover:depth-layer-3
-                hover:shadow-elevated
-                transition-all duration-500
-                group"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center p-6">
-                <div className="order-1">
-                  <div 
-                    className="depth-layer-1
-                      shadow-inset
-                      h-80
-                      flex items-center justify-center
-                      group-hover:scale-105
-                      transition-transform duration-500"
-                  >
-                    <Bot className="h-32 w-32 text-muted-foreground" />
-                  </div>
-                </div>
-                <div className="order-2">
-                  <Badge
-                    className="depth-layer-3 text-shadow-sm
-                      shadow-depth-md
-                      border-0
-                      text-shadow-sm
-                      z-10"
-                  >
-                    AI Coding
-                  </Badge>
-                  <h3 
-                    className="text-2xl font-bold mb-4 text-shadow-sm
-                      text-shadow-sm"
-                  >
-                    Make AI Assistants Understand Your Project
-                  </h3>
-                  <p className="text-foreground/80">Stop getting generic code suggestions that don&apos;t match your style. Our .cursorrules file teaches Cursor, Copilot, and other AI assistants exactly how you write code.</p>
-                  <ul className="mt-4 space-y-2">
-                    <li
-                      className="flex items-start gap-2
-                        depth-layer-3
-                        rounded-lg p-3
-                        shadow-depth-sm
-                        hover-lift"
-                    >
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span>10x more relevant AI suggestions</span>
-                    </li>
-                    <li
-                      className="flex items-start gap-2
-                        depth-layer-3
-                        rounded-lg p-3
-                        shadow-depth-sm
-                        hover-lift"
-                    >
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span>Maintain consistent code style</span>
-                    </li>
-                    <li
-                      className="flex items-start gap-2
-                        depth-layer-3
-                        rounded-lg p-3
-                        shadow-depth-sm
-                        hover-lift"
-                    >
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span>Save hours of manual prompt crafting</span>
-                    </li>
-                  </ul>
-                  <Button className="mt-6">Start Generating</Button>
-                </div>
-              </div>
-            </Card>
-
-            {/* Use Case 4 - Open Source Contributions (Content left, image right) */}
-            <Card 
-              className="depth-layer-2
-                shadow-depth-lg
-                border-0
-                overflow-hidden
-                hover:depth-layer-3
-                hover:shadow-elevated
-                transition-all duration-500
-                group"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center p-6">
-                <div className="order-2 md:order-1">
-                  <Badge
-                    className="depth-layer-3 text-shadow-sm
-                      shadow-depth-md
-                      border-0
-                      text-shadow-sm
-                      z-10"
-                  >
-                    Open Source
-                  </Badge>
-                  <h3 
-                    className="text-2xl font-bold mb-4 text-shadow-sm
-                      text-shadow-sm"
-                  >
-                    Help Contributors Get Started Instantly
-                  </h3>
-                  <p className="text-foreground/80">Make your open source project contributor-friendly. Generate comprehensive documentation that helps anyone understand how to contribute, from first-time contributors to experienced maintainers.</p>
-                  <ul className="mt-4 space-y-2">
-                    <li
-                      className="flex items-start gap-2
-                        depth-layer-3
-                        rounded-lg p-3
-                        shadow-depth-sm
-                        hover-lift"
-                    >
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span>Increase contributions by 3x</span>
-                    </li>
-                    <li
-                      className="flex items-start gap-2
-                        depth-layer-3
-                        rounded-lg p-3
-                        shadow-depth-sm
-                        hover-lift"
-                    >
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span>Reduce &apos;how do I start?&apos; questions</span>
-                    </li>
-                    <li
-                      className="flex items-start gap-2
-                        depth-layer-3
-                        rounded-lg p-3
-                        shadow-depth-sm
-                        hover-lift"
-                    >
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span>Maintain consistent code quality</span>
-                    </li>
-                  </ul>
-                  <Button className="mt-6" variant="outline">Try for OSS</Button>
-                </div>
-                <div className="order-1 md:order-2">
-                  <div 
-                    className="depth-layer-1
-                      shadow-inset
-                      h-80
-                      flex items-center justify-center
-                      group-hover:scale-105
-                      transition-transform duration-500"
-                  >
-                    <GitFork className="h-32 w-32 text-muted-foreground" />
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
-      </section>
-      </ScrollReveal>
-
-      {/* How It Works - New Section */}
+      {/* SECTION 4: THE SOLUTION (How It Works - Visual) */}
       <ScrollReveal>
       <section 
         id="how-it-works" 
-        className="relative max-w-7xl mx-auto px-4 py-20
-          depth-layer-1
-          border-y border-border/20"
+        className="max-w-7xl mx-auto px-4 py-16"
       >
         <h2 
-          className="text-4xl font-bold text-center mb-4
+          className="text-3xl sm:text-4xl font-bold text-center mb-4 text-primary
             text-shadow-md"
         >
-          How It Works
+          How Context Wizard Fixes This in 30 Seconds
         </h2>
-        <p className="text-muted-foreground text-center mb-16">Get perfect context files in three simple steps</p>
+        <p className="text-muted-foreground text-center mb-12 text-base">A simple 3-step process that transforms your AI coding experience</p>
 
-        {/* Arrows between steps (desktop only) */}
-        <div className="pointer-events-none absolute inset-0 hidden md:block">
-          <ArrowRight className="absolute top-1/2 left-[33.5%] -translate-y-1/2 h-8 w-8 text-muted-foreground/60 animate-pulse" />
-          <ArrowRight className="absolute top-1/2 left-[66.5%] -translate-y-1/2 h-8 w-8 text-muted-foreground/60 animate-pulse" />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
           {/* Step 1 */}
-          <div className="relative">
+          <Card 
+            className="relative
+              depth-layer-2
+              shadow-depth-sm
+              border-0
+              hover-lift
+              transition-all duration-300
+              overflow-hidden"
+          >
             <div 
-              className="absolute -top-3 -left-3
-                depth-top
-                shadow-depth-lg
-                w-12 h-12 rounded-full
+              className="absolute top-4 left-4
+                bg-primary/10
+                w-8 h-8 rounded-full
                 flex items-center justify-center
-                text-lg font-bold
-                text-shadow-sm
-                border-4 border-background"
+                text-sm font-semibold
+                text-primary"
             >
               1
             </div>
-            <Card 
-              className="relative
-                depth-layer-2
-                shadow-depth-md
-                border-0
-                hover-lift
-                transition-all duration-300"
+            <div
+              className="bg-muted/30
+                rounded-lg h-40
+                flex items-center justify-center
+                mb-4"
             >
-              <div
-                className="depth-layer-1
-                  shadow-inset
-                  rounded-lg h-48
-                  flex items-center justify-center
-                  mb-4"
-              >
-                <FileCode className="h-16 w-16 text-muted-foreground" />
-              </div>
-              <CardHeader>
-                <CardTitle
-                  className="text-xl font-semibold text-shadow-sm
-                    text-shadow-sm"
-                >
-                  Paste GitHub URL
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Enter any public GitHub repository URL. Our AI instantly analyzes the codebase structure, tech stack, and coding patterns.
-                </p>
-                <p className="mt-2 text-xs text-muted-foreground">Works with GitHub, GitLab, and Bitbucket</p>
-              </CardContent>
-            </Card>
-          </div>
+              <FileCode className="h-14 w-14 text-muted-foreground" />
+            </div>
+            <CardHeader className="pt-2">
+              <CardTitle className="text-lg font-semibold">
+                Paste Your GitHub URL
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pb-6">
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Public or private repo—we analyze your entire project structure, dependencies, and code patterns.
+              </p>
+            </CardContent>
+          </Card>
 
           {/* Step 2 */}
-          <div className="relative">
+          <Card 
+            className="relative
+              depth-layer-2
+              shadow-depth-sm
+              border-0
+              hover-lift
+              transition-all duration-300
+              overflow-hidden"
+          >
             <div 
-              className="absolute -top-3 -left-3
-                depth-top
-                shadow-depth-lg
-                w-12 h-12 rounded-full
+              className="absolute top-4 left-4
+                bg-primary/10
+                w-8 h-8 rounded-full
                 flex items-center justify-center
-                text-lg font-bold
-                text-shadow-sm
-                border-4 border-background"
+                text-sm font-semibold
+                text-primary"
             >
               2
             </div>
-            <Card 
-              className="relative
-                depth-layer-2
-                shadow-depth-md
-                border-0
-                hover-lift
-                transition-all duration-300"
+            <div
+              className="bg-muted/30
+                rounded-lg h-40
+                flex items-center justify-center
+                mb-4"
             >
-              <div
-                className="depth-layer-1
-                  shadow-inset
-                  rounded-lg h-48
-                  flex items-center justify-center
-                  mb-4"
-              >
-                <Brain className="h-16 w-16 text-muted-foreground animate-pulse" />
-              </div>
-              <CardHeader>
-                <CardTitle
-                  className="text-xl font-semibold text-shadow-sm
-                    text-shadow-sm"
-                >
-                  AI Analyzes & Generates
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Our advanced AI models process your repository, detecting frameworks, dependencies, and code conventions to create comprehensive context files.
-                </p>
-                <p className="mt-2 text-xs text-muted-foreground">Average generation time: 15-30 seconds</p>
-              </CardContent>
-            </Card>
-          </div>
+              <Brain className="h-14 w-14 text-muted-foreground animate-pulse" />
+            </div>
+            <CardHeader className="pt-2">
+              <CardTitle className="text-lg font-semibold">
+                AI Analyzes Your Codebase
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pb-6">
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Our AI detects your tech stack, coding conventions, architecture patterns, and generates optimized context.
+              </p>
+            </CardContent>
+          </Card>
 
           {/* Step 3 */}
-          <div className="relative">
+          <Card 
+            className="relative
+              depth-layer-2
+              shadow-depth-sm
+              border-0
+              hover-lift
+              transition-all duration-300
+              overflow-hidden"
+          >
             <div 
-              className="absolute -top-3 -left-3
-                depth-top
-                shadow-depth-lg
-                w-12 h-12 rounded-full
+              className="absolute top-4 left-4
+                bg-primary/10
+                w-8 h-8 rounded-full
                 flex items-center justify-center
-                text-lg font-bold
-                text-shadow-sm
-                border-4 border-background"
+                text-sm font-semibold
+                text-primary"
             >
               3
             </div>
-            <Card 
-              className="relative
-                depth-layer-2
-                shadow-depth-md
-                border-0
-                hover-lift
-                transition-all duration-300"
+            <div
+              className="bg-muted/30
+                rounded-lg h-40
+                flex items-center justify-center
+                mb-4"
             >
-              <div
-                className="depth-layer-1
-                  shadow-inset
-                  rounded-lg h-48
-                  flex items-center justify-center
-                  mb-4"
-              >
-                <Download className="h-16 w-16 text-muted-foreground" />
-              </div>
-              <CardHeader>
-                <CardTitle
-                  className="text-xl font-semibold text-shadow-sm
-                    text-shadow-sm"
-                >
-                  Download & Use
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Get .cursorrules, PROJECT_OVERVIEW.md, ARCHITECTURE.md, and more. Drop them into your project and watch your AI assistant understand everything perfectly.
-                </p>
-                <p className="mt-2 text-xs text-muted-foreground">Includes 6+ essential context files</p>
-              </CardContent>
-            </Card>
-          </div>
+              <Download className="h-14 w-14 text-muted-foreground" />
+            </div>
+            <CardHeader className="pt-2">
+              <CardTitle className="text-lg font-semibold">
+                Download Perfect Context Files
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pb-6">
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                .cursorrules, PROJECT_OVERVIEW.md, ARCHITECTURE.md, and more—ready to drop into your project.
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* CTA */}
-        <div className="text-center mt-12">
-          <button
-            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg inline-flex items-center justify-center mx-auto shadow hover:shadow-lg transition-shadow"
-            onClick={() => {
-              trackEvent("hero_cta_clicked", { button_text: "Ready to try it?" });
-              const el = document.querySelector('input[type="url"]') as HTMLInputElement | null;
-              if (el) {
-                el.scrollIntoView({ behavior: "smooth", block: "center" });
-                el.focus();
-              } else {
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }
-            }}
-          >
-            Ready to try it?
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </button>
-          <p className="text-muted-foreground mt-2">No credit card required • Free tier available</p>
+        {/* Helper text consolidated */}
+        <p className="text-center text-xs text-muted-foreground mt-6">
+          Works with GitHub, GitLab, and Bitbucket • Average generation time: 15-30 seconds • Includes 6+ essential context files
+        </p>
+
+        {/* Video Demo Embed */}
+        <div className="mt-12 max-w-4xl mx-auto">
+          <div className="relative aspect-video rounded-xl border-2 border-border bg-gradient-to-br from-muted to-muted/50 shadow-2xl overflow-hidden">
+            {/* Placeholder for video - replace with actual embed */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+              <Video className="h-24 w-24 text-muted-foreground mb-4" />
+              <div className="text-xl font-semibold">See Context Wizard in Action</div>
+              <div className="text-sm text-muted-foreground mt-2">Watch how easy it is to generate perfect context files</div>
+              
+              {/* Play button overlay */}
+              <button
+                aria-label="Play video"
+                className="absolute inset-0 m-auto h-20 w-20 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors grid place-items-center animate-pulse"
+                onClick={() => {
+                  trackEvent("demo_video_played", { section: "solution" });
+                }}
+              >
+                <Video className="h-10 w-10 text-primary" />
+              </button>
+            </div>
+          </div>
         </div>
       </section>
       </ScrollReveal>
@@ -1630,213 +601,224 @@ export default function Home() {
         </section>
       )}
 
-      {/* See The Difference - Tabbed */}
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <h2 className="text-center text-3xl font-bold text-primary">See The Difference Context Makes</h2>
-        <Tabs defaultValue="react" className="mt-8">
-          <div className="flex justify-center">
-            <TabsList className="rounded-lg">
-              <TabsTrigger value="react">React Component</TabsTrigger>
-              <TabsTrigger value="api">API Route</TabsTrigger>
-              <TabsTrigger value="db">Database Schema</TabsTrigger>
+      {/* SECTION 5: BEFORE/AFTER (Proof It Works) */}
+      <ScrollReveal>
+      <section id="before-after" className="mx-auto max-w-7xl px-4 sm:px-6 py-20">
+        <h2 className="text-center text-3xl sm:text-4xl font-bold text-primary mb-4 text-shadow-md">
+          See The Difference Context Makes
+        </h2>
+        <p className="text-center text-muted-foreground mb-12 text-base max-w-2xl mx-auto">
+          Same prompt, completely different results. See why context files matter.
+        </p>
+        
+        {/* Desktop: Side-by-side, Mobile: Tabs */}
+        <div className="hidden md:grid grid-cols-2 gap-6 lg:gap-8 mb-8">
+          {/* Before */}
+          <Card className="depth-layer-2 shadow-depth-md border-0 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <X className="h-6 w-6 text-destructive" />
+              <CardTitle className="text-xl font-semibold text-destructive">Without Context Files</CardTitle>
+            </div>
+            <div className="rounded-lg depth-layer-1 shadow-inset p-4 mb-4">
+              <Image src="/window.svg" alt="Messy AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
+            </div>
+            <p className="text-sm text-muted-foreground text-center">32 lines of bugs, wrong dependencies, doesn't run</p>
+          </Card>
+
+          {/* After */}
+          <Card className="depth-layer-3 shadow-depth-lg border-0 p-6 hover-lift">
+            <div className="flex items-center gap-2 mb-4">
+              <Check className="h-6 w-6 text-primary" />
+              <CardTitle className="text-xl font-semibold text-primary">With Context Files</CardTitle>
+            </div>
+            <div className="rounded-lg depth-layer-3 shadow-depth-sm p-4 mb-4">
+              <Image src="/file.svg" alt="Clean AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
+            </div>
+            <p className="text-sm font-medium text-primary text-center">Production-ready code, correct patterns, works first try</p>
+          </Card>
+        </div>
+
+        {/* Mobile: Tabs */}
+        <div className="md:hidden mb-8">
+          <Tabs defaultValue="before" className="w-full">
+            <TabsList className="w-full mb-4 h-12">
+              <TabsTrigger value="before" className="flex-1 text-base">
+                <X className="h-4 w-4 mr-2" />
+                Without Context
+              </TabsTrigger>
+              <TabsTrigger value="after" className="flex-1 text-base">
+                <Check className="h-4 w-4 mr-2" />
+                With Context
+              </TabsTrigger>
             </TabsList>
+            <TabsContent value="before" className="mt-0">
+              <Card className="depth-layer-2 shadow-depth-md border-0 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <X className="h-6 w-6 text-destructive" />
+                  <CardTitle className="text-xl font-semibold text-destructive">Without Context Files</CardTitle>
+                </div>
+                <div className="rounded-lg depth-layer-1 shadow-inset p-4 mb-4">
+                  <Image src="/window.svg" alt="Messy AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
+                </div>
+                <p className="text-sm text-muted-foreground text-center">32 lines of bugs, wrong dependencies, doesn't run</p>
+              </Card>
+            </TabsContent>
+            <TabsContent value="after" className="mt-0">
+              <Card className="depth-layer-3 shadow-depth-lg border-0 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Check className="h-6 w-6 text-primary" />
+                  <CardTitle className="text-xl font-semibold text-primary">With Context Files</CardTitle>
+                </div>
+                <div className="rounded-lg depth-layer-3 shadow-depth-sm p-4 mb-4">
+                  <Image src="/file.svg" alt="Clean AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
+                </div>
+                <p className="text-sm font-medium text-primary text-center">Production-ready code, correct patterns, works first try</p>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* CTA Button */}
+        <div className="text-center">
+          <SignUpButton mode="modal">
+            <Button 
+              size="lg" 
+              className="h-12 px-8 text-base font-semibold shadow-depth-lg hover:shadow-elevated"
+              onClick={() => {
+                trackEvent("before_after_cta_clicked", { button_text: "Try It Free on Your Repo" });
+                const el = document.querySelector('input[type="url"]') as HTMLInputElement | null;
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+                  el.focus();
+                } else {
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }
+              }}
+            >
+              Try It Free on Your Repo
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </SignUpButton>
+        </div>
+      </section>
+      </ScrollReveal>
+
+      {/* SECTION 6: TESTIMONIALS (Trust - High Up!) */}
+      <ScrollReveal>
+      <section id="testimonials" className="bg-background">
+        <div className="max-w-6xl mx-auto px-4 py-16">
+          {/* Section Header with Highlight */}
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-3">
+              <span className="bg-primary/20 px-3 py-1 rounded">WORLD-CLASS</span> CUSTOMER SUPPORT
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              Don't just take our word for it. Our A-team gets tons of praise.
+            </p>
           </div>
 
-          {/* Tab: React Component */}
-          <TabsContent value="react" className="mt-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Testimonials Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            {[
+              { 
+                initials: "JD", 
+                bg: "bg-blue-500", 
+                quote: "I've been using BluE for 7 months now. Trust my notice all I get paid and support is <mark>excellent</mark>. I contacted human support 3 times, and their support was very <mark>quick to respond</mark> (that drives you crazy with the website itself has made the minimum needed a virtual tool drives you crazy).", 
+                name: "Lindy", 
+                source: "Trustpilot", 
+                date: "2 weeks ago" 
+              },
+              { 
+                initials: "MS", 
+                bg: "bg-green-500", 
+                quote: "I start out using BluE as a freelancer, it was <mark>easy to use</mark>. Recently I started my own company and I now use BluE as a business to work with my contractors, freelancers and employees. I love how easy it is to <mark>transfer or withdraw</mark> service when I had any questions about the transfers or withdrawals.", 
+                name: "Anne", 
+                source: "Trustpilot", 
+                date: "1 month ago" 
+              },
+              { 
+                initials: "AL", 
+                bg: "bg-purple-500", 
+                quote: "I have been using Cursor for 5+ years now. I find the pleasure of using BluE for their <mark>excellent communication capabilities</mark> facilitated by the staff.", 
+                name: "Rosalie", 
+                source: "Trustpilot", 
+                date: "3 weeks ago" 
+              },
+              { 
+                initials: "SK", 
+                bg: "bg-amber-500", 
+                quote: "The .cursorrules files are <mark>game-changing</mark>. Cursor now generates code that matches our style guide perfectly. <mark>No more manual corrections!</mark>", 
+                name: "Sarah Kim", 
+                source: "Product Hunt", 
+                date: "2 weeks ago" 
+              },
+            ].map((t, idx) => (
               <Card 
-                className="p-0
-                  depth-layer-2
-                  shadow-depth-md
-                  border-0"
+                key={idx}
+                className="p-4 rounded-lg bg-card border border-border/40 hover:border-border transition-colors"
               >
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <X className="text-red-500" />
-                  <CardTitle className="text-left text-lg text-shadow-sm">Before • Without Context</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div 
-                    className="rounded-lg
-                      depth-layer-1
-                      shadow-inset
-                      p-4 relative"
-                  >
-                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
-                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed text-foreground/70">
-{`function fetchData() {
-  // Fetch data from API
-  // Process data
-  // Update state
-}`}
-                    </pre>
+                <div className="flex items-start gap-3 mb-3">
+                  <div className={`h-10 w-10 rounded-full ${t.bg} text-white flex items-center justify-center font-bold text-sm shrink-0`}>
+                    {t.initials}
                   </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="text-sm text-foreground/70">Lines of bugs: 8</div>
-                </CardFooter>
-              </Card>
-              <Card 
-                className="p-0
-                  depth-layer-2
-                  shadow-depth-md
-                  border-0"
-              >
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Check className="text-green-600" />
-                  <CardTitle className="text-left text-lg text-shadow-sm">After • With Context</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div 
-                    className="rounded-lg
-                      depth-layer-3
-                      shadow-depth-sm
-                      p-4 relative"
-                  >
-                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
-                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed">
-{`import { useEffect, useState } from 'react';
-
-function useFetchData(url: string) {
-  const [data, setData] = useState<unknown | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchData() {
-      const response = await fetch(url);
-      const result = await response.json();
-      if (isMounted) setData(result);
-    }
-    fetchData();
-    return () => { isMounted = false };
-  }, [url]);
-
-  return data;
-}`}
-                    </pre>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm">{t.name}</div>
+                    <div className="flex items-center gap-1 mt-1">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star key={i} className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                      ))}
+                    </div>
                   </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="text-sm font-medium text-primary">Production-ready: ✓</div>
-                </CardFooter>
+                </div>
+                <p 
+                  className="text-sm leading-relaxed mb-2"
+                  dangerouslySetInnerHTML={{ 
+                    __html: t.quote.replace(
+                      /<mark>/g, 
+                      '<mark class="bg-primary/20 px-1 rounded">'
+                    )
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t.source} • {t.date}
+                </p>
               </Card>
+            ))}
+          </div>
+
+          {/* Stats Bar */}
+          <div className="flex flex-wrap items-center justify-center gap-6 py-6 border-t border-border/40">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <Star className="h-5 w-5 fill-yellow-500 text-yellow-500" />
+                <span className="text-2xl font-bold">4.9</span>
+              </div>
+              <span className="text-sm text-muted-foreground">stars out of 5</span>
             </div>
-          </TabsContent>
-
-          {/* Tab: API Route */}
-          <TabsContent value="api" className="mt-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="p-0">
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <X className="text-red-500" />
-                  <CardTitle className="text-left text-lg text-shadow-sm">Before • Poor Express Route</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-lg bg-muted/40 p-4 ring-1 ring-border relative">
-                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
-                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed text-foreground/70">
-{`app.get('/data', (req, res) => {
-  // Fetch data from database
-  // Send response
-});`}
-                    </pre>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="text-sm text-foreground/70">Lines of bugs: 8</div>
-                </CardFooter>
-              </Card>
-              <Card className="p-0">
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Check className="text-green-600" />
-                  <CardTitle className="text-left text-lg text-shadow-sm">After • Next.js API Route</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-lg bg-background p-4 ring-1 ring-border relative">
-                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
-                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed">
-{`import type { NextRequest } from 'next/server';
-export async function GET(req: NextRequest) {
-  try {
-    const data = await fetch('https://api.example.com/data').then(r => r.json());
-    return Response.json({ data }, { status: 200 });
-  } catch (err) {
-    return Response.json({ error: 'Internal Server Error' }, { status: 500 });
-  }
-}`}
-                    </pre>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="text-sm font-medium text-primary">Production-ready: ✓</div>
-                </CardFooter>
-              </Card>
+            <span className="text-muted-foreground/40">|</span>
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <div className="text-2xl font-bold">3 minutes</div>
+                <div className="text-xs text-muted-foreground">avg. response time</div>
+              </div>
             </div>
-          </TabsContent>
-
-          {/* Tab: Database Schema */}
-          <TabsContent value="db" className="mt-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="p-0">
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <X className="text-red-500" />
-                  <CardTitle className="text-left text-lg text-shadow-sm">Before • Inconsistent Model</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-lg bg-muted/40 p-4 ring-1 ring-border relative">
-                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
-                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed text-foreground/70">
-{`const User = {
-  name: String,
-  email: String,
-  password: String,
-  // Additional fields
-};`}
-                    </pre>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="text-sm text-foreground/70">Lines of bugs: 8</div>
-                </CardFooter>
-              </Card>
-              <Card className="p-0">
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Check className="text-green-600" />
-                  <CardTitle className="text-left text-lg text-shadow-sm">After • Prisma Schema</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-lg bg-background p-4 ring-1 ring-border relative">
-                    <button className="absolute right-3 top-3 text-xs rounded border px-2 py-1">Copy</button>
-                    <pre className="max-h-[400px] overflow-auto text-sm leading-relaxed">
-{`model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  posts     Post[]
-  createdAt DateTime @default(now())
-}
-
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  String
-  createdAt DateTime @default(now())
-}`}
-                    </pre>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <div className="text-sm font-medium text-primary">Production-ready: ✓</div>
-                </CardFooter>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
+            <span className="text-muted-foreground/40">|</span>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="gap-2"
+              onClick={() => trackEvent('trustpilot_clicked')}
+            >
+              See 275+ reviews on Trustpilot
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </section>
+      </ScrollReveal>
 
-      {/* What You Get - Feature Grid */}
+      {/* SECTION 7: FEATURES (What You Get - Benefit-Focused) */}
       <ScrollReveal>
       <section 
         id="features" 
@@ -1845,21 +827,21 @@ model Post {
           border-y border-border/20"
       >
         <h2 
-          className="text-center text-3xl font-bold text-primary
+          className="text-center text-3xl sm:text-4xl font-bold text-primary
             text-shadow-md
             tracking-tight"
         >
-          What You Get
+          Everything You Need to Build Better with AI
         </h2>
-        <p className="mx-auto mt-3 max-w-2xl text-center text-foreground/70">Six focused deliverables that make Cursor understand your repo instantly.</p>
+        <p className="mx-auto mt-3 max-w-2xl text-center text-foreground/70 text-base">Six powerful benefits that transform how you work with AI coding assistants.</p>
         <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            { icon: FileCode, title: ".cursorrules Generator", desc: "Generate precise, repo-aware instructions for Cursor to follow." },
-            { icon: BookOpen, title: "Project Documentation", desc: "Concise, actionable docs tailored to your codebase." },
-            { icon: Map, title: "Architecture Maps", desc: "Visualize flows, ownership, and key boundaries at a glance." },
-            { icon: Layers, title: "Tech Stack Guide", desc: "Frameworks, libraries, versions, and how they fit together." },
-            { icon: Code2, title: "Code Conventions", desc: "Naming, patterns, file org, and API usage—codified." },
-            { icon: Sparkles, title: "Best Practices", desc: "Opinionated guidance tuned to your repo's constraints." },
+            { icon: FileCode, title: "Never Write .cursorrules Again", desc: "Automatically generates Cursor configuration based on your tech stack, coding style, and project needs." },
+            { icon: BookOpen, title: "Instant Project Documentation", desc: "Get comprehensive project documentation that helps new developers understand your codebase in minutes, not days." },
+            { icon: Map, title: "Architecture Understanding Out of Box", desc: "Visualize your project structure, data flows, and key boundaries—all automatically detected and documented." },
+            { icon: Layers, title: "Tech Stack Best Practices Included", desc: "Frameworks, libraries, versions, and how they fit together—with best practices tailored to your specific setup." },
+            { icon: Code2, title: "Code Convention Detection", desc: "Automatically detects and codifies your naming patterns, file organization, and API usage conventions." },
+            { icon: Sparkles, title: "Error Prevention Built-In", desc: "Opinionated guidance tuned to your repo's constraints helps prevent common mistakes before they happen." },
           ].map(({ icon: Icon, title, desc }, i) => (
             <motion.div
               key={i}
@@ -1898,7 +880,7 @@ model Post {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">
+                  <p className="text-muted-foreground text-base leading-relaxed">
                     {desc}
                   </p>
                 </CardContent>
@@ -1909,131 +891,193 @@ model Post {
       </section>
       </ScrollReveal>
 
-      {/* Demo - Video Section */}
+      {/* SECTION 8: USE CASES (Who This Is For) */}
       <ScrollReveal>
-      <section id="demo" className="bg-muted/30">
-        <div className="max-w-6xl mx-auto px-4 py-20">
-          <h2 className="text-4xl font-bold text-center mb-4 text-shadow-sm">See Context Wizard in Action</h2>
-          <p className="text-muted-foreground text-center mb-12">Watch how easy it is to generate perfect context files</p>
+      <section 
+        id="use-cases"
+        className="depth-layer-1"
+      >
+        <div className="max-w-7xl mx-auto px-4 py-20">
+          <h2 
+            className="text-3xl sm:text-4xl font-bold text-center mb-4 text-primary
+              text-shadow-md"
+          >
+            Perfect For Every Developer
+          </h2>
+          <p className="text-muted-foreground text-center mb-12 text-base">Find your perfect fit—from solo developers to enterprise teams</p>
 
-          {/* Decorative gradient blur orbs */}
-          <div className="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
-            <div className="h-80 w-80 rounded-full bg-primary/20 blur-3xl" />
-          </div>
-
-          {/* Video placeholder */}
-          <div className="relative aspect-video rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-muted to-muted/50 shadow-2xl overflow-hidden">
-            {/* Placeholder content */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
-              <Video className="h-24 w-24 text-muted-foreground mb-4" />
-              <div className="text-xl font-semibold">Demo Video Coming Soon</div>
-              <div className="text-sm text-muted-foreground">We&apos;re creating an awesome demo video for you!</div>
-
-              {/* Play button overlay */}
-              <button
-                aria-label="Play video"
-                className="absolute inset-0 m-auto h-20 w-20 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors grid place-items-center animate-pulse"
-                onClick={() => {
-                  trackEvent("demo_video_played");
-                  trackEvent("demo_video_completed");
-                }}
-                <Video className="h-10 w-10 text-primary" />
-              </button>
-            </div>
-          </div>
-
-          {/* Highlights */}
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card 
-              className="p-6 rounded-lg
-                depth-layer-2
-                shadow-depth-md
-                border-0
-                hover-lift"
-            >
-              <Zap className="h-8 w-8 text-primary mb-2" />
-              <div className="text-lg font-semibold">⚡ Lightning Fast</div>
-              <div className="text-sm text-muted-foreground">Generate context in 30 seconds</div>
+          {/* Primary: Vibe Coders (40% size) */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
+            <Card className="lg:col-span-2 depth-layer-2 shadow-depth-lg border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="depth-layer-3 shadow-depth-sm w-12 h-12 rounded-lg flex items-center justify-center">
+                  <Bot className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-2xl font-bold text-primary">Vibe Coders</h3>
+              </div>
+              <p className="text-muted-foreground mb-4 text-base">Using Cursor but getting frustrated with bad results</p>
+              <ul className="space-y-3">
+                <li className="flex items-start gap-2">
+                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <span className="text-base">Get production-ready code instead of broken demos</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <span className="text-base">Stop wasting time fixing AI mistakes</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <span className="text-base">Build 10x faster with proper context</span>
+                </li>
+              </ul>
             </Card>
-            <Card 
-              className="p-6 rounded-lg
-                depth-layer-2
-                shadow-depth-md
-                border-0
-                hover-lift"
-            >
-              <Target className="h-8 w-8 text-primary mb-2" />
-              <div className="text-lg font-semibold">🎯 Highly Accurate</div>
-              <div className="text-sm text-muted-foreground">95%+ accuracy in tech stack detection</div>
+
+            {/* Secondary cards (20% each) */}
+            <Card className="lg:col-span-1 depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Code2 className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Experienced Developers</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">Want to automate context setup completely</p>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Eliminate hours of manual documentation</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Onboard new projects in seconds</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Scale your AI-assisted workflow</span>
+                </li>
+              </ul>
             </Card>
-            <Card 
-              className="p-6 rounded-lg
-                depth-layer-2
-                shadow-depth-md
-                border-0
-                hover-lift"
-            >
-              <Lock className="h-8 w-8 text-primary mb-2" />
-              <div className="text-lg font-semibold">🔒 Secure & Private</div>
-              <div className="text-sm text-muted-foreground">Your code stays yours, we never store it</div>
+
+            <Card className="lg:col-span-1 depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <GitFork className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Open Source Maintainers</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">Need better project documentation</p>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Auto-generate comprehensive docs</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Help contributors understand codebase</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Increase contribution quality</span>
+                </li>
+              </ul>
+            </Card>
+
+            <Card className="lg:col-span-1 depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Teams & Agencies</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">Standardize AI context across projects</p>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Consistent code quality across team</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Faster onboarding for new developers</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Better collaboration with AI tools</span>
+                </li>
+              </ul>
             </Card>
           </div>
         </div>
       </section>
       </ScrollReveal>
 
-      {/* Mid-Page CTA Section */}
-      <section className="max-w-4xl mx-auto px-4 py-16">
-        <div 
-          className="depth-layer-2
-            shadow-depth-lg
-            border-0
-            rounded-2xl p-8 text-center"
-        >
-          <Sparkles className="h-12 w-12 text-primary mx-auto mb-4" />
-          <h2 className="text-3xl font-bold mb-3 text-shadow-sm">Ready to Transform Your Development Workflow?</h2>
-          <p className="text-muted-foreground mb-6">Join 2,500+ developers who already boosted their productivity</p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
-            <SignUpButton mode="modal">
-              <Button size="lg" className="w-full sm:w-auto">
-                Start Free Trial
-              </Button>
-            </SignUpButton>
-            <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
-              <a href="/pricing">See Pricing</a>
-            </Button>
-          </div>
-          
-          <p className="text-sm text-muted-foreground mb-6">No credit card required • 5 free generations daily</p>
-          
-          {/* Social Proof */}
-          <div className="flex items-center justify-center gap-2">
-            <div className="flex -space-x-2">
-              {[
-                { bg: 'bg-blue-500', initials: 'JD' },
-                { bg: 'bg-green-500', initials: 'MS' },
-                { bg: 'bg-purple-500', initials: 'AL' },
-                { bg: 'bg-amber-500', initials: 'SK' },
-                { bg: 'bg-pink-500', initials: 'RC' },
-                { bg: 'bg-teal-500', initials: 'EP' }
-              ].map((avatar, idx) => (
-                <div 
-                  key={idx}
-                  className={`h-8 w-8 rounded-full ${avatar.bg} text-white text-xs flex items-center justify-center font-semibold border-2 border-background`}
-                >
-                  {avatar.initials}
+      {/* SECTION 9: THE INNOVATION (Cursor Prompt Builder) */}
+      <ScrollReveal>
+      <section id="innovation" className="max-w-7xl mx-auto px-4 py-20 bg-muted/20">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl sm:text-4xl font-bold text-primary mb-4 text-shadow-md">
+            Go Beyond Context Files—Build Entire Apps
+          </h2>
+          <p className="text-muted-foreground text-base max-w-2xl mx-auto">
+            The only tool that generates complete Cursor prompts for building full applications
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          {/* Left: Visual/Screenshot */}
+          <div className="order-2 lg:order-1">
+            <Card className="depth-layer-2 shadow-depth-lg border-0 p-6">
+              <div className="rounded-lg depth-layer-1 shadow-inset h-96 flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
+                <div className="text-center">
+                  <Workflow className="h-24 w-24 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-sm text-muted-foreground">Cursor Builder Screenshot</p>
+                  <p className="text-xs text-muted-foreground mt-2">10-step wizard interface</p>
                 </div>
-              ))}
+              </div>
+            </Card>
+          </div>
+
+          {/* Right: Benefits */}
+          <div className="order-1 lg:order-2">
+            <h3 className="text-2xl font-bold mb-6 text-primary">The Only Tool That Generates Complete Cursor Prompts</h3>
+            <ul className="space-y-4">
+              <li className="flex items-start gap-3">
+                <Check className="h-6 w-6 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-base">Not just context—get step-by-step prompts for building features</p>
+                  <p className="text-sm text-muted-foreground mt-1">Works for portfolio sites, e-commerce, SaaS, and more</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <Check className="h-6 w-6 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-base">Even non-developers can build with AI</p>
+                  <p className="text-sm text-muted-foreground mt-1">Guided prompts make complex apps accessible to everyone</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <Check className="h-6 w-6 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-base">Includes error handling, best practices, and architecture guidance</p>
+                  <p className="text-sm text-muted-foreground mt-1">Production-ready prompts from day one</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <Check className="h-6 w-6 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-base">10-step wizard guides you through every aspect</p>
+                  <p className="text-sm text-muted-foreground mt-1">From project setup to deployment—all covered</p>
+                </div>
+              </li>
+            </ul>
+            <div className="mt-8">
+              <Button asChild size="lg" className="h-12 px-8 text-base font-semibold">
+                <Link href="/dashboard/cursor-builder" onClick={() => trackEvent("cursor_builder_cta_clicked", { location: "innovation_section" })}>
+                  Try Cursor Builder
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
             </div>
-            <span className="text-sm font-medium text-foreground/80">2,500+ developers</span>
           </div>
         </div>
       </section>
+      </ScrollReveal>
 
-      
 
-      {/* FAQ - Accordion Section (moved below Pricing) */}
+
+      {/* SECTION 11: FAQ (Objection Handling) */}
       <section id="faq" aria-labelledby="faq-heading" className="bg-background">
         <div className="max-w-4xl mx-auto px-4 py-20">
           <h2 id="faq-heading" className="text-4xl font-bold text-center mb-4 text-shadow-sm">Frequently Asked Questions</h2>
@@ -2062,234 +1106,58 @@ model Post {
         </div>
       </section>
 
-      {/* Blog/Resources Section */}
-      <section id="resources" className="max-w-7xl mx-auto px-4 py-20">
-        <h2 className="text-4xl font-bold text-center mb-4 text-shadow-sm">Latest from Our Blog</h2>
-        <p className="text-muted-foreground text-center mb-12">Tips, tutorials, and insights for better development</p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-          {/* Blog Post 1 */}
-          <motion.div
-            whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            className="group"
-          >
-            <Card className="bg-card rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300">
-              <div className="relative">
-                <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 h-48 rounded-t-lg flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-                  <BookOpen className="h-16 w-16 text-blue-500/60" />
-                </div>
-                <div className="absolute top-4 left-4">
-                  <span className="bg-blue-500/10 text-blue-600 px-3 py-1 rounded-full text-sm font-medium">
-                    Tutorial
-                  </span>
-                </div>
-                <div className="absolute top-4 right-4">
-                  <span className="text-sm text-muted-foreground">March 15, 2025</span>
-                </div>
-              </div>
-              
-              <CardContent className="p-6">
-                <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors">
-                  How to Write Perfect .cursorrules Files
-                </h3>
-                <p className="text-muted-foreground mb-4 line-clamp-3">
-                  Learn the secrets to creating .cursorrules that make AI assistants generate exactly the code you want...
-                </p>
-                
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>5 min read</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
-                      <User className="h-4 w-4 text-white" />
-                    </div>
-                    <span className="text-sm text-muted-foreground">Sarah Chen</span>
-                  </div>
-                </div>
-                
-                <Button asChild variant="outline" className="w-full">
-                  <a href="/blog/cursorrules-guide">Read More</a>
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Blog Post 2 */}
-          <motion.div
-            whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            className="group"
-          >
-            <Card className="bg-card rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300">
-              <div className="relative">
-                <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 h-48 rounded-t-lg flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-                  <BookOpen className="h-16 w-16 text-purple-500/60" />
-                </div>
-                <div className="absolute top-4 left-4">
-                  <span className="bg-purple-500/10 text-purple-600 px-3 py-1 rounded-full text-sm font-medium">
-                    Best Practices
-                  </span>
-                </div>
-                <div className="absolute top-4 right-4">
-                  <span className="text-sm text-muted-foreground">March 10, 2025</span>
-                </div>
-              </div>
-              
-              <CardContent className="p-6">
-                <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors">
-                  Onboarding Developers 10x Faster with Context Files
-                </h3>
-                <p className="text-muted-foreground mb-4 line-clamp-3">
-                  Discover how leading tech companies are using automated documentation to reduce onboarding time...
-                </p>
-                
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>7 min read</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-purple-500 flex items-center justify-center">
-                      <User className="h-4 w-4 text-white" />
-                    </div>
-                    <span className="text-sm text-muted-foreground">Mike Johnson</span>
-                  </div>
-                </div>
-                
-                <Button asChild variant="outline" className="w-full">
-                  <a href="/blog/onboarding-guide">Read More</a>
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Blog Post 3 */}
-          <motion.div
-            whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            className="group"
-          >
-            <Card className="bg-card rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300">
-              <div className="relative">
-                <div className="bg-gradient-to-br from-green-500/20 to-teal-500/20 h-48 rounded-t-lg flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-                  <BookOpen className="h-16 w-16 text-green-500/60" />
-                </div>
-                <div className="absolute top-4 left-4">
-                  <span className="bg-green-500/10 text-green-600 px-3 py-1 rounded-full text-sm font-medium">
-                    Case Study
-                  </span>
-                </div>
-                <div className="absolute top-4 right-4">
-                  <span className="text-sm text-muted-foreground">March 5, 2025</span>
-                </div>
-              </div>
-              
-              <CardContent className="p-6">
-                <h3 className="text-xl font-semibold mb-3 group-hover:text-primary transition-colors">
-                  How StartupXYZ Improved Code Review Speed by 60%
-                </h3>
-                <p className="text-muted-foreground mb-4 line-clamp-3">
-                  A detailed look at how one startup transformed their code review process using Context Wizard...
-                </p>
-                
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>10 min read</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
-                      <User className="h-4 w-4 text-white" />
-                    </div>
-                    <span className="text-sm text-muted-foreground">Alex Rivera</span>
-                  </div>
-                </div>
-                
-                <Button asChild variant="outline" className="w-full">
-                  <a href="/blog/startup-case-study">Read More</a>
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
+      {/* SECTION 12: FINAL CTA (Strong Close) */}
+      <ScrollReveal>
+      <section className="relative max-w-7xl mx-auto px-4 py-20 overflow-hidden">
+        {/* Subtle gradient background */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-purple-500/5" />
+          <div className="absolute top-0 right-0 h-64 w-64 bg-primary/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 h-64 w-64 bg-purple-500/10 rounded-full blur-3xl" />
         </div>
 
-        {/* Bottom Row */}
         <div className="text-center">
-          <Button asChild size="lg" className="mb-4">
-            <a href="/blog">View All Articles</a>
-          </Button>
-          <p className="text-muted-foreground">Subscribe to our newsletter for weekly development tips</p>
-        </div>
-      </section>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-primary text-shadow-md">
+            Ready to Stop Fighting with AI Tools?
+          </h2>
+          <p className="text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+            Join 1,247+ developers generating perfect context in seconds.
+          </p>
 
-      {/* Pre-Footer CTA Section */}
-      <section className="max-w-7xl mx-auto px-4 py-20">
-        <div className="bg-card rounded-3xl border p-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            {/* Left Column */}
-            <div>
-              <h2 className="text-3xl font-bold mb-3 text-shadow-sm">Still on the Fence?</h2>
-              <p className="text-lg text-muted-foreground mb-6">Try Context Wizard risk-free for 7 days</p>
-              
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
-                  <span>Cancel anytime</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
-                  <span>No credit card required for free tier</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
-                  <span>Full access to all free features</span>
-                </li>
-                <li className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
-                  <span>Upgrade to Pro anytime</span>
-                </li>
-              </ul>
-              
-              <SignUpButton mode="modal">
-                <Button size="lg" className="w-full sm:w-auto">
-                  Start Your Free Trial
-                </Button>
-              </SignUpButton>
-            </div>
-
-            {/* Right Column */}
-            <div>
-              <h2 className="text-3xl font-bold mb-3 text-shadow-sm">Have Questions?</h2>
-              <p className="text-muted-foreground mb-6">We&apos;re here to help! Talk to our team about your specific use case.</p>
-              
-              <div className="space-y-4 mb-8">
-                <div className="flex items-center gap-3">
-                  <Mail className="h-5 w-5 text-primary flex-shrink-0" />
-                  <a href="mailto:support@contextwizard.com" className="text-foreground hover:text-primary transition-colors">
-                    support@contextwizard.com
-                  </a>
-                </div>
-                <div className="flex items-center gap-3">
-                  <MessageSquare className="h-5 w-5 text-primary flex-shrink-0" />
-                  <a href="#" className="text-foreground hover:text-primary transition-colors">
-                    Join our community
-                  </a>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Calendar className="h-5 w-5 text-primary flex-shrink-0" />
-                  <a href="#" className="text-foreground hover:text-primary transition-colors">
-                    Book a demo call
-                  </a>
-                </div>
-              </div>
-              
-              <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
-                <a href="mailto:sales@contextwizard.com">Contact Sales</a>
+          {/* Large CTA */}
+          <div className="mb-8">
+            <SignUpButton mode="modal">
+              <Button 
+                size="lg" 
+                className="h-14 sm:h-16 px-8 sm:px-12 text-base sm:text-lg font-semibold shadow-depth-lg hover:shadow-elevated hover:scale-105 transition-all duration-200"
+                onClick={() => trackEvent('final_cta_clicked', { location: 'final_cta_section' })}
+              >
+                Start Free—No Credit Card Required
+                <ArrowRight className="ml-2 h-5 w-5 sm:h-6 sm:w-6" />
               </Button>
+            </SignUpButton>
+          </div>
+
+          {/* Trust Badges Row */}
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-primary" />
+              <span className="font-medium">1,247+ repos analyzed</span>
+            </div>
+            <span className="hidden sm:inline text-muted-foreground">•</span>
+            <div className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-primary" />
+              <span className="font-medium">12,583 context files generated</span>
+            </div>
+            <span className="hidden sm:inline text-muted-foreground">•</span>
+            <div className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-primary" />
+              <span className="font-medium">847 developers building better</span>
             </div>
           </div>
         </div>
       </section>
+      </ScrollReveal>
 
       <Footer />
       <BackToTop />

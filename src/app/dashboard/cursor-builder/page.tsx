@@ -299,9 +299,9 @@ export default function CursorBuilderPage() {
       setProgress(100);
       setShowConfetti(true);
       toast.success("Prompt set generated!");
-      const techStack = [frontend, backend, database, ...tools.filter(Boolean), projectType].filter(Boolean);
+      const generatedTechStack = [frontend, backend, database, ...tools.filter(Boolean), projectType].filter(Boolean);
       const promptCount = (generated.frontendPrompts?.length || 0) + (generated.backendPrompts?.length || 0) + (generated.errorFixPrompts?.length || 0) + (generated.cursorRules ? 1 : 0);
-      trackEvent('cursor_prompts_generated', { prompt_count: promptCount, tech_stack: techStack.join(', ') });
+      trackEvent('cursor_prompts_generated', { prompt_count: promptCount, tech_stack: generatedTechStack.join(', ') });
       // Save to autofill history
       recordSubmission("cursor-app", {
         projectType,

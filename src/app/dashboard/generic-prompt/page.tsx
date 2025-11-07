@@ -21,7 +21,7 @@ import { ToneStyleSelector } from "@/components/forms/ToneStyleSelector";
 import { OutputFormatSelector } from "@/components/forms/OutputFormatSelector";
 import { AudienceSelector } from "@/components/forms/AudienceSelector";
 import { PromptPreview } from "@/components/forms/PromptPreview";
-import { initAnalytics, identify, track } from "@/lib/analytics";
+import { initAnalytics, identify, trackEvent } from "@/lib/analytics";
 
 export default function GenericPromptPage() {
   const { user } = useUser();

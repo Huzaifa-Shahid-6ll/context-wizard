@@ -75,7 +75,7 @@ export const getUserPreferences = query({
     // choose most recent matching featureType
     const forFeature = prefs.filter((p) => String((p as Record<string, unknown>).featureType) === featureType);
     if (!forFeature.length) return null as unknown as null;
-    forFeature.sort((a, b) => (b as Record<string, unknown>).updatedAt as number - (a as Record<string, unknown>).updatedAt as number);
+    forFeature.sort((a, b) => (b as { updatedAt?: number }).updatedAt! - (a as { updatedAt?: number }).updatedAt!);
     return forFeature[0];
   },
 });
@@ -100,7 +100,7 @@ export const listPromptTemplates = query({
     if (category) {
       combined = combined.filter((t) => String((t as Record<string, unknown>).category) === category);
     }
-    combined.sort((a, b) => (b as Record<string, unknown>).updatedAt as number - (a as Record<string, unknown>).updatedAt as number);
+    combined.sort((a, b) => (b as { updatedAt?: number }).updatedAt! - (a as { updatedAt?: number }).updatedAt!);
     return combined;
   },
 });

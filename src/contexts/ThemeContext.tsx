@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { trackSettingsEvent } from '@/lib/analytics';
 
 type Theme = 'light' | 'dark' | 'high-contrast';
 
@@ -14,15 +15,16 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const [theme, _setTheme] = useState<Theme>(() => {
-    const setTheme = (newTheme: Theme) => {
-      _setTheme(newTheme);
-      trackSettingsEvent('theme_changed', { theme: newTheme });
-    };
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('theme') as Theme) || 'dark';
     }
     return 'dark';
   });
+
+  const setTheme = (newTheme: Theme) => {
+    _setTheme(newTheme);
+    trackSettingsEvent('theme_changed', { theme: newTheme });
+  };
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -32,11 +34,8 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prevTheme) => {
-      if (prevTheme === 'light') return 'dark';
-      if (prevTheme === 'dark') return 'high-contrast';
-      return 'light';
-    });
+    const nextTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'high-contrast' : 'light';
+    setTheme(nextTheme);
   };
 
   return (

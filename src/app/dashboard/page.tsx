@@ -13,6 +13,7 @@ import { CheckCircle2, XCircle, Loader2, Github, X } from "lucide-react";
 import GenerationPreview from "@/components/landing/GenerationPreview";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { FeedbackModal } from "@/components/feedback/FeedbackModal";
 
 type GenerationItem = {
   _id: string;
@@ -50,6 +51,8 @@ export default function DashboardHome() {
   const [correctedTechStack, setCorrectedTechStack] = useState<string[]>([]);
   const [techStackInput, setTechStackInput] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
   const getTechStack = useAction(api.actions.getTechStack);
   const createGeneration = useMutation(api.mutations.createGeneration);
@@ -374,6 +377,32 @@ export default function DashboardHome() {
           </Card>
         </section>
       )}
+
+      {/* Feedback after successful generation */}
+      {latestCompleted && (
+        <section className="mt-6 flex flex-col items-center justify-center gap-3 rounded-lg bg-muted/30 p-4 text-center shadow-sm ring-1 ring-border">
+          <h3 className="text-lg font-semibold">How was this generation?</h3>
+          <p className="text-sm text-foreground/70">We'd love to hear your feedback to improve Context Wizard!</p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                trackEvent('feedback_modal_opened', { location: 'post_generation' });
+                setIsFeedbackModalOpen(true);
+              }}
+            >
+              Share Feedback
+            </Button>
+          </div>
+        </section>
+      )}
+
+      {/* Feedback Modal */}
+      <FeedbackModal 
+        isOpen={isFeedbackModalOpen} 
+        onClose={() => setIsFeedbackModalOpen(false)} 
+        initialPage="/dashboard" 
+      />
 
       {/* Full-screen Preview */}
       {latestCompleted && (

@@ -21,12 +21,14 @@ import {
   Crown,
   CreditCard,
   Sparkles,
+  Wrench,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { initPostHog, trackEvent, identify } from "@/lib/analytics";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import ThemeToggleButton from "@/components/ui/ThemeToggleButton";
+import OnboardingModal from "@/components/onboarding/OnboardingModal";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -41,6 +43,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         promptsTodayByType?: Record<string, number>;
       }
     | undefined;
+  const convexUser = useQuery(
+    api.queries.getUserByClerkId,
+    user?.id ? { clerkId: user.id } : "skip"
+  );
+
+  const [showOnboarding, setShowOnboarding] = React.useState(false);
+
+  React.useEffect(() => {
+    // Show onboarding if:
+    // 1. User is authenticated
+    // 2. User hasn't completed onboarding
+    // 3. This is their first session
+    if (convexUser && !convexUser.onboardingCompleted) {
+      setShowOnboarding(true);
+    }
+  }, [convexUser]);
   const remainingPrompts = stats?.remainingPrompts ?? 0;
 
   React.useEffect(() => {
@@ -74,6 +92,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     } catch {}
   }, [isSignedIn]);
 
+  // Determine if user is admin (for now based on email, can be updated later)
+  const isAdmin = user?.primaryEmailAddress?.emailAddress?.includes('admin') || 
+                 user?.primaryEmailAddress?.emailAddress === 'james@contextwizard.com';
+
   const navItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     // @dashboard/
     { href: "/dashboard", label: "Dashboard", icon: Home },
@@ -93,11 +115,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/dashboard/prompt-history", label: "Prompt History", icon: Clock },
     // @prompt-studio/
     { href: "/dashboard/prompt-studio", label: "Prompt Studio", icon: BarChart2 },
+    // @tools/
+    { href: "/tools", label: "Recommended Tools", icon: Wrench },
     // @billing/
     { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
     // @settings/
     { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon },
   ];
+
+  // Add admin items for admin users only
+  if (isAdmin) {
+    navItems.push({ href: "/dashboard/admin/onboarding-stats", label: "Admin Stats", icon: BarChart2 });
+  }
 
   function isActive(href: string) {
     if (!pathname) return false;
@@ -213,6 +242,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="pointer-events-none absolute inset-0 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white/30 before:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-24 after:bg-black/20 after:blur-3xl after:content-['']" />
           <main className="relative mx-auto w-full max-w-7xl px-4 py-6">
             {children}
+            {showOnboarding && user?.id && (
+              <OnboardingModal
+                userId={user.id}
+                onComplete={() => setShowOnboarding(false)}
+              />
+            )}
           </main>
         </div>
 
@@ -229,6 +264,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               { href: "/dashboard/history", label: "History", Icon: Clock },
               { href: "/dashboard/prompt-history", label: "Prompts", Icon: Clock },
               { href: "/dashboard/prompt-studio", label: "Studio", Icon: BarChart2 },
+              { href: "/tools", label: "Tools", Icon: Wrench },
               { href: "/dashboard/settings", label: "Settings", Icon: SettingsIcon },
             ].map(({ href, label, Icon }) => (
               <Link key={href} href={href} className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-xs">

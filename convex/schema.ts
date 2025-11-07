@@ -20,6 +20,8 @@ const users = defineTable({
   subscriptionStatus: v.optional(v.string()),
   subscriptionCurrentPeriodEnd: v.optional(v.number()),
   subscriptionCancelAtPeriodEnd: v.optional(v.boolean()),
+  // Onboarding
+  onboardingCompleted: v.optional(v.boolean()),
 }).index("by_clerkId", ["clerkId"]);
 
 // Generations table schema
@@ -214,6 +216,53 @@ const formSubmissions = defineTable({
   .index("by_featureType", ["featureType"])
   .index("by_createdAt", ["createdAt"]);
 
+// Feedback table schema
+const feedback = defineTable({
+  userId: v.optional(v.string()), // Clerk ID if authenticated
+  email: v.optional(v.string()),
+  type: v.string(), // "bug", "feature", "general", "docs", "confusion"
+  message: v.string(),
+  rating: v.optional(v.number()), // 1-5 stars
+  userAgent: v.optional(v.string()),
+  page: v.optional(v.string()), // Which page they submitted from
+  resolved: v.boolean(),
+  resolvedAt: v.optional(v.number()),
+  resolvedBy: v.optional(v.string()),
+  notes: v.optional(v.string()), // Admin notes
+  createdAt: v.number(),
+})
+.index("by_userId", ["userId"])
+.index("by_type", ["type"])
+.index("by_resolved", ["resolved"])
+.index("by_createdAt", ["createdAt"]);
+
+// Onboarding Responses table schema
+const onboardingResponses = defineTable({
+  userId: v.string(), // Clerk ID
+  role: v.string(),
+  tools: v.array(v.string()),
+  painPoint: v.string(),
+  projectTypes: v.array(v.string()),
+  techFamiliarity: v.string(),
+  goal: v.string(),
+  source: v.string(),
+  sourceDetails: v.optional(v.string()),
+  completedAt: v.number(),
+})
+.index("by_userId", ["userId"])
+.index("by_role", ["role"])
+.index("by_painPoint", ["painPoint"]);
+
+// Affiliate Clicks table schema
+const affiliateClicks = defineTable({
+  userId: v.optional(v.string()),
+  toolName: v.string(),
+  category: v.string(),
+  clickedAt: v.number(),
+})
+.index("by_toolName", ["toolName"])
+.index("by_clickedAt", ["clickedAt"]);
+
 // Export the schema
 export default defineSchema({
   users,
@@ -228,6 +277,9 @@ export default defineSchema({
   structuredInputTemplates,
   userPreferences,
   formSubmissions,
+  feedback,
+  onboardingResponses,
+  affiliateClicks,
 });
 
 // Type helpers generated via convex codegen (imported by consumers):

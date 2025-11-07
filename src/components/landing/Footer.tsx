@@ -1,8 +1,19 @@
 import { trackEvent } from "@/lib/analytics";
 import { Twitter, Github, Linkedin, MessageCircle } from "lucide-react";
-import React from "react";
+import React, { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { FeedbackModal } from "@/components/feedback/FeedbackModal";
 
 export const Footer: React.FC = () => {
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [initialPage] = useState(() => typeof window !== 'undefined' ? window.location.pathname : '');
+
+  const openFeedbackModal = () => {
+    trackEvent('feedback_modal_opened', { location: 'footer' });
+    setIsFeedbackModalOpen(true);
+  };
+
   return (
     <footer className="bg-muted/30 border-t py-12 px-4 text-sm text-muted-foreground">
       {/* Newsletter Signup */}
@@ -65,9 +76,11 @@ export const Footer: React.FC = () => {
           <ul className="mt-2 space-y-2">
             <li><a href="/docs" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'documentation' })}>Documentation</a></li>
             <li><a href="/api-docs" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'api_reference' })}>API Reference</a></li>
+            <li><a href="/tools" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'tools' })}>Tools</a></li>
             <li><a href="/blog" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'blog' })}>Blog</a></li>
             <li><a href="/tutorials" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'tutorials' })}>Tutorials</a></li>
             <li><a href="https://discord.gg/contextwizard" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'community' })}>Community</a></li>
+            <li><a href="#" className="hover:text-primary transition-colors" onClick={(e) => { e.preventDefault(); openFeedbackModal(); trackEvent('footer_link_clicked', { link_name: 'feedback' }); }}>Feedback</a></li>
             <li><a href="mailto:support@contextwizard.com" className="hover:text-primary transition-colors" onClick={() => { trackEvent('footer_link_clicked', { link_name: 'support' }); trackEvent('support_link_clicked'); }}>Support</a></li>
           </ul>
         </div>
@@ -93,6 +106,12 @@ export const Footer: React.FC = () => {
           All systems operational
         </p>
       </div>
+      {/* Feedback Modal */}
+      <FeedbackModal 
+        isOpen={isFeedbackModalOpen} 
+        onClose={() => setIsFeedbackModalOpen(false)} 
+        initialPage={initialPage}
+      />
     </footer>
   );
 };
