@@ -28,7 +28,7 @@ export default function GenericPromptPage() {
   React.useEffect(() => {
     initAnalytics();
     if (user?.id) identify(user.id);
-    track("generic_prompt_page_view");
+    trackEvent("generic_prompt_page_view");
   }, [user?.id]);
   const runGenerate = useAction(api.promptGenerators.generateGenericPrompt);
   const saveTemplate = useMutation(api.mutations.savePromptTemplate);
@@ -164,15 +164,20 @@ export default function GenericPromptPage() {
     } else {
       setShowAutofill(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category, mode, step, user?.id]);
 
   function applyAutofill() {
     const fields = autofillFields.current;
     if (!fields) return;
     // Pre-fill all matching fields (only those present in fields and the state)
-    if (typeof fields.format === 'string') setOutputConfig(prev => ({ ...prev, format: fields.format }));
-    if (typeof fields.tone === 'string') setToneConfig(prev => ({ ...prev, tone: fields.tone }));
+    if (typeof fields.format === 'string') {
+      const format = fields.format;
+      setOutputConfig(prev => ({ ...prev, format }));
+    }
+    if (typeof fields.tone === 'string') {
+      const tone = fields.tone;
+      setToneConfig(prev => ({ ...prev, tone }));
+    }
     if (typeof fields.goal === 'string') setGoal(fields.goal);
     if (typeof fields.emailRecipient === 'string') setEmailRecipient(fields.emailRecipient);
     if (typeof fields.emailPurpose === 'string') setEmailPurpose(fields.emailPurpose);
@@ -186,8 +191,14 @@ export default function GenericPromptPage() {
     if (typeof fields.codeIncludeDocs === 'boolean') setCodeIncludeDocs(fields.codeIncludeDocs);
     if (typeof fields.contentType === 'string') setContentType(fields.contentType);
     if (typeof fields.contentTopic === 'string') setContentTopic(fields.contentTopic);
-    if (typeof fields.contentAudience === 'string') setAudienceConfig(prev => ({ ...prev, profession: fields.contentAudience }));
-    else if (typeof fields.contentAudience === 'object') setAudienceConfig(fields.contentAudience);
+    if (typeof fields.contentAudience === 'string') {
+      const profession = fields.contentAudience;
+      setAudienceConfig(prev => ({ ...prev, profession }));
+    }
+    else if (typeof fields.contentAudience === 'object' && fields.contentAudience !== null) {
+      const audienceObj = fields.contentAudience;
+      setAudienceConfig(audienceObj as { ageRange: string; profession: string; expertiseLevel: string; industry: string; useCase: string; });
+    }
     if (typeof fields.contentWordCount === 'string') setContentWordCount(fields.contentWordCount);
     if (Array.isArray(fields.contentKeyPoints)) setContentKeyPoints(fields.contentKeyPoints);
     if (Array.isArray(fields.contentSeo)) setContentSeo(fields.contentSeo);
@@ -210,7 +221,7 @@ export default function GenericPromptPage() {
     return true;
   }
   function next() {
-    track("generic_prompt_step_next", { step });
+    trackEvent("generic_prompt_step_next", { step });
     if (!validateStep(step)) {
       toast.error("Please complete required fields before continuing.");
       return;
@@ -218,7 +229,7 @@ export default function GenericPromptPage() {
     setStep((s) => Math.min(4, s + 1));
   }
   function prev() {
-    track("generic_prompt_step_prev", { step });
+    trackEvent("generic_prompt_step_prev", { step });
     setStep((s) => Math.max(1, s - 1));
   }
 
@@ -289,7 +300,7 @@ export default function GenericPromptPage() {
       toast.error("Daily limit reached. Please upgrade to continue.");
       return;
     }
-    track("generic_prompt_generate", { category, tone: toneConfig.tone, format: outputConfig.format });
+    trackEvent("generic_prompt_generate", { category, tone: toneConfig.tone, format: outputConfig.format });
     if (!validateStep(1) || !validateStep(2)) {
       toast.error("Please complete required fields first.");
       setStep(1);
@@ -321,7 +332,7 @@ export default function GenericPromptPage() {
       setSuccess(true);
       setShowConfetti(true);
       toast.success("Prompt generated!");
-      track("generic_prompt_generated_success");
+      trackEvent("generic_prompt_generated_success");
     } finally {
       setLoading(false);
       setTimeout(() => setSuccess(false), 1200);
@@ -332,8 +343,14 @@ export default function GenericPromptPage() {
   function applyTemplate(template: { goal: string; context?: string; format?: string; tone?: string }) {
     setGoal(template.goal);
     if (template.context) setContext(template.context);
-    if (template.format) setOutputConfig(prev => ({ ...prev, format: template.format || prev.format }));
-    if (template.tone) setToneConfig(prev => ({ ...prev, tone: template.tone || prev.tone }));
+    if (typeof template.format === 'string') {
+      const format = template.format;
+      setOutputConfig(prev => ({ ...prev, format }));
+    }
+    if (typeof template.tone === 'string') {
+      const tone = template.tone;
+      setToneConfig(prev => ({ ...prev, tone }));
+    }
   }
 
   const userPrefs = useQuery(api.queries.getUserPreferences, user?.id ? { userId: user.id, featureType: "generic" } : "skip") as Record<string, unknown> | null | undefined;
@@ -385,10 +402,16 @@ export default function GenericPromptPage() {
 
   // Apply template: set all matching fields
   function onTemplateApply(tpl: Template) {
-    if (tpl.fields.goal) setGoal(tpl.fields.goal);
-    if (tpl.fields.context) setContext(tpl.fields.context);
-    if (tpl.fields.format) setOutputConfig(prev => ({ ...prev, format: tpl.fields.format || prev.format }));
-    if (tpl.fields.tone) setToneConfig(prev => ({ ...prev, tone: tpl.fields.tone || prev.tone }));
+    if (typeof tpl.fields.goal === 'string') setGoal(tpl.fields.goal);
+    if (typeof tpl.fields.context === 'string') setContext(tpl.fields.context);
+    if (typeof tpl.fields.format === 'string') {
+      const format = tpl.fields.format;
+      setOutputConfig(prev => ({ ...prev, format }));
+    }
+    if (typeof tpl.fields.tone === 'string') {
+      const tone = tpl.fields.tone;
+      setToneConfig(prev => ({ ...prev, tone }));
+    }
     // try to guess best category
     if (typeof tpl.fields.goal === 'string' && tpl.fields.goal.toLowerCase().includes("email")) setCategory("Email Writing");
     else if (typeof tpl.fields.goal === 'string' && tpl.fields.goal.toLowerCase().includes("summarize")) setCategory("Content Creation");
@@ -417,10 +440,10 @@ export default function GenericPromptPage() {
     <div className="mx-auto w-full max-w-4xl space-y-8 px-4 py-6">
       <div className="text-center">
         <h1 className="text-2xl font-semibold tracking-tight">Generic Prompt Assistant</h1>
-        <p className="mt-1 text-sm text-foreground/70">We&apos;ll guide you through a few quick steps.</p>
+        <p className="mt-1 text-sm text-foreground/70">We{'\''}ll guide you through a few quick steps.</p>
         <div className="mt-3 flex justify-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => { setMode("quick"); setStep(1); track("cta_quick_mode_click", { feature: "generic" }); }}>Quick Mode</Button>
-          <Button size="sm" onClick={() => { window.location.href = "/dashboard/templates"; track("cta_start_from_template_click", { feature: "generic" }); }}>Start from Template</Button>
+          <Button size="sm" variant="outline" onClick={() => { setMode("quick"); setStep(1); trackEvent("cta_quick_mode_click", { feature: "generic" }); }}>Quick Mode</Button>
+          <Button size="sm" onClick={() => { window.location.href = "/dashboard/templates"; trackEvent("cta_start_from_template_click", { feature: "generic" }); }}>Start from Template</Button>
         </div>
       </div>
 
@@ -439,7 +462,7 @@ export default function GenericPromptPage() {
 
       {/* Import/Export Config */}
       <div className="flex justify-end gap-2 mb-2">
-        <input id="import-generic-json" type="file" accept="application/json" className="hidden" onChange={(e) => {
+        <input id="import-generic-json" type="file" accept="application/json" className="hidden" aria-label="Import configuration" onChange={(e) => {
           const file = e.target.files?.[0];
           if (!file) return;
           const reader = new FileReader();

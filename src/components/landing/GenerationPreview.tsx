@@ -17,7 +17,7 @@ type GeneratedFile = { name: string; content: string };
 
 export type GenerationPreviewProps = {
   open: boolean;
-  onClose: () => void;
+  onOpenChange: (open: boolean) => void;
   repoName: string;
   techStack: string[];
   files: GeneratedFile[];
@@ -33,7 +33,7 @@ function getFileIcon(name: string) {
   return <File className="h-4 w-4" />;
 }
 
-export default function GenerationPreview({ open, onClose, repoName, techStack, files, onGenerateAgain, onSaveToHistory }: GenerationPreviewProps) {
+export default function GenerationPreview({ open, onOpenChange, repoName, techStack, files, onGenerateAgain, onSaveToHistory }: GenerationPreviewProps) {
   const [selected, setSelected] = useState(0);
   const selectedFile = files[selected];
 
@@ -82,7 +82,7 @@ export default function GenerationPreview({ open, onClose, repoName, techStack, 
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[60] bg-black/50"
-          onClick={onClose}
+          onClick={() => onOpenChange(false)}
         >
           <motion.div
             initial={{ y: 40, opacity: 0 }}

@@ -266,7 +266,7 @@ export default function ImagePromptPage() {
             {/* Progress Indicator */}
             <div className="flex items-center justify-between">
               <div className="text-sm" id="img-prompt-wizard-h2">Step {step} of {totalSteps}</div>
-              <div className="flex-1 mx-3 h-2 bg-secondary/30 rounded">
+              <div className="flex-1 mx-3 h-2 bg-secondary/30 rounded" role="progressbar" aria-valuenow={step} aria-valuemin={1} aria-valuemax={totalSteps} aria-label={`Progress: Step ${step} of ${totalSteps}`}>
                 <div className="h-2 bg-primary rounded" style={{ width: `${(step/totalSteps)*100}%` }} />
               </div>
               <div className="text-xs text-foreground/60">Structured form</div>
@@ -286,13 +286,16 @@ export default function ImagePromptPage() {
                   </TooltipWrapper>
                 </Label>
                 <div>
-                  <Label className="mb-1 block text-xs text-foreground/60">
+                  <Label htmlFor="subjectType" className="mb-1 block text-xs text-foreground/60">
                     <TooltipWrapper content="Pick what type of subject you're depicting" glossaryTerm="Subject Type">
                       Subject Type
                     </TooltipWrapper>
                   </Label>
-                  <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
-                    value={form.subjectType} onChange={(e) => update("subjectType", e.target.value as SubjectType)}>
+                  <select 
+                    id="subjectType"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                    value={form.subjectType} 
+                    onChange={(e) => update("subjectType", e.target.value as SubjectType)}>
                     <option value="">Select a subject</option>
                     {(["Person","Landscape","Object","Animal","Abstract","Architecture"] as SubjectType[]).map((s) => (
                       <option key={s} value={s}>{s}</option>
@@ -313,8 +316,10 @@ export default function ImagePromptPage() {
                 {form.subjectType === "Person" && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <Label className="mb-1 block text-xs text-foreground/60">Gender</Label>
-                      <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                      <Label htmlFor="person-gender" className="mb-1 block text-xs text-foreground/60">Gender</Label>
+                      <select 
+                        id="person-gender"
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
                         value={form.person?.gender || ""}
                         onChange={(e) => update("person", { ...(form.person||{}), gender: e.target.value })}
                       >
@@ -326,8 +331,10 @@ export default function ImagePromptPage() {
                       </select>
                     </div>
                     <div>
-                      <Label className="mb-1 block text-xs text-foreground/60">Age Range</Label>
-                      <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                      <Label htmlFor="person-age-range" className="mb-1 block text-xs text-foreground/60">Age Range</Label>
+                      <select 
+                        id="person-age-range"
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
                         value={form.person?.ageRange || ""}
                         onChange={(e) => update("person", { ...(form.person||{}), ageRange: e.target.value })}
                       >
@@ -376,8 +383,10 @@ export default function ImagePromptPage() {
                       />
                     </div>
                     <div>
-                      <Label className="mb-1 block text-xs text-foreground/60">Time of Day</Label>
-                      <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                      <Label htmlFor="landscape-time-of-day" className="mb-1 block text-xs text-foreground/60">Time of Day</Label>
+                      <select 
+                        id="landscape-time-of-day"
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
                         value={form.landscape?.timeOfDay || ""}
                         onChange={(e) => update("landscape", { ...(form.landscape||{}), timeOfDay: e.target.value })}
                       >
@@ -392,8 +401,10 @@ export default function ImagePromptPage() {
                       </select>
                     </div>
                     <div>
-                      <Label className="mb-1 block text-xs text-foreground/60">Season</Label>
-                      <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                      <Label htmlFor="landscape-season" className="mb-1 block text-xs text-foreground/60">Season</Label>
+                      <select 
+                        id="landscape-season"
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
                         value={form.landscape?.season || ""}
                         onChange={(e) => update("landscape", { ...(form.landscape||{}), season: e.target.value })}
                       >
@@ -405,8 +416,10 @@ export default function ImagePromptPage() {
                       </select>
                     </div>
                     <div>
-                      <Label className="mb-1 block text-xs text-foreground/60">Weather</Label>
-                      <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                      <Label htmlFor="landscape-weather" className="mb-1 block text-xs text-foreground/60">Weather</Label>
+                      <select 
+                        id="landscape-weather"
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
                         value={form.landscape?.weather || ""}
                         onChange={(e) => update("landscape", { ...(form.landscape||{}), weather: e.target.value })}
                       >
@@ -480,12 +493,14 @@ export default function ImagePromptPage() {
                 </Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <Label className="mb-1 block text-xs text-foreground/60">
+                    <Label htmlFor="shot-type" className="mb-1 block text-xs text-foreground/60">
                       <TooltipWrapper content="The type of shot you want to capture" glossaryTerm="Shot Type">
                         Shot Type
                       </TooltipWrapper>
                     </Label>
-                    <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                    <select 
+                      id="shot-type"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
                       value={form.shotType || ""}
                       onChange={(e) => update("shotType", e.target.value)}
                     >
@@ -498,12 +513,14 @@ export default function ImagePromptPage() {
                     </select>
                   </div>
                   <div>
-                    <Label className="mb-1 block text-xs text-foreground/60">
+                    <Label htmlFor="camera-angle" className="mb-1 block text-xs text-foreground/60">
                       <TooltipWrapper content="The angle from which the camera is positioned" glossaryTerm="Camera Angle">
                         Camera Angle
                       </TooltipWrapper>
                     </Label>
-                    <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                    <select 
+                      id="camera-angle"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
                       value={form.cameraAngle || ""}
                       onChange={(e) => update("cameraAngle", e.target.value)}
                     >
@@ -511,18 +528,20 @@ export default function ImagePromptPage() {
                       <option>Eye level</option>
                       <option>High angle</option>
                       <option>Low angle</option>
-                      <option>Bird&apos;s eye</option>
-                      <option>Worm&apos;s eye</option>
+                      <option>Bird{'\''}s eye</option>
+                      <option>Worm{'\''}s eye</option>
                       <option>Dutch angle</option>
                     </select>
                   </div>
                   <div className="md:col-span-2">
-                    <Label className="mb-1 block text-xs text-foreground/60">
+                    <Label htmlFor="composition" className="mb-1 block text-xs text-foreground/60">
                       <TooltipWrapper content="The arrangement of elements within the frame" glossaryTerm="Composition">
                         Composition
                       </TooltipWrapper>
                     </Label>
-                    <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                    <select 
+                      id="composition"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
                       value={form.composition || ""}
                       onChange={(e) => update("composition", e.target.value)}
                     >
@@ -573,12 +592,14 @@ export default function ImagePromptPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <Label className="mb-1 block text-xs text-foreground/60">
+                    <Label htmlFor="time-of-day" className="mb-1 block text-xs text-foreground/60">
                       <TooltipWrapper content="The time of day or weather conditions" glossaryTerm="Time of Day">
                         Time of Day
                       </TooltipWrapper>
                     </Label>
-                    <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                    <select 
+                      id="time-of-day"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
                       value={form.timeOfDay || ""}
                       onChange={(e) => update("timeOfDay", e.target.value)}
                     >
@@ -593,12 +614,14 @@ export default function ImagePromptPage() {
                     </select>
                   </div>
                   <div>
-                    <Label className="mb-1 block text-xs text-foreground/60">
+                    <Label htmlFor="atmosphere" className="mb-1 block text-xs text-foreground/60">
                       <TooltipWrapper content="The atmospheric conditions and weather" glossaryTerm="Atmosphere/Weather">
                         Atmosphere/Weather
                       </TooltipWrapper>
                     </Label>
-                    <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                    <select 
+                      id="atmosphere"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
                       value={form.atmosphere || ""}
                       onChange={(e) => update("atmosphere", e.target.value)}
                     >
@@ -683,12 +706,14 @@ export default function ImagePromptPage() {
               </div>
             </div>
                 <div>
-                  <Label className="mb-1 block text-xs text-foreground/60">
+                  <Label htmlFor="color-palette" className="mb-1 block text-xs text-foreground/60">
                     <TooltipWrapper content="The color scheme you want to use" glossaryTerm="Color Palette">
                       Color Palette
                     </TooltipWrapper>
                   </Label>
-                  <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                  <select 
+                    id="color-palette"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
                     value={form.colorPalette || ""}
                     onChange={(e) => update("colorPalette", e.target.value)}
                   >
@@ -733,12 +758,14 @@ export default function ImagePromptPage() {
                     </div>
                   </div>
             <div>
-                    <Label className="mb-1 block text-xs text-foreground/60">
+                    <Label htmlFor="aspect-ratio" className="mb-1 block text-xs text-foreground/60">
                       <TooltipWrapper content="The aspect ratio of your image" glossaryTerm="Aspect Ratio">
                         Aspect Ratio
                       </TooltipWrapper>
                     </Label>
-                    <select className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
+                    <select 
+                      id="aspect-ratio"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 ring-primary"
                       value={form.aspectRatio || ""}
                       onChange={(e) => update("aspectRatio", e.target.value)}
                     >

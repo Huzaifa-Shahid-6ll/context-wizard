@@ -20,6 +20,10 @@ const users = defineTable({
   subscriptionStatus: v.optional(v.string()),
   subscriptionCurrentPeriodEnd: v.optional(v.number()),
   subscriptionCancelAtPeriodEnd: v.optional(v.boolean()),
+  subscriptionTrialEnd: v.optional(v.number()),
+  subscriptionBillingCycle: v.optional(v.union(v.literal("monthly"), v.literal("annual"))),
+  subscriptionAmount: v.optional(v.number()), // Amount in cents
+  lastWebhookEventId: v.optional(v.string()), // Last processed webhook event ID to prevent duplicates
   // Onboarding
   onboardingCompleted: v.optional(v.boolean()),
 }).index("by_clerkId", ["clerkId"]);
@@ -263,6 +267,27 @@ const affiliateClicks = defineTable({
 .index("by_toolName", ["toolName"])
 .index("by_clickedAt", ["clickedAt"]);
 
+// Webhook Logs table schema for tracking Stripe webhook events
+const webhookLogs = defineTable({
+  eventId: v.string(), // Stripe event ID
+  eventType: v.string(), // Event type (e.g., 'checkout.session.completed')
+  status: v.union(
+    v.literal("success"),
+    v.literal("failed"),
+    v.literal("retrying")
+  ),
+  userId: v.optional(v.string()), // Clerk user ID if available
+  errorMessage: v.optional(v.string()),
+  processedAt: v.number(), // Timestamp when processed
+  retryCount: v.number(), // Number of retry attempts
+  requestId: v.optional(v.string()), // Internal request ID for tracking
+  processingTimeMs: v.optional(v.number()), // Time taken to process
+})
+.index("by_eventId", ["eventId"]) // Prevent duplicate processing
+.index("by_processedAt", ["processedAt"]) // For cleanup queries
+.index("by_status", ["status"]) // For monitoring failed events
+.index("by_userId", ["userId"]); // For user-specific queries
+
 // Export the schema
 export default defineSchema({
   users,
@@ -280,6 +305,7 @@ export default defineSchema({
   feedback,
   onboardingResponses,
   affiliateClicks,
+  webhookLogs,
 });
 
 // Type helpers generated via convex codegen (imported by consumers):

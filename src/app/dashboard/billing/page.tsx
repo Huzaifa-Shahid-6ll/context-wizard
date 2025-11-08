@@ -23,8 +23,32 @@ export default function BillingPage() {
 
 	const isLoading = userId != null && userStats === undefined; // convex returns undefined while loading
 	const isPro = !!userStats?.isPro;
+	
+	// Loading states for API calls
+	const [isUpgrading, setIsUpgrading] = React.useState(false);
+	const [isManagingBilling, setIsManagingBilling] = React.useState(false);
+	const [isCancelling, setIsCancelling] = React.useState(false);
 
-	const handleUpgrade = async () => {
+	// Wrapper functions for mouse events
+	const handleUpgradeClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+		e.preventDefault();
+		handleUpgrade();
+	};
+
+	const handleManageBillingClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+		e.preventDefault();
+		handleManageBilling();
+	};
+
+	const handleCancelClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+		e.preventDefault();
+		handleCancel();
+	};
+
+	const handleUpgrade = async (retryCount = 0) => {
+		if (isUpgrading) return;
+		
+		setIsUpgrading(true);
 		try {
             trackEvent('upgrade_button_clicked', { location: 'billing_page' });
             trackEvent('payment_initiated');
@@ -33,40 +57,128 @@ export default function BillingPage() {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ billingPeriod: 'monthly' }),
 			});
-			const { url } = await response.json();
-			if (!response.ok || !url) throw new Error('Missing checkout URL');
-			window.location.href = url;
+			
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+				throw new Error(errorData.error || `Server error: ${response.status}`);
+			}
+			
+			const data = await response.json();
+			if (!data.url) {
+				throw new Error('Checkout URL not provided by server');
+			}
+			
+			toast.success('Redirecting to checkout...');
+			window.location.href = data.url;
 		} catch (error) {
-			console.error(error);
-			toast.error('Failed to start checkout');
-            trackEvent('payment_failed', { error_type: 'checkout_start' });
+			console.error('Upgrade error:', error);
+			const errorMessage = error instanceof Error ? error.message : 'Failed to start checkout';
+			
+			// Retry logic (max 2 retries)
+			if (retryCount < 2) {
+				toast.error(`${errorMessage}. Retrying...`, {
+					action: {
+						label: 'Retry Now',
+						onClick: () => handleUpgrade(retryCount + 1),
+					},
+				});
+			} else {
+				toast.error(`Failed to start checkout: ${errorMessage}. Please try again later.`);
+			}
+			
+            trackEvent('payment_failed', { error_type: 'checkout_start', error_message: errorMessage });
+		} finally {
+			setIsUpgrading(false);
 		}
 	};
 
-	const handleManageBilling = async () => {
+	const handleManageBilling = async (retryCount = 0) => {
+		if (isManagingBilling) return;
+		
+		setIsManagingBilling(true);
 		try {
             trackEvent('manage_billing_clicked');
 			const response = await fetch('/api/stripe/portal', { method: 'POST' });
-			const { url } = await response.json();
-			if (!response.ok || !url) throw new Error('Missing portal URL');
-			window.location.href = url;
+			
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+				throw new Error(errorData.error || `Server error: ${response.status}`);
+			}
+			
+			const data = await response.json();
+			if (!data.url) {
+				throw new Error('Portal URL not provided by server');
+			}
+			
+			toast.success('Opening billing portal...');
+			window.location.href = data.url;
 		} catch (error) {
-			console.error(error);
-			toast.error('Failed to open customer portal');
+			console.error('Manage billing error:', error);
+			const errorMessage = error instanceof Error ? error.message : 'Failed to open customer portal';
+			
+			// Retry logic (max 2 retries)
+			if (retryCount < 2) {
+				toast.error(`${errorMessage}. Retrying...`, {
+					action: {
+						label: 'Retry Now',
+						onClick: () => handleManageBilling(retryCount + 1),
+					},
+				});
+			} else {
+				toast.error(`Failed to open customer portal: ${errorMessage}. Please try again later.`);
+			}
+		} finally {
+			setIsManagingBilling(false);
 		}
 	};
 
-	const handleCancel = async () => {
+	const handleCancel = async (retryCount = 0) => {
+		if (isCancelling) return;
+		
+		const confirmed = window.confirm(
+			'Are you sure you want to cancel your subscription? ' +
+			'Your subscription will remain active until the end of the current billing period.'
+		);
+		if (!confirmed) return;
+		
+		setIsCancelling(true);
 		try {
-			const confirmed = window.confirm('Are you sure you want to cancel your subscription?');
-			if (!confirmed) return;
+			trackEvent('cancel_subscription_clicked');
 			const response = await fetch('/api/stripe/cancel', { method: 'POST' });
-			if (!response.ok) throw new Error('Cancel failed');
-			toast.success('Subscription cancellation submitted');
-			await handleManageBilling();
+			
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+				throw new Error(errorData.error || `Server error: ${response.status}`);
+			}
+			
+			const data = await response.json();
+			const cancelAtPeriodEnd = data.cancelAtPeriodEnd ?? true;
+			
+			if (cancelAtPeriodEnd) {
+				toast.success('Subscription will be cancelled at the end of the billing period. You can reactivate anytime before then.');
+			} else {
+				toast.success('Subscription cancelled successfully.');
+			}
+			
+			// Refresh the page to show updated status
+			window.location.reload();
 		} catch (error) {
-			console.error(error);
-			toast.error('Failed to cancel subscription');
+			console.error('Cancel subscription error:', error);
+			const errorMessage = error instanceof Error ? error.message : 'Failed to cancel subscription';
+			
+			// Retry logic (max 2 retries)
+			if (retryCount < 2) {
+				toast.error(`${errorMessage}. Retrying...`, {
+					action: {
+						label: 'Retry Now',
+						onClick: () => handleCancel(retryCount + 1),
+					},
+				});
+			} else {
+				toast.error(`Failed to cancel subscription: ${errorMessage}. Please try again later or contact support.`);
+			}
+		} finally {
+			setIsCancelling(false);
 		}
 	};
 
@@ -91,14 +203,50 @@ export default function BillingPage() {
 							<div>
 								<div className="flex items-center gap-2">
 									<Badge className="bg-primary text-primary-foreground">Pro</Badge>
-									<span className="text-sm text-muted-foreground">Active subscription</span>
+									<span className="text-sm text-muted-foreground">
+										{userStats?.subscriptionCancelAtPeriodEnd 
+											? 'Cancelling at period end' 
+											: 'Active subscription'}
+									</span>
 								</div>
+								{userStats?.subscriptionCancelAtPeriodEnd && (
+									<div className="mt-2 text-xs text-muted-foreground">
+										Your subscription will remain active until {formatDate(userStats?.subscriptionCurrentPeriodEnd)}.
+									</div>
+								)}
 								<div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-									<Button onClick={handleManageBilling} aria-label="Manage billing" className="w-full">
-										<CreditCard className="mr-2 h-4 w-4" aria-hidden /> Manage billing
+									<Button 
+										onClick={handleManageBillingClick} 
+										aria-label="Manage billing" 
+										className="w-full"
+										disabled={isManagingBilling}
+									>
+										{isManagingBilling ? (
+											<>
+												<Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> Loading...
+											</>
+										) : (
+											<>
+												<CreditCard className="mr-2 h-4 w-4" aria-hidden /> Manage billing
+											</>
+										)}
 									</Button>
-									<Button variant="outline" onClick={handleCancel} aria-label="Cancel subscription" className="w-full">
-										Cancel subscription
+									<Button 
+										variant="outline" 
+										onClick={handleCancelClick} 
+										aria-label="Cancel subscription" 
+										className="w-full"
+										disabled={isCancelling || userStats?.subscriptionCancelAtPeriodEnd}
+									>
+										{isCancelling ? (
+											<>
+												<Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> Cancelling...
+											</>
+										) : userStats?.subscriptionCancelAtPeriodEnd ? (
+											'Already Cancelled'
+										) : (
+											'Cancel subscription'
+										)}
 									</Button>
 								</div>
 							</div>
@@ -113,8 +261,21 @@ export default function BillingPage() {
 									<li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-600" aria-hidden /> 20 prompts/day</li>
 									<li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-600" aria-hidden /> Public repos only</li>
 								</ul>
-								<Button className="mt-4" onClick={handleUpgrade} aria-label="Upgrade to Pro">
-									Upgrade to Pro <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
+								<Button 
+									className="mt-4" 
+									onClick={handleUpgradeClick} 
+									aria-label="Upgrade to Pro"
+									disabled={isUpgrading}
+								>
+									{isUpgrading ? (
+										<>
+											<Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> Processing...
+										</>
+									) : (
+										<>
+											Upgrade to Pro <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
+										</>
+									)}
 								</Button>
 							</div>
 						)}
@@ -125,7 +286,7 @@ export default function BillingPage() {
 				<Card className="shadow-sm">
 					<CardHeader>
 						<CardTitle>Usage</CardTitle>
-                        <CardDescription>Today&apos;s usage and totals</CardDescription>
+                        <CardDescription>Today{'\''}s usage and totals</CardDescription>
 					</CardHeader>
 					<CardContent>
 						{isLoading ? (
@@ -175,8 +336,37 @@ export default function BillingPage() {
 									<div className="text-sm font-medium">{userStats?.paymentMethodLast4 ? `•••• ${userStats.paymentMethodLast4}` : '—'}</div>
 								</div>
 								<div className="mt-4 flex flex-wrap gap-3">
-									<Button onClick={handleManageBilling} aria-label="Open Stripe customer portal"><CreditCard className="mr-2 h-4 w-4" aria-hidden /> Manage billing</Button>
-									<Button variant="outline" onClick={handleCancel} aria-label="Cancel subscription">Cancel subscription</Button>
+									<Button 
+										onClick={handleManageBillingClick} 
+										aria-label="Open Stripe customer portal"
+										disabled={isManagingBilling}
+									>
+										{isManagingBilling ? (
+											<>
+												<Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> Loading...
+											</>
+										) : (
+											<>
+												<CreditCard className="mr-2 h-4 w-4" aria-hidden /> Manage billing
+											</>
+										)}
+									</Button>
+									<Button 
+										variant="outline" 
+										onClick={handleCancelClick} 
+										aria-label="Cancel subscription"
+										disabled={isCancelling || userStats?.subscriptionCancelAtPeriodEnd}
+									>
+										{isCancelling ? (
+											<>
+												<Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> Cancelling...
+											</>
+										) : userStats?.subscriptionCancelAtPeriodEnd ? (
+											'Already Cancelled'
+										) : (
+											'Cancel subscription'
+										)}
+									</Button>
 								</div>
 							</div>
 						</CardContent>
@@ -189,7 +379,7 @@ export default function BillingPage() {
 						</CardHeader>
 						<CardContent>
 							<p className="text-sm text-muted-foreground">Open the Stripe customer portal to view your invoice history and receipts.</p>
-							<Button className="mt-4" variant="outline" onClick={handleManageBilling} aria-label="Open invoices in Stripe portal">
+							<Button className="mt-4" variant="outline" onClick={handleManageBillingClick} aria-label="Open invoices in Stripe portal">
 								Open Customer Portal
 							</Button>
 						</CardContent>
@@ -207,9 +397,20 @@ export default function BillingPage() {
 						</CardHeader>
 						<CardContent>
 							<p className="text-sm text-muted-foreground">Upgrade to Pro to access invoices and manage billing via the Stripe customer portal.</p>
-							<Button className="mt-4" onClick={handleUpgrade} aria-label="Upgrade to Pro from billing history">
-								Upgrade to Pro
-							</Button>
+								<Button 
+									className="mt-4" 
+									onClick={handleUpgradeClick} 
+									aria-label="Upgrade to Pro from billing history"
+									disabled={isUpgrading}
+								>
+									{isUpgrading ? (
+										<>
+											<Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> Processing...
+										</>
+									) : (
+										'Upgrade to Pro'
+									)}
+								</Button>
 						</CardContent>
 					</Card>
 				</div>

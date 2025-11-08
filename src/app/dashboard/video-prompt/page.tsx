@@ -1,4 +1,5 @@
-import React from "react";
+"use client";
+import React, { createContext } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useAction, useQuery, useMutation } from "convex/react";
 import { recordSubmission } from "@/lib/autofill";
@@ -479,8 +480,8 @@ export default function VideoPromptPage() {
                     <option>High angle</option>
                     <option>Low angle</option>
                     <option>Dutch angle</option>
-                    <option>Bird&apos;s eye</option>
-                    <option>Worm&apos;s eye</option>
+                    <option>Bird{'\''}s eye</option>
+                    <option>Worm{'\''}s eye</option>
                   </select>
                 </div>
               </div>

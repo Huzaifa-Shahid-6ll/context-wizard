@@ -22,6 +22,7 @@ import {
   CreditCard,
   Sparkles,
   Wrench,
+  Shield,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { initPostHog, trackEvent, identify } from "@/lib/analytics";
@@ -116,7 +117,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // @prompt-studio/
     { href: "/dashboard/prompt-studio", label: "Prompt Studio", icon: BarChart2 },
     // @tools/
-    { href: "/tools", label: "Recommended Tools", icon: Wrench },
+    { href: "/dashboard/tools", label: "Recommended Tools", icon: Wrench },
     // @billing/
     { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
     // @settings/
@@ -126,6 +127,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Add admin items for admin users only
   if (isAdmin) {
     navItems.push({ href: "/dashboard/admin/onboarding-stats", label: "Admin Stats", icon: BarChart2 });
+    navItems.push({ href: "/dashboard/admin/security", label: "Security", icon: Shield });
   }
 
   function isActive(href: string) {
@@ -193,13 +195,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen w-full">
-      {/* Desktop / Tablet Sidebar */}
-      <div className="hidden md:block">{Sidebar}</div>
+      {/* Desktop / Tablet Sidebar - Hide during onboarding */}
+      {!showOnboarding && (
+        <div className="hidden md:block">{Sidebar}</div>
+      )}
 
       {/* Main Column */}
       <div className="flex min-h-screen flex-1 flex-col">
-        {/* Top Navigation Bar */}
-        <header className="sticky top-0 z-40 bg-base/95 backdrop-blur supports-[backdrop-filter]:bg-base/80 ring-1 ring-border shine-top">
+        {/* Top Navigation Bar - Hide during onboarding */}
+        {!showOnboarding && (
+          <header className="sticky top-0 z-40 bg-base/95 backdrop-blur supports-[backdrop-filter]:bg-base/80 ring-1 ring-border shine-top">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
               <Sheet>
@@ -236,6 +241,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
         </header>
+        )}
 
         {/* Layered background main area */}
         <div className="relative isolate flex-1 bg-gradient-to-b from-background to-card">
@@ -251,8 +257,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </main>
         </div>
 
-        {/* Mobile bottom tab bar */}
-        <nav className="sticky bottom-0 z-40 block border-t border-border bg-base/95 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-base/80 md:hidden">
+        {/* Mobile bottom tab bar - Hide during onboarding */}
+        {!showOnboarding && (
+          <nav className="sticky bottom-0 z-40 block border-t border-border bg-base/95 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-base/80 md:hidden">
           <div className="grid grid-cols-4 gap-2">
             {[
               { href: "/dashboard", label: "Home", Icon: Home },
@@ -264,7 +271,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               { href: "/dashboard/history", label: "History", Icon: Clock },
               { href: "/dashboard/prompt-history", label: "Prompts", Icon: Clock },
               { href: "/dashboard/prompt-studio", label: "Studio", Icon: BarChart2 },
-              { href: "/tools", label: "Tools", Icon: Wrench },
+              { href: "/dashboard/tools", label: "Tools", Icon: Wrench },
               { href: "/dashboard/settings", label: "Settings", Icon: SettingsIcon },
             ].map(({ href, label, Icon }) => (
               <Link key={href} href={href} className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-xs">
@@ -274,6 +281,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             ))}
           </div>
         </nav>
+        )}
       </div>
     </div>
   );
@@ -289,16 +297,16 @@ function UsageIndicator({ remaining, breakdown, isPro }: { remaining: number; br
   React.useEffect(() => {
     try {
       if (isPro) {
-        (window as any)?.posthog?.capture('pro_unlimited_accessed');
+        window.posthog?.capture('pro_unlimited_accessed');
       } else if (remaining <= 5) {
-        (window as any)?.posthog?.capture('free_limit_warning_shown', { remaining_count: remaining });
+        window.posthog?.capture('free_limit_warning_shown', { remaining_count: remaining });
       }
     } catch {}
   }, [isPro, remaining]);
   return (
     <>
       <button
-        onClick={() => { try { (window as any)?.posthog?.capture('quota_viewed', { used: (breakdown.generic||0)+(breakdown.image||0), remaining, limit: isPro ? Number.MAX_SAFE_INTEGER : 20 }); } catch {}; setOpen(true); }}
+        onClick={() => { try { window.posthog?.capture('quota_viewed', { used: (breakdown.generic||0)+(breakdown.image||0), remaining, limit: isPro ? Number.MAX_SAFE_INTEGER : 20 }); } catch {}; setOpen(true); }}
         className={`min-h-11 min-w-11 rounded-md border border-border px-3 py-2 text-sm ${color}`}
         title="Daily prompt usage"
       >
@@ -312,7 +320,7 @@ function UsageIndicator({ remaining, breakdown, isPro }: { remaining: number; br
             <div className="text-sm text-foreground/70">{isPro ? "Unlimited for Pro users" : `${remaining} remaining today`}</div>
             {!isPro && (
               <div className="mt-3">
-                <div className="text-xs font-medium text-foreground/60">Today&apos;s prompts by type</div>
+                <div className="text-xs font-medium text-foreground/60">Today{'\''}s prompts by type</div>
                 <ul className="mt-1 space-y-1 text-sm">
                   {Object.keys(breakdown).length === 0 && <li className="text-foreground/60">No prompts yet today.</li>}
                   {Object.entries(breakdown).map(([k, v]) => (

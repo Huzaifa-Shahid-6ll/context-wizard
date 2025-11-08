@@ -12,6 +12,9 @@ import { Check, X, Star } from 'lucide-react';
 import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useUser } from '@clerk/nextjs';
+import { HoneypotField } from '@/components/forms/HoneypotField';
+import { logSecurityEvent } from '@/lib/securityLogger';
+import { sanitizeInput, sanitizeEmail } from '@/lib/sanitize';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -74,11 +77,26 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Check honeypot
+    const formData = new FormData(e.target as HTMLFormElement);
+    if (formData.get('website_url')) {
+      logSecurityEvent('honeypot_triggered', {
+        path: initialPage,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      });
+      // Silently fail - don't show error to bot
+      return;
+    }
+    
     if (!validate()) return;
     
     setIsSubmitting(true);
     
     try {
+      // Sanitize inputs
+      const sanitizedMessage = sanitizeInput(message);
+      const sanitizedEmail = email ? sanitizeEmail(email) : undefined;
+      
       // Track the submission attempt
       trackEvent('feedback_submitted', {
         type: feedbackType,
@@ -90,8 +108,8 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
       await submitFeedback({
         userId: user?.id,
         type: feedbackType,
-        message,
-        email: email || undefined,
+        message: sanitizedMessage,
+        email: sanitizedEmail,
         rating: rating || undefined,
         page: initialPage,
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
@@ -184,6 +202,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                     </DialogHeader>
                     
                     <form onSubmit={handleSubmit} className="space-y-4">
+                      <HoneypotField />
                       <div>
                         <label className="block text-sm font-medium mb-2">Feedback Type *</label>
                         <Select 

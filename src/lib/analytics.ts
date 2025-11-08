@@ -3,7 +3,7 @@ import posthog from 'posthog-js';
 // Extended window interface for our analytics properties
 type PlausibleFunction = (
   eventName: string,
-  options?: { callback?: () => void; props?: Record<string, any> }
+  options?: { callback?: () => void; props?: Record<string, unknown> }
 ) => void;
 
 declare global {
@@ -32,13 +32,13 @@ export function initAnalytics() {
   initPostHog();
 }
 
-export const identify = (userId: string, properties?: Record<string, any>) => {
+export const identify = (userId: string, properties?: Record<string, unknown>) => {
   if (typeof window !== 'undefined' && window.posthog) {
     window.posthog.identify(userId, properties);
   }
 };
 
-export function trackEvent(eventName: string, properties?: Record<string, any>) {
+export function trackEvent(eventName: string, properties?: Record<string, unknown>) {
   if (typeof window !== 'undefined' && window.posthog) {
     window.posthog.capture(eventName, properties);
   }
@@ -46,7 +46,6 @@ export function trackEvent(eventName: string, properties?: Record<string, any>) 
     window.plausible(eventName, { props: properties });
   }
   if (process.env.NODE_ENV === 'development') {
-    // eslint-disable-next-line no-console
     console.log('[Analytics]', eventName, properties);
   }
 }
@@ -61,27 +60,27 @@ export const trackPageView = (pageName: string) => {
 };
 
 // Wrapper functions for specific event categories
-export const trackAuth = (eventName: string, properties?: Record<string, any>) => {
+export const trackAuth = (eventName: string, properties?: Record<string, unknown>) => {
   trackEvent(eventName, properties);
 };
 
-export const trackLandingEvent = (eventName: string, properties?: Record<string, any>) => {
+export const trackLandingEvent = (eventName: string, properties?: Record<string, unknown>) => {
   trackEvent(eventName, properties);
 };
 
-export const trackGenerationEvent = (eventName: string, properties?: Record<string, any>) => {
+export const trackGenerationEvent = (eventName: string, properties?: Record<string, unknown>) => {
   trackEvent(eventName, properties);
 };
 
-export const trackHistoryEvent = (eventName: string, properties?: Record<string, any>) => {
+export const trackHistoryEvent = (eventName: string, properties?: Record<string, unknown>) => {
   trackEvent(eventName, properties);
 };
 
-export const trackPromptEvent = (eventName: string, properties?: Record<string, any>) => {
+export const trackPromptEvent = (eventName: string, properties?: Record<string, unknown>) => {
   trackEvent(eventName, properties);
 };
 
-export const trackSettingsEvent = (eventName: string, properties?: Record<string, any>) => {
+export const trackSettingsEvent = (eventName: string, properties?: Record<string, unknown>) => {
   trackEvent(eventName, properties);
 };
 
@@ -98,7 +97,7 @@ export const USER_STAGES = {
 export function updateUserStage(
   userId: string,
   stage: typeof USER_STAGES[keyof typeof USER_STAGES],
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ) {
   if (typeof window === 'undefined' || !window.posthog) return;
   window.posthog.identify(userId, {
@@ -110,7 +109,7 @@ export function updateUserStage(
   });
 }
 
-export function trackMilestone(milestoneName: string, properties?: Record<string, any>) {
+export function trackMilestone(milestoneName: string, properties?: Record<string, unknown>) {
   trackEvent('milestone_reached', {
     milestone_type: milestoneName,
     timestamp: new Date().toISOString(),

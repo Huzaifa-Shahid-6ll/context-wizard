@@ -19,10 +19,6 @@ import { initPostHog, trackEvent } from "@/lib/analytics";
 const PAGE_SIZE = 10;
 
 export default function HistoryPage() {
-  React.useEffect(() => {
-    initPostHog();
-    trackEvent('history_page_viewed');
-  }, []);
   const { user } = useUser();
   const userId = user?.id;
   const all = useQuery(api.queries.listGenerationsByUser, userId ? { userId } : "skip") as Generation[] | undefined;
@@ -34,6 +30,7 @@ export default function HistoryPage() {
   const [endDate, setEndDate] = useState<string>("");
   const [stackFilter, setStackFilter] = useState<string>("");
   const [sort, setSort] = useState<"date-desc" | "date-asc" | "status">("date-desc");
+  const [page, setPage] = useState(1);
 
   const handleFilterChange = (filterType: string, value: string) => {
     trackEvent('history_filtered', { filter_type: filterType });
@@ -79,12 +76,24 @@ export default function HistoryPage() {
   const totalPages = Math.max(1, Math.ceil((filtered?.length || 0) / PAGE_SIZE));
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  React.useEffect(() => {
+    initPostHog();
+    trackEvent('history_page_viewed');
+  }, []);
+
+  // Track empty state when it appears
+  React.useEffect(() => {
+    if (all !== undefined && pageItems.length === 0) {
+      trackEvent('history_empty_state_viewed');
+    }
+  }, [all, pageItems.length]);
+
   async function onDelete(id: string) {
     if (!userId) return;
-    trackHistoryEvent('history_delete_clicked', { generation_id: id });
+    trackEvent('history_delete_clicked', { generation_id: id });
     const confirmed = window.confirm("Delete this generation? This cannot be undone.");
     if (!confirmed) return;
-    trackHistoryEvent('history_delete_confirmed', { generation_id: id });
+    trackEvent('history_delete_confirmed', { generation_id: id });
     await deleteGeneration({ id: id as Id<"generations">, userId });
   }
 
@@ -155,9 +164,7 @@ export default function HistoryPage() {
               )}
 
               {all !== undefined && pageItems.length === 0 && (
-                <>
-                  {React.useEffect(() => { trackEvent('history_empty_state_viewed'); }, [])}
-                  <TableRow>
+                <TableRow>
                     <TableCell colSpan={5}>
                       <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
                         <Github className="h-8 w-8 text-foreground/40" />
@@ -168,8 +175,7 @@ export default function HistoryPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                </>
-              )}
+                )}
 
               {pageItems.map((g, idx) => (
                 <TableRow key={g._id} className={(idx % 2 ? "bg-secondary/20 " : "") + "transition-all hover:-translate-y-0.5 hover:shadow-sm"}>
@@ -243,9 +249,9 @@ async function downloadOneZip(g: Generation) {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    try { (window as any)?.posthog ? (window as any).posthog.capture('download_completed') : undefined; } catch {}
+    try { window.posthog?.capture('download_completed'); } catch {}
   } catch (e) {
-    try { (window as any)?.posthog ? (window as any).posthog.capture('download_failed') : undefined; } catch {}
+    try { window.posthog?.capture('download_failed'); } catch {}
     throw e;
   }
 }

@@ -44,9 +44,9 @@ export default function SettingsPage() {
   const resetOnboarding = useMutation(api.onboarding.resetOnboarding);
 
   // Analytics tracking function
-  function trackSettingsEvent(eventName: string, properties?: Record<string, any>) {
+  function trackSettingsEvent(eventName: string, properties?: Record<string, unknown>) {
     try {
-      (window as any)?.posthog?.capture?.(eventName, properties);
+      window.posthog?.capture?.(eventName, properties);
     } catch (e) {
       console.warn('PostHog tracking failed:', e);
     }
@@ -98,8 +98,9 @@ export default function SettingsPage() {
         <h2 className="text-base font-semibold">API Preferences</h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <Label className="mb-2 block">Preferred AI model</Label>
+            <Label htmlFor="preferred-ai-model" className="mb-2 block">Preferred AI model</Label>
             <select
+              id="preferred-ai-model"
               className="w-full rounded-md border border-border bg-background p-2 text-sm"
               value={prefs.model}
               onChange={(e) => update("model", e.target.value)}
@@ -110,8 +111,9 @@ export default function SettingsPage() {
             </select>
           </div>
           <div>
-            <Label className="mb-2 block">Output verbosity</Label>
+            <Label htmlFor="output-verbosity" className="mb-2 block">Output verbosity</Label>
             <select
+              id="output-verbosity"
               className="w-full rounded-md border border-border bg-background p-2 text-sm"
               value={prefs.verbosity}
               onChange={(e) => update("verbosity", e.target.value as Prefs["verbosity"])}
@@ -133,8 +135,9 @@ export default function SettingsPage() {
         <h2 className="text-base font-semibold">Prompt Defaults</h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
-            <Label className="mb-2 block">Default tone</Label>
+            <Label htmlFor="default-tone" className="mb-2 block">Default tone</Label>
             <select
+              id="default-tone"
               className="w-full rounded-md border border-border bg-background p-2 text-sm"
               value={prefs.tone}
               onChange={(e) => update("tone", e.target.value)}
@@ -145,8 +148,9 @@ export default function SettingsPage() {
             </select>
           </div>
           <div>
-            <Label className="mb-2 block">Default format</Label>
+            <Label htmlFor="default-format" className="mb-2 block">Default format</Label>
             <select
+              id="default-format"
               className="w-full rounded-md border border-border bg-background p-2 text-sm"
               value={prefs.format}
               onChange={(e) => update("format", e.target.value)}

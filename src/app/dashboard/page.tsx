@@ -137,7 +137,9 @@ export default function DashboardHome() {
       trackGenerationEvent("generation_completed", { repo_name: repoUrl, tech_stack: correctedTechStack, duration_seconds });
       try {
         // Best-effort stage updates based on totalGenerations after completion
-        const total = (stats as any)?.totalGenerations as number | undefined;
+        const total = stats && typeof stats === 'object' && 'totalGenerations' in stats 
+          ? (stats as { totalGenerations?: number }).totalGenerations 
+          : undefined;
         if (isSignedIn && userId) {
           if (total === 0) {
             updateUserStage(userId, USER_STAGES.ACTIVATED, { activated_at: new Date().toISOString() });
@@ -243,7 +245,7 @@ export default function DashboardHome() {
           <DialogHeader>
             <DialogTitle>Review and Correct Tech Stack</DialogTitle>
             <DialogDescription>
-              We&apos;ve detected the following technologies. Please add or remove any to ensure accuracy.
+              We{'\''}ve detected the following technologies. Please add or remove any to ensure accuracy.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-wrap gap-2">
@@ -354,7 +356,7 @@ export default function DashboardHome() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-base font-semibold">Generate Cursor Prompts from This Repo</h3>
-                <p className="text-sm text-foreground/70">We&apos;ll pre-fill the builder with the detected tech stack, project structure, and existing patterns.</p>
+                <p className="text-sm text-foreground/70">We{'\''}ll pre-fill the builder with the detected tech stack, project structure, and existing patterns.</p>
               </div>
               <Button
                 onClick={() => {
@@ -382,7 +384,7 @@ export default function DashboardHome() {
       {latestCompleted && (
         <section className="mt-6 flex flex-col items-center justify-center gap-3 rounded-lg bg-muted/30 p-4 text-center shadow-sm ring-1 ring-border">
           <h3 className="text-lg font-semibold">How was this generation?</h3>
-          <p className="text-sm text-foreground/70">We'd love to hear your feedback to improve Context Wizard!</p>
+          <p className="text-sm text-foreground/70">We{'\''}d love to hear your feedback to improve Context Wizard!</p>
           <div className="flex gap-2">
             <Button
               variant="outline"

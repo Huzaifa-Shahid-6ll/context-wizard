@@ -65,10 +65,14 @@ export default function PredictPage() {
       setPrediction(res as unknown as Prediction);
       const cs = (() => {
         if (!res) return 0;
-        const obj = res as any;
+        const obj = res as unknown;
         if (obj && typeof obj === 'object') {
-          if (typeof obj.confidence === 'number') return obj.confidence;
-          if (obj.predictedOutput && typeof obj.predictedOutput === 'object' && typeof obj.predictedOutput.confidence === 'number') return obj.predictedOutput.confidence;
+          const objRecord = obj as Record<string, unknown>;
+          if (typeof objRecord.confidence === 'number') return objRecord.confidence;
+          if (objRecord.predictedOutput && typeof objRecord.predictedOutput === 'object') {
+            const predictedOutput = objRecord.predictedOutput as Record<string, unknown>;
+            if (typeof predictedOutput.confidence === 'number') return predictedOutput.confidence;
+          }
         }
         return 0;
       })();
@@ -116,7 +120,7 @@ export default function PredictPage() {
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium">Temperature</label>
-                <input type="range" min={0} max={1} step={0.1} value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} className="w-full" />
+                <input type="range" min={0} max={1} step={0.1} value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} className="w-full" aria-label="Temperature control" />
                 <div className="mt-1 text-xs text-foreground/60">Lower = more focused; Higher = more creative ({temperature.toFixed(1)})</div>
               </div>
             </div>
@@ -182,8 +186,8 @@ export default function PredictPage() {
                   <div className="text-sm font-medium">Confidence</div>
                   <Badge variant="secondary">{confidence}%</Badge>
                 </div>
-                <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-secondary/40">
-                  <div className={`h-3 ${confidenceColor}`} style={{ width: `${confidence}%` }} />
+                <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-secondary/40" role="progressbar" aria-valuenow={Number(confidence || 0)} aria-valuemin={0} aria-valuemax={100} aria-label="Confidence meter">
+                  <div className={`h-3 ${confidenceColor}`} style={{ width: `${Number(confidence || 0)}%` }} />
                 </div>
               </div>
 
@@ -294,5 +298,3 @@ function AlertItem({ text }: { text: string }) {
     </div>
   );
 }
-
-

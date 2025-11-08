@@ -24,6 +24,12 @@ type UserStats = {
   remainingPrompts: number;
   promptTypeBreakdown: Record<string, number>;
   promptsTodayByType: Record<string, number>;
+  // Subscription fields
+  nextBillingDate?: number;
+  amount?: number;
+  paymentMethodLast4?: string;
+  subscriptionCancelAtPeriodEnd?: boolean;
+  subscriptionCurrentPeriodEnd?: number;
 };
 
 const DAILY_FREE_LIMIT = 5;
@@ -181,6 +187,11 @@ export const getUserStats = query({
         remainingPrompts: 20,
         promptTypeBreakdown: {},
         promptsTodayByType: {},
+        nextBillingDate: undefined,
+        amount: undefined,
+        paymentMethodLast4: undefined,
+        subscriptionCancelAtPeriodEnd: undefined,
+        subscriptionCurrentPeriodEnd: undefined,
       };
     }
 
@@ -234,6 +245,12 @@ export const getUserStats = query({
       remainingPrompts,
       promptTypeBreakdown,
       promptsTodayByType,
+      // Subscription fields
+      nextBillingDate: user.subscriptionCurrentPeriodEnd,
+      amount: undefined, // Amount would need to be fetched from Stripe or stored
+      paymentMethodLast4: undefined, // Payment method info would need to be fetched from Stripe
+      subscriptionCancelAtPeriodEnd: user.subscriptionCancelAtPeriodEnd,
+      subscriptionCurrentPeriodEnd: user.subscriptionCurrentPeriodEnd,
     };
   },
 });

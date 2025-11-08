@@ -135,7 +135,7 @@ export default function AdminFeedbackDashboard() {
 
       {/* Controls */}
       <div className="mb-6 flex flex-col md:flex-row gap-4">
-        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full md:w-auto">
+        <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as 'new' | 'resolved' | 'all')} className="w-full md:w-auto">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="new">New</TabsTrigger>
             <TabsTrigger value="resolved">Resolved</TabsTrigger>

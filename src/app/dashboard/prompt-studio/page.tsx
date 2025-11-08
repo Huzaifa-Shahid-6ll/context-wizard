@@ -44,18 +44,38 @@ export default function PromptStudioPage() {
   // Generic prompt state
   const [goal, setGoal] = React.useState("");
   const [context, setContext] = React.useState("");
-  const [outputFormatDetails, setOutputFormatDetails] = React.useState({
+  const [outputFormatDetails, setOutputFormatDetails] = React.useState<{
+    format: string;
+    length: string;
+    structure: string[];
+    constraints: {
+      wordCount?: number;
+      characterLimit?: number;
+      includeIntro?: boolean;
+      includeSummary?: boolean;
+    };
+  }>({
     format: "text",
     length: "standard",
     structure: [],
     constraints: {},
   });
-  const [toneStyleDetails, setToneStyleDetails] = React.useState({
+  const [toneStyleDetails, setToneStyleDetails] = React.useState<{
+    tone: string;
+    style: string;
+    modifiers: string[];
+  }>({
     tone: "professional",
     style: "concise",
     modifiers: [],
   });
-  const [audience, setAudience] = React.useState("general");
+  const [audience, setAudience] = React.useState({
+    ageRange: "",
+    profession: "",
+    expertiseLevel: "",
+    industry: "",
+    useCase: ""
+  });
 
   // Image prompt state
   const [imageDescription, setImageDescription] = React.useState("");
@@ -92,7 +112,6 @@ export default function PromptStudioPage() {
         context: context.trim() || undefined,
         outputFormat: outputFormatDetails.format,
         tone: toneStyleDetails.tone,
-        audience: audience,
         userId: user.id,
       });
       setResults({ type: "generic", data: res });

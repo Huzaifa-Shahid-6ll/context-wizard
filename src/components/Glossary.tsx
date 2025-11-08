@@ -46,10 +46,11 @@ export function Glossary({ term, showSearch = true, showCategories = true, class
 
       {showCategories && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="glossary-category-select" className="block text-sm font-medium text-gray-700 mb-2">
             Filter by Category
           </label>
           <select
+            id="glossary-category-select"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
@@ -157,7 +158,7 @@ export function GlossaryTooltip({ term, children }: { term: string; children: Re
   return (
     <TooltipWrapper 
       content={glossaryTerm.definition}
-      learnMoreLink={`/glossary#${term.toLowerCase()}`}
+      glossaryTerm={term}
     >
       {children}
     </TooltipWrapper>

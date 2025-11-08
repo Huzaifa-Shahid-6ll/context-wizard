@@ -331,3 +331,48 @@ export const cancelUserSubscription = mutation({
   },
 });
 
+// Webhook logging mutation
+export const logWebhookEvent = mutation({
+  args: {
+    eventId: v.string(),
+    eventType: v.string(),
+    status: v.union(v.literal("success"), v.literal("failed"), v.literal("retrying")),
+    userId: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+    retryCount: v.number(),
+    requestId: v.optional(v.string()),
+    processingTimeMs: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    // Check if event already logged (prevent duplicates)
+    const existing = await ctx.db
+      .query("webhookLogs")
+      .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+      .first();
+    
+    if (existing) {
+      // Update existing log
+      await ctx.db.patch(existing._id, {
+        status: args.status,
+        errorMessage: args.errorMessage,
+        retryCount: args.retryCount,
+        processingTimeMs: args.processingTimeMs,
+        processedAt: Date.now(),
+      });
+    } else {
+      // Create new log
+      await ctx.db.insert("webhookLogs", {
+        eventId: args.eventId,
+        eventType: args.eventType,
+        status: args.status,
+        userId: args.userId,
+        errorMessage: args.errorMessage,
+        processedAt: Date.now(),
+        retryCount: args.retryCount,
+        requestId: args.requestId,
+        processingTimeMs: args.processingTimeMs,
+      });
+    }
+  },
+});
+

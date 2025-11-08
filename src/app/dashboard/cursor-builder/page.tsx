@@ -325,9 +325,20 @@ export default function CursorBuilderPage() {
   const previewPanelId = "cursorbuilder-preview-panel";
   const outputPanelId = "cursorbuilder-output-panel";
 
+  // Define type for tech details
+  type TechDetails = {
+    category: string;
+    details: Record<string, unknown> & {
+      frontend: string;
+      backend: string;
+      database: string;
+      tools: string[];
+    };
+  };
+
   // [Define new state for best compatibility]
-  const [techDetails, setTechDetails] = React.useState(() => ({
-    category: 'camera',
+  const [techDetails, setTechDetails] = React.useState<TechDetails>(() => ({
+    category: 'code',
     details: {
       frontend: frontend || '',
       backend: backend || '',
@@ -336,12 +347,25 @@ export default function CursorBuilderPage() {
     },
   }));
 
-  // Keep techDetails in sync with individual fields
+  // Wrapper function to properly handle the onChange type for TechnicalDetailsBuilder
+  const handleTechDetailsChange = React.useCallback((value: { category: string; details: Record<string, unknown> }) => {
+    setTechDetails(prev => ({
+      ...prev,
+      ...value,
+      details: {
+        ...prev.details,
+        ...value.details
+      }
+    }));
+  }, []);
+
+  // Keep individual fields in sync with techDetails (only in one direction)
   React.useEffect(() => {
-    setFrontend(techDetails.details.frontend || "");
-    setBackend(techDetails.details.backend || "");
-    setDatabase(techDetails.details.database || "");
-    setTools(Array.isArray(techDetails.details.tools) ? techDetails.details.tools : []);
+    const details = techDetails.details;
+    setFrontend(details.frontend || '');
+    setBackend(details.backend || '');
+    setDatabase(details.database || '');
+    setTools(Array.isArray(details.tools) ? details.tools as string[] : []);
   }, [techDetails]);
 
   const templates = [
@@ -472,7 +496,10 @@ export default function CursorBuilderPage() {
           <div className="text-xs text-foreground/60">Step {currentStep + 1} of {steps.length}</div>
         </div>
         <div className="h-2 w-full rounded bg-secondary/20">
-          <div className="h-2 rounded bg-primary transition-[width] duration-300" style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }} />
+          <div 
+            className="h-2 rounded bg-primary transition-[width] duration-300" 
+            style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }} 
+          />
         </div>
       </Card>
 
@@ -610,12 +637,12 @@ export default function CursorBuilderPage() {
                           }
                         }}
                       >{idx + 1}</Badge>
-                      <Input value={f.name} onChange={(e) => setFeatures((arr) => arr.map((x) => x.id === f.id ? { ...x, name: e.target.value } : x))} className="flex-1" />
+                      <Input value={f.name} onChange={(e) => setFeatures((arr) => arr.map((x) => x.id === f.id ? { ...x, name: e.target.value } : x))} className="flex-1" aria-label={`Feature ${idx + 1} name`} />
                       <Button variant="outline" size="sm" onClick={() => removeFeature(f.id)}>Remove</Button>
                     </div>
                     <div className="mt-2">
                       <Label>Description</Label>
-                      <textarea className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" rows={3} value={f.description} onChange={(e) => setFeatures((arr) => arr.map((x) => x.id === f.id ? { ...x, description: e.target.value } : x))} />
+                      <textarea className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" rows={3} value={f.description} onChange={(e) => setFeatures((arr) => arr.map((x) => x.id === f.id ? { ...x, description: e.target.value } : x))} aria-label={`Feature ${idx + 1} description`} />
                     </div>
                   </li>
                 ))}
@@ -629,7 +656,7 @@ export default function CursorBuilderPage() {
               <h2 className="text-base font-semibold tracking-tight">Tech Stack</h2>
               <TechnicalDetailsBuilder
                 value={techDetails}
-                onChange={setTechDetails}
+                onChange={handleTechDetailsChange}
               />
             </div>
           )}
