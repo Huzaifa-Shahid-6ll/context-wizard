@@ -71,7 +71,7 @@ export const Navbar: React.FC = () => {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Left: Brand */}
         <Link href="/" className="flex items-center gap-2 depth-layer-2 rounded-lg px-3 py-1.5 shadow-depth-sm hover-lift cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <span className="text-xl font-bold tracking-tight text-primary">Context Wizard</span>
+          <span className="text-xl font-bold tracking-tight text-primary">Conard</span>
         </Link>
 
         {/* Center: Desktop nav */}
@@ -183,5 +183,3 @@ export const Navbar: React.FC = () => {
 };
 
 export default Navbar;
-
-

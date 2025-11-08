@@ -1,4 +1,4 @@
-# Context Wizard
+# Conard
 
 **Stop fighting AI coding tools with bad context. Generate perfect .cursorrules and context files from any GitHub repo in 30 seconds.**
 
@@ -6,9 +6,9 @@
 
 **Demo:**
 
-![Demo GIF of Context Wizard]([DEMO_GIF_OR_VIDEO])
+![Demo GIF of Conard]([DEMO_GIF_OR_VIDEO])
 
-Context Wizard is a tool that helps you generate context files for your AI coding tools. It analyzes your GitHub repository and creates a `.cursorrules` file that you can use with tools like Cursor to provide better context to the AI.
+Conard is a tool that helps you generate context files for your AI coding tools. It analyzes your GitHub repository and creates a `.cursorrules` file that you can use with tools like Cursor to provide better context to the AI.
 
 ## Features
 
@@ -27,9 +27,9 @@ Context Wizard is a tool that helps you generate context files for your AI codin
 
 ## How It Works
 
-1.  **Connect Your GitHub Account:** Securely connect your GitHub account to give Context Wizard access to your repositories.
+1.  **Connect Your GitHub Account:** Securely connect your GitHub account to give Conard access to your repositories.
 2.  **Select a Repository:** Choose the repository you want to generate a context file for.
-3.  **Generate Context:** Context Wizard will analyze your repository and generate a `.cursorrules` file.
+3.  **Generate Context:** Conard will analyze your repository and generate a `.cursorrules` file.
 4.  **Download and Use:** Download the generated file and use it with your favorite AI coding tool.
 
 ## Contributing

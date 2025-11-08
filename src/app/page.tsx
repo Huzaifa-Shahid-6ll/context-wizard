@@ -67,7 +67,7 @@ export default function Home() {
     {
       question: "Do I need to know how to code?",
       answer:
-        "Not at all! Context Wizard is designed to work for everyone. You just need to paste your GitHub repository URL, and our AI does the rest. The generated context files help both experienced developers and beginners work better with AI coding assistants like Cursor.",
+        "Not at all! Conard is designed to work for everyone. You just need to paste your GitHub repository URL, and our AI does the rest. The generated context files help both experienced developers and beginners work better with AI coding assistants like Cursor.",
     },
     {
       question: "What if my repo is huge/complex?",
@@ -203,7 +203,7 @@ export default function Home() {
 
           {/* Subheadline */}
           <p className="mx-auto mt-4 max-w-3xl text-lg sm:text-xl font-normal text-foreground/60 text-shadow-sm">
-            AI coding tools fail because they don{'\''}t understand your project. Context Wizard analyzes any GitHub repo and generates the perfect .cursorrules and documentation files—so Cursor actually works.
+            AI coding tools fail because they don{'\''}t understand your project. Conard analyzes any GitHub repo and generates the perfect .cursorrules and documentation files—so Cursor actually works.
           </p>
 
           {/* Two-column feature comparison */}

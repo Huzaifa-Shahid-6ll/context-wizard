@@ -34,7 +34,7 @@ export const Footer: React.FC = () => {
           <div className="flex items-center space-x-2">
             {/* Replace with your logo */}
             <div className="h-8 w-8 bg-gray-300" />
-            <span className="text-lg font-bold">Context Wizard</span>
+            <span className="text-lg font-bold">Conard</span>
           </div>
           <p className="mt-2">AI-powered context generation for better code</p>
           <p className="mt-2">
@@ -99,7 +99,7 @@ export const Footer: React.FC = () => {
 
       {/* Bottom Bar */}
       <div className="mt-8 border-t pt-4 flex flex-col md:flex-row justify-between items-center text-center max-w-6xl mx-auto">
-        <p>© 2025 Context Wizard. All rights reserved.</p>
+        <p>© 2025 Conard. All rights reserved.</p>
         <p>Built with ❤️ for developers</p>
         <p className="flex items-center">
           <span className="h-2 w-2 bg-green-500 rounded-full mr-2" />
@@ -115,5 +115,3 @@ export const Footer: React.FC = () => {
     </footer>
   );
 };
-
-

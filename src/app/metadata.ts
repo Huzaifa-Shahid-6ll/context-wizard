@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: {
-    default: 'Context Wizard - AI-Powered Context Files for Better Code',
-    template: '%s | Context Wizard'
+    default: 'Conard - AI-Powered Context Files for Better Code',
+    template: '%s | Conard'
   },
   description:
-    'Context Wizard is an AI-powered tool that generates context files for your codebase, helping you understand and navigate complex projects with ease.',
+    'Conard is an AI-powered tool that generates context files for your codebase, helping you understand and navigate complex projects with ease.',
   keywords: [
     'AI',
     'Context',
@@ -24,33 +24,33 @@ export const metadata: Metadata = {
   ],
   authors: [
     {
-      name: 'Context Wizard',
+      name: 'Conard',
       url: 'https://contextwizard.com',
     },
   ],
-  creator: 'Context Wizard',
+  creator: 'Conard',
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: 'https://contextwizard.com',
-    title: 'Context Wizard - AI-Powered Context Files for Better Code',
+    title: 'Conard - AI-Powered Context Files for Better Code',
     description:
-      'Context Wizard is an AI-powered tool that generates context files for your codebase, helping you understand and navigate complex projects with ease.',
-    siteName: 'Context Wizard',
+      'Conard is an AI-powered tool that generates context files for your codebase, helping you understand and navigate complex projects with ease.',
+    siteName: 'Conard',
     images: [
       {
         url: 'https://contextwizard.com/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: 'Context Wizard - AI-Powered Context Files for Better Code',
+        alt: 'Conard - AI-Powered Context Files for Better Code',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Context Wizard - AI-Powered Context Files for Better Code',
+    title: 'Conard - AI-Powered Context Files for Better Code',
     description:
-      'Context Wizard is an AI-powered tool that generates context files for your codebase, helping you understand and navigate complex projects with ease.',
+      'Conard is an AI-powered tool that generates context files for your codebase, helping you understand and navigate complex projects with ease.',
     images: ['https://contextwizard.com/og-image.jpg'],
     creator: '@ContextWizard',
   },

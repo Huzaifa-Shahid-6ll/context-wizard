@@ -218,7 +218,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </SheetContent>
               </Sheet>
               <Link href="/dashboard" className="text-lg font-semibold tracking-tight text-primary">
-                Context Wizard
+                Conard
               </Link>
             </div>
             <div className="flex items-center gap-4">
@@ -341,5 +341,3 @@ function UsageIndicator({ remaining, breakdown, isPro }: { remaining: number; br
     </>
   );
 }
-
-
