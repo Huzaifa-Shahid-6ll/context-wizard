@@ -38,7 +38,7 @@ class ErrorBoundary extends React.Component<Props, State> {
             <h2 className="text-lg font-semibold text-destructive">Something went wrong</h2>
             <p className="text-destructive/80 mt-2">{this.state.error?.message}</p>
           </div>
-          <p className="mb-4">We've been notified of this issue. If you'd like to provide more details, please share your feedback below.</p>
+          <p className="mb-4">We{'&apos;'}ve been notified of this issue. If you{'&apos;'}d like to provide more details, please share your feedback below.</p>
           <FeedbackTrigger error={this.state.error} />
         </div>
       );

@@ -170,7 +170,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
       case 0: // Role Identification
         return (
           <div className="w-full max-w-md">
-            <h2 className="text-2xl font-bold text-white mb-6">Welcome! Let's personalize your experience</h2>
+            <h2 className="text-2xl font-bold text-white mb-6">Welcome! Let{'&apos;'}s personalize your experience</h2>
             <h3 className="text-xl font-semibold text-gray-200 mb-6">What best describes your role?</h3>
             
             <div className="space-y-3">
@@ -238,7 +238,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
       case 2: // Main Pain Point
         return (
           <div className="w-full max-w-md">
-            <h2 className="text-2xl font-bold text-white mb-2">What's your biggest frustration with AI coding tools?</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">What{'&apos;'}s your biggest frustration with AI coding tools?</h2>
             
             <div className="space-y-3">
               {[
@@ -337,7 +337,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
       case 5: // Desired Outcome
         return (
           <div className="w-full max-w-md">
-            <h2 className="text-2xl font-bold text-white mb-2">What's your main goal in the next 30 days?</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">What{'&apos;'}s your main goal in the next 30 days?</h2>
             
             <div className="space-y-3">
               {[

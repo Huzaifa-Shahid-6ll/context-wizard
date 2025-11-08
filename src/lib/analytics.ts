@@ -1,8 +1,22 @@
 import posthog from 'posthog-js';
 
+// Extended window interface for our analytics properties
+type PlausibleFunction = (
+  eventName: string,
+  options?: { callback?: () => void; props?: Record<string, any> }
+) => void;
+
+declare global {
+  interface Window {
+    posthog: typeof posthog;
+    _phInitialized: boolean;
+    plausible?: PlausibleFunction;
+  }
+}
+
 export function initPostHog() {
   if (typeof window === 'undefined') return;
-  if ((window as any)._phInitialized) return;
+  if (window._phInitialized) return;
   const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   if (!key) return;
   posthog.init(key, {
@@ -10,8 +24,8 @@ export function initPostHog() {
     autocapture: false,
     person_profiles: 'identified_only',
   });
-  (window as any).posthog = posthog;
-  (window as any)._phInitialized = true;
+  window.posthog = posthog;
+  window._phInitialized = true;
 }
 
 export function initAnalytics() {
@@ -19,17 +33,17 @@ export function initAnalytics() {
 }
 
 export const identify = (userId: string, properties?: Record<string, any>) => {
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.identify(userId, properties);
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.identify(userId, properties);
   }
 };
 
 export function trackEvent(eventName: string, properties?: Record<string, any>) {
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture(eventName, properties);
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture(eventName, properties);
   }
-  if (typeof window !== 'undefined' && (window as any).plausible) {
-    (window as any).plausible(eventName, { props: properties });
+  if (typeof window !== 'undefined' && window.plausible) {
+    window.plausible(eventName, { props: properties });
   }
   if (process.env.NODE_ENV === 'development') {
     // eslint-disable-next-line no-console
@@ -38,8 +52,8 @@ export function trackEvent(eventName: string, properties?: Record<string, any>) 
 }
 
 export const trackPageView = (pageName: string) => {
-  if (typeof window !== 'undefined' && (window as any).posthog) {
-    (window as any).posthog.capture('$pageview', {
+  if (typeof window !== 'undefined' && window.posthog) {
+    window.posthog.capture('$pageview', {
       $current_url: window.location.href,
       page_name: pageName,
     });
@@ -86,8 +100,8 @@ export function updateUserStage(
   stage: typeof USER_STAGES[keyof typeof USER_STAGES],
   metadata?: Record<string, any>
 ) {
-  if (typeof window === 'undefined' || !(window as any).posthog) return;
-  (window as any).posthog.identify(userId, {
+  if (typeof window === 'undefined' || !window.posthog) return;
+  window.posthog.identify(userId, {
     $set: {
       user_stage: stage,
       stage_updated_at: new Date().toISOString(),

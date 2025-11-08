@@ -95,19 +95,19 @@ export default function Home() {
         "Our AI analyzes your repository structure, package.json dependencies, README files, code patterns, and framework configurations. We use GPT-4o and Claude 3.5 Sonnet to understand your codebase and generate accurate, helpful context files that make AI coding assistants work better.",
     },
     {
-      question: "What's the difference between Free and Pro plans?",
+      question: "What{'&apos;'}s the difference between Free and Pro plans?",
       answer:
         "Free plan includes 5 generations per day for public repositories. Pro plan ($9/month) offers unlimited generations, private repository support, priority processing (3x faster), access to premium AI models, and advanced features like custom prompt templates and team collaboration (coming soon).",
     },
     {
       question: "How accurate are the generated context files?",
       answer:
-        "Our AI achieves 95%+ accuracy in detecting tech stacks and coding patterns. However, we always recommend reviewing the generated files before using them in production. You can easily edit any file to match your team's specific preferences.",
+        "Our AI achieves 95%+ accuracy in detecting tech stacks and coding patterns. However, we always recommend reviewing the generated files before using them in production. You can easily edit any file to match your team{'&apos;'}s specific preferences.",
     },
     {
       question: "Can I customize the generated files?",
       answer:
-        "Absolutely! All generated files are plain text (markdown and rules files) that you can edit with any text editor. Pro users also get access to custom templates where you can define your team's specific coding standards and have them automatically included in all generations.",
+        "Absolutely! All generated files are plain text (markdown and rules files) that you can edit with any text editor. Pro users also get access to custom templates where you can define your team{'&apos;'}s specific coding standards and have them automatically included in all generations.",
     },
     {
       question: "Do you store my code or repository data?",
@@ -363,7 +363,7 @@ export default function Home() {
           Why AI Coding Tools Keep Failing You
         </h2>
         <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-          Every developer knows the frustration. Here's what's really going wrong.
+          Every developer knows the frustration. Here{'&apos;'}s what{'&apos;'}s really going wrong.
         </p>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
@@ -622,7 +622,7 @@ export default function Home() {
             <div className="rounded-lg depth-layer-1 shadow-inset p-4 mb-4">
               <Image src="/window.svg" alt="Messy AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
             </div>
-            <p className="text-sm text-muted-foreground text-center">32 lines of bugs, wrong dependencies, doesn't run</p>
+            <p className="text-sm text-muted-foreground text-center">32 lines of bugs, wrong dependencies, doesn{'&apos;'}t run</p>
           </Card>
 
           {/* After */}
@@ -660,7 +660,7 @@ export default function Home() {
                 <div className="rounded-lg depth-layer-1 shadow-inset p-4 mb-4">
                   <Image src="/window.svg" alt="Messy AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
                 </div>
-                <p className="text-sm text-muted-foreground text-center">32 lines of bugs, wrong dependencies, doesn't run</p>
+                <p className="text-sm text-muted-foreground text-center">32 lines of bugs, wrong dependencies, doesn{'&apos;'}t run</p>
               </Card>
             </TabsContent>
             <TabsContent value="after" className="mt-0">
@@ -713,7 +713,7 @@ export default function Home() {
               <span className="bg-primary/20 px-3 py-1 rounded">WORLD-CLASS</span> CUSTOMER SUPPORT
             </h2>
             <p className="text-muted-foreground text-sm">
-              Don't just take our word for it. Our A-team gets tons of praise.
+              Don{'&apos;'}t just take our word for it. Our A-team gets tons of praise.
             </p>
           </div>
 
