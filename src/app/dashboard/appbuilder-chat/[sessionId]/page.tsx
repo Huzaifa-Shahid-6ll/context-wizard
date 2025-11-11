@@ -17,7 +17,7 @@ export default function ChatPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useUser();
-  const sessionId = params.sessionId as string;
+  const sessionId = params?.sessionId as string | undefined;
 
   const session = useQuery(api.chatQueries.getChatSession, sessionId ? { sessionId: sessionId as any } : "skip");
   const chatHistory = useQuery(api.chatQueries.getChatHistory, sessionId ? { sessionId: sessionId as any } : "skip");
@@ -203,8 +203,8 @@ export default function ChatPage() {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="font-semibold">{session.title}</h1>
-            <p className="text-xs text-foreground/60">{session.projectName}</p>
+            <h1 className="font-semibold">{session && "title" in session ? session.title : "Chat Session"}</h1>
+            <p className="text-xs text-foreground/60">{session && "projectName" in session ? session.projectName : ""}</p>
           </div>
         </div>
 
@@ -266,7 +266,7 @@ export default function ChatPage() {
             </Button>
           </div>
           <p className="text-xs text-foreground/60 mt-2">
-            Turns: {session.turnCount}/50 | Messages: {session.messageCount}/5
+            Turns: {session && "turnCount" in session ? session.turnCount : 0}/50 | Messages: {session && "messageCount" in session ? session.messageCount : 0}/5
           </p>
         </div>
       </div>

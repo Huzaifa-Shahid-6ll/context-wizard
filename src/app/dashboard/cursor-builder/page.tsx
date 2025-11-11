@@ -390,6 +390,7 @@ export default function CursorBuilderPage() {
         setAvgGenerationTime(newAvg);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPromptIndex, generatedPrompts, generatedLists, avgGenerationTime, generationStartTime]);
 
   function next() {
@@ -922,7 +923,7 @@ export default function CursorBuilderPage() {
                 type: promptType as any,
                 section: p.title,
                 promptId: `${type}_${idx}`,
-              },
+              } as any,
             });
           });
         }
