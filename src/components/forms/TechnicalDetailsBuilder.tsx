@@ -181,7 +181,8 @@ export function TechnicalDetailsBuilder({ value, onChange, className = '' }: Tec
           <select
             value={fieldValue as string}
             onChange={(e) => handleFieldChange(field.name, e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            style={{ colorScheme: 'light dark' }}
           >
             <option value="">Select {field.label}</option>
             {field.options?.map((option: string) => (
@@ -207,9 +208,9 @@ export function TechnicalDetailsBuilder({ value, onChange, className = '' }: Tec
                       : selectedValues.filter((v: string) => v !== option);
                     handleFieldChange(field.name, newValues);
                   }}
-                  className="text-blue-600 focus:ring-blue-500"
+                  className="text-primary focus:ring-primary"
                 />
-                <span className="text-sm">{option}</span>
+                <span className="text-sm text-foreground">{option}</span>
               </label>
             ))}
           </div>
@@ -224,7 +225,7 @@ export function TechnicalDetailsBuilder({ value, onChange, className = '' }: Tec
               onChange={(e) => handleFieldChange(field.name, e.target.checked)}
               className="text-blue-600 focus:ring-blue-500"
             />
-            <span className="text-sm">Enable {field.label}</span>
+            <span className="text-sm text-foreground">Enable {field.label}</span>
           </label>
         );
       
@@ -235,7 +236,7 @@ export function TechnicalDetailsBuilder({ value, onChange, className = '' }: Tec
             onChange={(e) => handleFieldChange(field.name, e.target.value)}
             placeholder={field.placeholder}
             rows={3}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         );
       
@@ -247,7 +248,7 @@ export function TechnicalDetailsBuilder({ value, onChange, className = '' }: Tec
   return (
     <div className={`space-y-6 ${className}`}>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
+        <label className="block text-sm font-medium text-foreground mb-3">
           <TooltipWrapper content="Select the technical category you want to specify">
             Technical Category
           </TooltipWrapper>
@@ -259,13 +260,13 @@ export function TechnicalDetailsBuilder({ value, onChange, className = '' }: Tec
               onClick={() => setActiveCategory(key)}
               className={`p-4 border rounded-lg transition-all ${
                 activeCategory === key
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border hover:border-primary/50'
               }`}
             >
               <div className="text-center">
                 <span className="text-2xl mb-2 block">{category.icon}</span>
-                <span className="text-sm font-medium">{category.label}</span>
+                <span className="text-sm font-medium text-foreground">{category.label}</span>
               </div>
             </button>
           ))}
@@ -273,13 +274,13 @@ export function TechnicalDetailsBuilder({ value, onChange, className = '' }: Tec
       </div>
 
       <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
+        <h3 className="text-lg font-medium text-foreground mb-4">
           {categories[activeCategory as keyof typeof categories].label}
         </h3>
         <div className="space-y-4">
           {categories[activeCategory as keyof typeof categories].fields.map((field) => (
             <div key={field.name}>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 <TooltipWrapper content={field.tooltip}>
                   {field.label}
                 </TooltipWrapper>
@@ -290,16 +291,16 @@ export function TechnicalDetailsBuilder({ value, onChange, className = '' }: Tec
         </div>
       </div>
 
-      <div className="p-4 bg-gray-50 rounded-lg">
-        <h4 className="font-medium text-gray-900 mb-2">Current Settings</h4>
-        <div className="text-sm text-gray-600 space-y-1">
+      <div className="p-4 bg-secondary/10 rounded-lg">
+        <h4 className="font-medium text-foreground mb-2">Current Settings</h4>
+        <div className="text-sm text-foreground/70 space-y-1">
           {Object.entries(value.details).map(([key, val]) => (
             <p key={key}>
               <strong>{key}:</strong> {Array.isArray(val) ? val.join(', ') : String(val)}
             </p>
           ))}
           {Object.keys(value.details).length === 0 && (
-            <p className="text-gray-500 italic">No technical details specified</p>
+            <p className="text-foreground/60 italic">No technical details specified</p>
           )}
         </div>
       </div>

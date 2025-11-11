@@ -50,6 +50,19 @@ const steps = [
   "Prompt Types",
 ] as const;
 
+const loadingTips = [
+  "💡 Tip: Review each prompt carefully - you can modify them in chat later!",
+  "🚀 Your prompts are being crafted with full context of your project...",
+  "✨ Each prompt includes specific implementation details for your tech stack",
+  "🎯 Prompts are optimized for your selected component libraries",
+  "📝 All prompts will be downloadable in multiple formats",
+  "🔧 Prompts include error handling and edge cases",
+  "⚡ Generation speed depends on prompt complexity",
+  "🎨 Frontend prompts include responsive design considerations",
+  "🔒 Security prompts include best practices and compliance",
+  "🐛 Error-fixing prompts cover common scenarios",
+];
+
 export default function CursorBuilderPage() {
   const { user } = useUser();
   const router = useRouter();
@@ -86,8 +99,14 @@ export default function CursorBuilderPage() {
   const [userFlowsContent, setUserFlowsContent] = React.useState<string | null>(null);
   const [taskFileContent, setTaskFileContent] = React.useState<string | null>(null);
   const [generatedLists, setGeneratedLists] = React.useState<any>(null);
-  const [currentPromptIndex, setCurrentPromptIndex] = React.useState<{ type: string; index: number } | null>(null);
+  const [currentPromptIndex, setCurrentPromptIndex] = React.useState<{ type: string; name: string; index: number } | null>(null);
   const [generatedPrompts, setGeneratedPrompts] = React.useState<any>({});
+
+  // Enhanced loading UI state
+  const [loadingTip, setLoadingTip] = React.useState("");
+  const [estimatedTime, setEstimatedTime] = React.useState(0);
+  const [avgGenerationTime, setAvgGenerationTime] = React.useState(5); // Default 5 seconds per prompt
+  const [generationStartTime, setGenerationStartTime] = React.useState(0);
 
   // Form state
   const [projectName, setProjectName] = React.useState("");
@@ -259,6 +278,30 @@ export default function CursorBuilderPage() {
     errorFixing: true,
   });
 
+  // Helper function to calculate total prompts
+  function calculateTotalPrompts(): number {
+    if (!generatedLists) return 0;
+    let total = 0;
+    if (generatedLists.screenList) total += generatedLists.screenList.length;
+    if (generatedLists.endpointList) total += generatedLists.endpointList.length;
+    if (generatedLists.securityFeatureList) total += generatedLists.securityFeatureList.length;
+    if (generatedLists.functionalityFeatureList) total += generatedLists.functionalityFeatureList.length;
+    if (generatedLists.errorScenarioList) total += generatedLists.errorScenarioList.length;
+    return total;
+  }
+
+  // Helper function to get icon/emoji for prompt type
+  function getPromptTypeIcon(type: string): { icon: string; label: string } {
+    switch (type) {
+      case "frontend": return { icon: "🎨", label: "Frontend Component" };
+      case "backend": return { icon: "⚙️", label: "Backend Endpoint" };
+      case "security": return { icon: "🔒", label: "Security Feature" };
+      case "functionality": return { icon: "⚡", label: "Business Logic" };
+      case "error_fixing": return { icon: "🐛", label: "Error Scenario" };
+      default: return { icon: "📝", label: "Prompt" };
+    }
+  }
+
   // Persist to localStorage
   React.useEffect(() => {
     try {
@@ -316,6 +359,38 @@ export default function CursorBuilderPage() {
     } catch {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Tip rotation effect
+  React.useEffect(() => {
+    if (isSubmitting && generationStep === "prompts") {
+      // Set initial tip
+      setLoadingTip(loadingTips[Math.floor(Math.random() * loadingTips.length)]);
+      
+      const tipInterval = setInterval(() => {
+        setLoadingTip(loadingTips[Math.floor(Math.random() * loadingTips.length)]);
+      }, 3000);
+      
+      return () => clearInterval(tipInterval);
+    }
+  }, [isSubmitting, generationStep]);
+
+  // Time estimation effect
+  React.useEffect(() => {
+    if (currentPromptIndex && generatedPrompts && generatedLists) {
+      const completed = Object.values(generatedPrompts).flat().length;
+      const total = calculateTotalPrompts();
+      const remaining = total - completed;
+      const estimated = remaining * avgGenerationTime;
+      setEstimatedTime(Math.max(0, estimated));
+      
+      // Update average generation time based on actual performance
+      if (generationStartTime > 0 && completed > 0) {
+        const elapsed = (Date.now() - generationStartTime) / 1000;
+        const newAvg = elapsed / completed;
+        setAvgGenerationTime(newAvg);
+      }
+    }
+  }, [currentPromptIndex, generatedPrompts, generatedLists, avgGenerationTime, generationStartTime]);
 
   function next() {
     // basic validations on early steps
@@ -671,6 +746,7 @@ export default function CursorBuilderPage() {
       setGeneratedLists(lists);
       setGenerationStep("prompts");
       setProgress(80);
+      setGenerationStartTime(Date.now());
       
       // Start generating prompts for first item
       await generateNextPrompt();
@@ -1102,22 +1178,67 @@ export default function CursorBuilderPage() {
           </Card>
         )}
 
-        {/* Prompt Generation Progress */}
+        {/* Prompt Generation Progress - Enhanced UI */}
         {generationStep === "prompts" && (
           <Card className="p-6">
-            <div className="mb-4">
+            <div className="mb-6 text-center">
+              <div className="mb-4">
+                {/* Animated spinner */}
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              </div>
               <h2 className="text-2xl font-bold mb-2">Generating Prompts</h2>
-              <p className="text-foreground/60">
+              <p className="text-foreground/60 mb-4">
                 {currentPromptIndex 
-                  ? `Generating prompt for: ${currentPromptIndex.name} (${currentPromptIndex.type})`
+                  ? `Creating prompt for: ${currentPromptIndex.name} (${currentPromptIndex.type})`
                   : "Preparing to generate prompts..."}
               </p>
+              
+              {/* Progress with stats */}
+              {generatedLists && (
+                <div className="mb-4">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-foreground/70">
+                      Progress: {Object.values(generatedPrompts).flat().length} / {calculateTotalPrompts()}
+                    </span>
+                    {estimatedTime > 0 && (
+                      <span className="text-foreground/70">
+                        Estimated: {Math.ceil(estimatedTime)}s remaining
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-3 w-full rounded-full bg-secondary/20 overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-full transition-all duration-500 ease-out"
+                      style={{ 
+                        width: `${calculateTotalPrompts() > 0 
+                          ? (Object.values(generatedPrompts).flat().length / calculateTotalPrompts()) * 100 
+                          : 0}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {/* Rotating tips */}
+              {loadingTip && (
+                <div className="mt-6 p-4 bg-secondary/10 rounded-lg border border-border">
+                  <p className="text-sm text-foreground/80 animate-pulse">
+                    {loadingTip}
+                  </p>
+                </div>
+              )}
+              
+              {/* Mini preview of what's being generated */}
+              {currentPromptIndex && (
+                <div className="mt-4 p-3 bg-background border border-border rounded text-left">
+                  <p className="text-xs text-foreground/60 mb-1">Generating:</p>
+                  <p className="text-sm font-medium">
+                    {getPromptTypeIcon(currentPromptIndex.type).icon} {getPromptTypeIcon(currentPromptIndex.type).label}
+                  </p>
+                  <p className="text-xs text-foreground/50 mt-1">{currentPromptIndex.name}</p>
+                </div>
+              )}
             </div>
-            {isSubmitting && (
-              <div className="mt-4 h-2 w-full rounded bg-secondary/20">
-                <div className="h-2 rounded bg-primary transition-[width] duration-300 animate-pulse" style={{ width: `${progress}%` }} />
-              </div>
-            )}
           </Card>
         )}
 

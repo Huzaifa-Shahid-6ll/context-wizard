@@ -22,6 +22,7 @@ export const createGeneration = mutation({
     const generationId = await ctx.db.insert("appBuilderGenerations", {
       ...args,
       status: "prd_pending",
+      generatedPrompts: {},
       createdAt: now,
       updatedAt: now,
     });
@@ -526,6 +527,7 @@ Include a 5-line explanation in simple language.`;
     // Update generation
     await ctx.runMutation(api.appBuilderGenerations.updateGenerationStatus, {
       generationId,
+      status: "generating_prompts",
       generatedPrompts: currentPrompts,
     });
 

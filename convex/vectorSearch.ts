@@ -133,26 +133,107 @@ export const searchSimilar = action({
     query: v.string(),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, { sessionId, query: searchQuery, limit = 10 }) => {
+  handler: async (ctx, { sessionId, query: searchQuery, limit = 10 }): Promise<Array<{
+    _id: any;
+    _creationTime: number;
+    sessionId: string;
+    userId: string;
+    content: string;
+    metadata: {
+      type: string;
+      section?: string;
+      promptId?: string;
+    };
+    createdAt: number;
+    similarity: number;
+  }>> => {
     // Generate embedding for search query
     const queryEmbedding = await ctx.runAction(api.vectorSearch.generateEmbedding, { text: searchQuery });
 
     // Get all embeddings for this session
-    const embeddings = await ctx.runQuery(api.vectorSearch.getEmbeddingsForSession, {
+    const embeddings: Array<{
+      _id: any;
+      _creationTime: number;
+      sessionId: string;
+      userId: string;
+      content: string;
+      embedding: number[];
+      metadata: {
+        type: string;
+        section?: string;
+        promptId?: string;
+      };
+      createdAt: number;
+    }> = await ctx.runQuery(api.vectorSearch.getEmbeddingsForSession, {
       sessionId: String(sessionId),
     });
 
     // Calculate similarities
-    const similarities = embeddings.map((emb) => ({
+    const similarities: Array<{
+      _id: any;
+      _creationTime: number;
+      sessionId: string;
+      userId: string;
+      content: string;
+      embedding: number[];
+      metadata: {
+        type: string;
+        section?: string;
+        promptId?: string;
+      };
+      createdAt: number;
+      similarity: number;
+    }> = embeddings.map((emb: {
+      _id: any;
+      _creationTime: number;
+      sessionId: string;
+      userId: string;
+      content: string;
+      embedding: number[];
+      metadata: {
+        type: string;
+        section?: string;
+        promptId?: string;
+      };
+      createdAt: number;
+    }) => ({
       ...emb,
       similarity: cosineSimilarity(queryEmbedding, emb.embedding),
     }));
 
     // Sort by similarity and return top results
-    return similarities
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, limit)
-      .map(({ embedding, ...rest }) => rest); // Remove embedding from response
+    const sorted = similarities
+      .sort((a: { similarity: number }, b: { similarity: number }) => b.similarity - a.similarity)
+      .slice(0, limit);
+    
+    // Remove embedding from response
+    return sorted.map((item: {
+      _id: any;
+      _creationTime: number;
+      sessionId: string;
+      userId: string;
+      content: string;
+      embedding: number[];
+      metadata: {
+        type: string;
+        section?: string;
+        promptId?: string;
+      };
+      createdAt: number;
+      similarity: number;
+    }) => {
+      const { embedding: _, ...rest } = item;
+      return {
+        _id: rest._id,
+        _creationTime: rest._creationTime,
+        sessionId: rest.sessionId,
+        userId: rest.userId,
+        content: rest.content,
+        metadata: rest.metadata,
+        createdAt: rest.createdAt,
+        similarity: rest.similarity,
+      };
+    });
   },
 });
 
@@ -174,9 +255,35 @@ export const getRelevantContext = action({
     query: v.string(),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, { sessionId, query: searchQuery, limit = 10 }) => {
+  handler: async (ctx, { sessionId, query: searchQuery, limit = 10 }): Promise<Array<{
+    _id: any;
+    _creationTime: number;
+    sessionId: string;
+    userId: string;
+    content: string;
+    metadata: {
+      type: string;
+      section?: string;
+      promptId?: string;
+    };
+    createdAt: number;
+    similarity: number;
+  }>> => {
     // Use vector search to find relevant context
-    const results = await ctx.runAction(api.vectorSearch.searchSimilar, {
+    const results: Array<{
+      _id: any;
+      _creationTime: number;
+      sessionId: string;
+      userId: string;
+      content: string;
+      metadata: {
+        type: string;
+        section?: string;
+        promptId?: string;
+      };
+      createdAt: number;
+      similarity: number;
+    }> = await ctx.runAction(api.vectorSearch.searchSimilar, {
       sessionId: String(sessionId),
       query: searchQuery,
       limit,

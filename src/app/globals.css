@@ -391,4 +391,20 @@ html {
     background-color: var(--primary);
     border-color: var(--primary);
   }
+  
+  /* Ensure select option elements are visible */
+  select option {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+  
+  select:not([multiple]) option:checked {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+  
+  select:not([multiple]) option:hover {
+    background-color: var(--secondary);
+    color: var(--secondary-foreground);
+  }
 }

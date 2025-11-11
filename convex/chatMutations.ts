@@ -79,8 +79,8 @@ export const sendMessage = action({
   },
   handler: async (ctx, { sessionId, userId, message }) => {
     // Get session
-    const session = await ctx.runQuery(api.chatQueries.getChatSession, { sessionId: sessionId as any });
-    if (!session) {
+    const session = await ctx.runQuery(api.chatQueries.getChatSession, { sessionId: sessionId as any }) as any;
+    if (!session || !("userId" in session)) {
       throw new Error("Chat session not found");
     }
 
@@ -243,8 +243,8 @@ export const regeneratePrompts = action({
     userId: v.string(),
   },
   handler: async (ctx, { sessionId, userId }) => {
-    const session = await ctx.runQuery(api.chatQueries.getChatSession, { sessionId });
-    if (!session) throw new Error("Session not found");
+    const session = await ctx.runQuery(api.chatQueries.getChatSession, { sessionId }) as any;
+    if (!session || !("userId" in session)) throw new Error("Session not found");
     if (session.userId !== userId) throw new Error("Unauthorized");
 
     // Use the updated context to regenerate prompts

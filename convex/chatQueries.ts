@@ -48,8 +48,8 @@ export const searchChatSessions = query({
 export const getChatHistory = query({
   args: { sessionId: v.union(v.string(), v.id("chatSessions")) },
   handler: async (ctx, { sessionId }) => {
-    const session = await ctx.db.get(sessionId as any);
-    if (!session) return null;
+    const session = await ctx.db.get(sessionId as any) as any;
+    if (!session || !("messages" in session)) return null;
 
     // Return last 20 messages with summarization note if more exist
     const messages = session.messages || [];
@@ -68,8 +68,8 @@ export const getChatHistory = query({
 export const getContextForSession = query({
   args: { sessionId: v.union(v.string(), v.id("chatSessions")) },
   handler: async (ctx, { sessionId }) => {
-    const session = await ctx.db.get(sessionId as any);
-    if (!session) return null;
+    const session = await ctx.db.get(sessionId as any) as any;
+    if (!session || !("context" in session)) return null;
 
     return {
       context: session.context,
