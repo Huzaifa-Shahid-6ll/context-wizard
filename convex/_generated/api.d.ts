@@ -15,6 +15,9 @@ import type {
 } from "convex/server";
 import type * as actions from "../actions.js";
 import type * as affiliate from "../affiliate.js";
+import type * as appBuilderGenerations from "../appBuilderGenerations.js";
+import type * as chatMutations from "../chatMutations.js";
+import type * as chatQueries from "../chatQueries.js";
 import type * as contextManagement from "../contextManagement.js";
 import type * as debug from "../debug.js";
 import type * as feedback from "../feedback.js";
@@ -28,6 +31,7 @@ import type * as stripeMutations from "../stripeMutations.js";
 import type * as testActions from "../testActions.js";
 import type * as testEnv from "../testEnv.js";
 import type * as users from "../users.js";
+import type * as vectorSearch from "../vectorSearch.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -40,6 +44,9 @@ import type * as users from "../users.js";
 declare const fullApi: ApiFromModules<{
   actions: typeof actions;
   affiliate: typeof affiliate;
+  appBuilderGenerations: typeof appBuilderGenerations;
+  chatMutations: typeof chatMutations;
+  chatQueries: typeof chatQueries;
   contextManagement: typeof contextManagement;
   debug: typeof debug;
   feedback: typeof feedback;
@@ -53,6 +60,7 @@ declare const fullApi: ApiFromModules<{
   testActions: typeof testActions;
   testEnv: typeof testEnv;
   users: typeof users;
+  vectorSearch: typeof vectorSearch;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

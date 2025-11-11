@@ -288,6 +288,107 @@ const webhookLogs = defineTable({
 .index("by_status", ["status"]) // For monitoring failed events
 .index("by_userId", ["userId"]); // For user-specific queries
 
+// Chat Sessions table schema
+const chatSessions = defineTable({
+  userId: v.string(),
+  generationId: v.string(), // Links to the generation that started this chat
+  title: v.string(), // Auto-generated from first user message
+  projectName: v.string(),
+  context: v.any(), // Full form data, PRD, User Flows, Tasks, generated prompts
+  messages: v.array(v.object({
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    timestamp: v.number(),
+    metadata: v.optional(v.any()), // For storing diffs, prompt references, etc.
+  })),
+  turnCount: v.number(), // Track turns (user message + AI response = 1 turn)
+  messageCount: v.number(), // Track total messages
+  isActive: v.boolean(),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+.index("by_userId", ["userId"])
+.index("by_generationId", ["generationId"])
+.index("by_createdAt", ["createdAt"]);
+
+// Vector Embeddings table schema for RAG
+const vectorEmbeddings = defineTable({
+  sessionId: v.string(), // Links to chat session
+  userId: v.string(),
+  content: v.string(), // Original text content
+  embedding: v.array(v.number()), // Vector embedding
+  metadata: v.object({
+    type: v.union(
+      v.literal("form_data"),
+      v.literal("prd"),
+      v.literal("user_flow"),
+      v.literal("task"),
+      v.literal("frontend_prompt"),
+      v.literal("backend_prompt"),
+      v.literal("security_prompt"),
+      v.literal("functionality_prompt"),
+      v.literal("error_fixing_prompt"),
+      v.literal("chat_message")
+    ),
+    section: v.optional(v.string()), // e.g., "hero_page", "auth_endpoint"
+    promptId: v.optional(v.string()),
+  }),
+  createdAt: v.number(),
+})
+.index("by_sessionId", ["sessionId"])
+.index("by_userId", ["userId"])
+.index("by_type", ["metadata.type"]);
+
+// Prompt Versions table schema
+const promptVersions = defineTable({
+  sessionId: v.string(),
+  userId: v.string(),
+  promptId: v.string(), // Identifier for the prompt (e.g., "frontend_hero_page")
+  version: v.number(), // Version number (1, 2, 3...)
+  content: v.string(), // Prompt content
+  diff: v.optional(v.string()), // Diff from previous version
+  createdAt: v.number(),
+})
+.index("by_sessionId_promptId", ["sessionId", "promptId"])
+.index("by_userId", ["userId"]);
+
+// AppBuilder Generation Results table schema
+const appBuilderGenerations = defineTable({
+  userId: v.string(),
+  projectName: v.string(),
+  formData: v.any(), // Complete form data
+  prd: v.optional(v.string()), // PRD content
+  userFlows: v.optional(v.string()), // User flows content
+  taskFile: v.optional(v.string()), // Task file content
+  selectedPromptTypes: v.array(v.union(
+    v.literal("frontend"),
+    v.literal("backend"),
+    v.literal("security"),
+    v.literal("functionality"),
+    v.literal("error_fixing")
+  )),
+  screenList: v.optional(v.array(v.string())), // List of screens for frontend
+  endpointList: v.optional(v.array(v.string())), // List of endpoints for backend
+  securityFeatureList: v.optional(v.array(v.string())), // List of security features
+  functionalityFeatureList: v.optional(v.array(v.string())), // List of functionality features
+  errorScenarioList: v.optional(v.array(v.string())), // List of error scenarios
+  generatedPrompts: v.any(), // All generated prompts organized by type
+  status: v.union(
+    v.literal("prd_pending"),
+    v.literal("prd_approved"),
+    v.literal("user_flows_pending"),
+    v.literal("user_flows_approved"),
+    v.literal("tasks_pending"),
+    v.literal("tasks_approved"),
+    v.literal("generating_prompts"),
+    v.literal("completed")
+  ),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+.index("by_userId", ["userId"])
+.index("by_createdAt", ["createdAt"]);
+
 // Export the schema
 export default defineSchema({
   users,
@@ -306,6 +407,10 @@ export default defineSchema({
   onboardingResponses,
   affiliateClicks,
   webhookLogs,
+  chatSessions,
+  vectorEmbeddings,
+  promptVersions,
+  appBuilderGenerations,
 });
 
 // Type helpers generated via convex codegen (imported by consumers):

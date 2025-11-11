@@ -23,6 +23,7 @@ import {
   Sparkles,
   Wrench,
   Shield,
+  MessageSquare,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { initPostHog, trackEvent, identify } from "@/lib/analytics";
@@ -111,7 +112,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // @dashboard/
     { href: "/dashboard", label: "Dashboard", icon: Home },
     // @cursor-builder/
-    { href: "/dashboard/cursor-builder", label: "Cursor App Builder", icon: AppWindow },
+    { href: "/dashboard/cursor-builder", label: "App Builder Prompts", icon: AppWindow },
     // @generic-prompt/
     { href: "/dashboard/generic-prompt", label: "Generic Prompts", icon: FileText },
     // @image-prompt/
@@ -124,6 +125,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/dashboard/history", label: "Generation History", icon: Clock },
     // @prompt-history/
     { href: "/dashboard/prompt-history", label: "Prompt History", icon: Clock },
+    // @chat-history/
+    { href: "/dashboard/chat-history", label: "Chat History", icon: MessageSquare },
     // @prompt-studio/
     { href: "/dashboard/prompt-studio", label: "Prompt Studio", icon: BarChart2 },
     // @tools/
@@ -285,7 +288,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="grid grid-cols-4 gap-2">
               {[
                 { href: "/dashboard", label: "Home", Icon: Home },
-                { href: "/dashboard/cursor-builder", label: "Builder", Icon: AppWindow },
+                { href: "/dashboard/cursor-builder", label: "App Builder", Icon: AppWindow },
                 { href: "/dashboard/generic-prompt", label: "Generic", Icon: FileText },
                 { href: "/dashboard/image-prompt", label: "Image", Icon: Image },
                 { href: "/dashboard/video-prompt", label: "Video", Icon: Video },
