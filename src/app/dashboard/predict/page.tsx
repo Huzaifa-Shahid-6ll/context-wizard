@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
+import { toast } from "sonner";
 
 type Prediction = {
   predictedOutput: string | { 
@@ -49,6 +50,7 @@ export default function PredictPage() {
 
   async function onPredict() {
     if (!user?.id || !prompt.trim()) return;
+    // Note: Token check is handled server-side in the action, but we can add a client-side check for better UX
     setLoading(true);
     try {
       trackEvent('output_prediction_requested');
@@ -77,6 +79,10 @@ export default function PredictPage() {
         return 0;
       })();
       trackEvent('output_prediction_completed', { confidence_score: cs });
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Failed to predict output";
+      toast.error(errorMessage);
+      console.error("Prediction error:", e);
     } finally {
       setLoading(false);
     }
@@ -186,8 +192,8 @@ export default function PredictPage() {
                   <div className="text-sm font-medium">Confidence</div>
                   <Badge variant="secondary">{confidence}%</Badge>
                 </div>
-                <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-secondary/40" role="progressbar" aria-valuenow={Number(confidence || 0)} aria-valuemin={0} aria-valuemax={100} aria-label="Confidence meter">
-                  <div className={`h-3 ${confidenceColor}`} style={{ width: `${Number(confidence || 0)}%` }} />
+                <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-secondary/40" role="progressbar" aria-valuenow={confidence} aria-valuemin={0} aria-valuemax={100} aria-label="Confidence meter">
+                  <div className={`h-3 ${confidenceColor}`} style={{ width: `${confidence}%` }} />
                 </div>
               </div>
 

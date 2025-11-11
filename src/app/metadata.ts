@@ -55,9 +55,9 @@ export const metadata: Metadata = {
     creator: '@ContextWizard',
   },
   icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon-16x16.png',
-    apple: '/apple-touch-icon.png',
+    icon: '/image-Photoroom.png',
+    shortcut: '/image-Photoroom.png',
+    apple: '/image-Photoroom.png',
   },
   manifest: '/site.webmanifest',
 };

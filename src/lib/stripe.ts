@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 
 // Expected Stripe API version
-const EXPECTED_API_VERSION = '2024-11-20.acacia';
+const EXPECTED_API_VERSION = '2025-10-29.clover';
 
 // Helper function to validate required environment variables
 function validateEnvVar(name: string, value: string | undefined): string {

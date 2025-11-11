@@ -176,8 +176,13 @@ export default function VideoPromptPage() {
 
   async function onGenerate() {
     if (!user?.id) return;
-    if (stats && !stats.isPro && stats.remainingPrompts <= 0) {
-      toast.error("Daily limit reached. Please upgrade to continue.");
+    if (stats && !stats.isPro && stats.remainingPrompts < 10) {
+      toast.error(`Daily prompt limit reached. You have ${stats.remainingPrompts} prompts remaining. Please upgrade to Pro for unlimited prompts.`, {
+        action: {
+          label: 'Upgrade',
+          onClick: () => { try { window.location.href = '/dashboard/billing'; } catch {} },
+        },
+      });
       return;
     }
     if (!validateStep(1) || !validateStep(2)) {
@@ -322,7 +327,7 @@ export default function VideoPromptPage() {
               <div className="flex items-center justify-between pt-2">
                 <div className="text-xs text-foreground/60">Required: Scene type, Indoor/Outdoor, Location</div>
                 <div className="flex gap-2">
-                  <Button variant="outline" tabIndex={0} onClick={onGenerate} disabled={loading || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)} className="focus-visible:ring-2 ring-primary">{loading ? "Generating..." : "Generate Now"}</Button>
+                  <Button variant="outline" tabIndex={0} onClick={onGenerate} disabled={loading || (!!stats && !stats.isPro && stats.remainingPrompts < 10)} className="focus-visible:ring-2 ring-primary">{loading ? "Generating..." : "Generate Now"}</Button>
                   <Button tabIndex={0} onClick={nextStep} className="focus-visible:ring-2 ring-primary">Next</Button>
                 </div>
             </div>
@@ -663,7 +668,7 @@ export default function VideoPromptPage() {
                 <Button variant="outline" tabIndex={0} onClick={prevStep} className="focus-visible:ring-2 ring-primary">Back</Button>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => { try { window.localStorage.removeItem(LOCAL_STORAGE_KEY); toast.success("Cleared saved form"); } catch {} }} tabIndex={0} className="focus-visible:ring-2 ring-primary">Clear Saved</Button>
-                  <Button tabIndex={0} onClick={onGenerate} disabled={loading || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)} className="focus-visible:ring-2 ring-primary">{loading ? "Generating..." : "Generate Prompts"}</Button>
+                  <Button tabIndex={0} onClick={onGenerate} disabled={loading || (!!stats && !stats.isPro && stats.remainingPrompts < 10)} className="focus-visible:ring-2 ring-primary">{loading ? "Generating..." : "Generate Prompts"}</Button>
                 </div>
           </div>
             </div>

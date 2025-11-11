@@ -227,7 +227,11 @@ export default function DashboardHome() {
 
             {/* Remaining quota */}
             {isSignedIn && (
+              stats === undefined ? (
+                <div className="h-4 w-56 rounded bg-secondary/20 animate-pulse" />
+              ) : (
               <div className="text-xs text-foreground/60">{remaining === Number.MAX_SAFE_INTEGER ? "Unlimited generations for Pro users" : `${remaining}/5 generations remaining today`}</div>
+              )
             )}
 
             {/* Progress bar */}

@@ -24,6 +24,7 @@ import type * as onboarding from "../onboarding.js";
 import type * as promptGenerators from "../promptGenerators.js";
 import type * as queries from "../queries.js";
 import type * as security from "../security.js";
+import type * as stripeMutations from "../stripeMutations.js";
 import type * as testActions from "../testActions.js";
 import type * as testEnv from "../testEnv.js";
 import type * as users from "../users.js";
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   promptGenerators: typeof promptGenerators;
   queries: typeof queries;
   security: typeof security;
+  stripeMutations: typeof stripeMutations;
   testActions: typeof testActions;
   testEnv: typeof testEnv;
   users: typeof users;

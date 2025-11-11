@@ -239,8 +239,13 @@ export default function CursorBuilderPage() {
 
   async function submit() {
     if (!user?.id) return;
-    if (stats && !stats.isPro && stats.remainingPrompts <= 0) {
-      toast.error("Daily limit reached. Please upgrade to continue.");
+    if (stats && !stats.isPro && stats.remainingPrompts < 10) {
+      toast.error(`Daily prompt limit reached. You have ${stats.remainingPrompts} prompts remaining. Please upgrade to Pro for unlimited prompts.`, {
+        action: {
+          label: 'Upgrade',
+          onClick: () => { try { window.location.href = '/dashboard/billing'; } catch {} },
+        },
+      });
       return;
     }
     setIsSubmitting(true);
@@ -816,7 +821,7 @@ export default function CursorBuilderPage() {
                       {stats.remainingPrompts <= 0 ? "Limit reached" : `${stats.remainingPrompts} remaining today`}
                     </span>
                   )}
-                  <Button onClick={submit} disabled={isSubmitting || !user?.id || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)} className="h-11">Generate Prompts</Button>
+                  <Button onClick={submit} disabled={isSubmitting || !user?.id || (!!stats && !stats.isPro && stats.remainingPrompts < 10)} className="h-11">Generate Prompts</Button>
                 </div>
               </div>
               {isSubmitting && (

@@ -63,7 +63,7 @@ function getApiKey(userTier: 'free' | 'pro'): string {
 function getDefaultModel(userTier: 'free' | 'pro'): string {
   return userTier === 'pro'
     ? 'anthropic/claude-3.5-sonnet'
-    : 'google/gemini-2.0-flash-exp:free';
+    : 'mistralai/mistral-7b-instruct:free';
 }
 
 function buildHeaders(apiKey: string): HeadersInit {

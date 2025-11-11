@@ -101,8 +101,13 @@ export default function PromptStudioPage() {
 
   async function handleGenericGenerate() {
     if (!user?.id || !goal.trim()) return;
-    if (stats && !stats.isPro && stats.remainingPrompts <= 0) {
-      toast.error("Daily limit reached. Please upgrade to continue.");
+    if (stats && !stats.isPro && stats.remainingPrompts < 10) {
+      toast.error(`Daily prompt limit reached. You have ${stats.remainingPrompts} prompts remaining. Please upgrade to Pro for unlimited prompts.`, {
+        action: {
+          label: 'Upgrade',
+          onClick: () => { try { window.location.href = '/dashboard/billing'; } catch {} },
+        },
+      });
       return;
     }
     setLoading(true);
@@ -126,8 +131,13 @@ export default function PromptStudioPage() {
 
   async function handleImageGenerate() {
     if (!user?.id || !imageDescription.trim()) return;
-    if (stats && !stats.isPro && stats.remainingPrompts <= 0) {
-      toast.error("Daily limit reached. Please upgrade to continue.");
+    if (stats && !stats.isPro && stats.remainingPrompts < 10) {
+      toast.error(`Daily prompt limit reached. You have ${stats.remainingPrompts} prompts remaining. Please upgrade to Pro for unlimited prompts.`, {
+        action: {
+          label: 'Upgrade',
+          onClick: () => { try { window.location.href = '/dashboard/billing'; } catch {} },
+        },
+      });
       return;
     }
     setLoading(true);
@@ -152,8 +162,13 @@ export default function PromptStudioPage() {
 
   async function handleAnalysis() {
     if (!user?.id || !analysisPrompt.trim()) return;
-    if (stats && !stats.isPro && stats.remainingPrompts <= 0) {
-      toast.error("Daily limit reached. Please upgrade to continue.");
+    if (stats && !stats.isPro && stats.remainingPrompts < 10) {
+      toast.error(`Daily prompt limit reached. You have ${stats.remainingPrompts} prompts remaining. Please upgrade to Pro for unlimited prompts.`, {
+        action: {
+          label: 'Upgrade',
+          onClick: () => { try { window.location.href = '/dashboard/billing'; } catch {} },
+        },
+      });
       return;
     }
     setLoading(true);
@@ -252,7 +267,7 @@ export default function PromptStudioPage() {
               </div>
               <Button 
                 onClick={handleGenericGenerate} 
-                disabled={loading || !goal.trim() || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)}
+                disabled={loading || !goal.trim() || (!!stats && !stats.isPro && stats.remainingPrompts < 10)}
                 className="w-full"
               >
                 {loading ? "Generating..." : "Generate Optimized Prompt"}
@@ -315,7 +330,7 @@ export default function PromptStudioPage() {
       </div>
               <Button 
                 onClick={handleImageGenerate} 
-                disabled={loading || !imageDescription.trim() || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)}
+                disabled={loading || !imageDescription.trim() || (!!stats && !stats.isPro && stats.remainingPrompts < 10)}
                 className="w-full"
               >
                 {loading ? "Generating..." : "Generate Image Prompts"}
@@ -416,7 +431,7 @@ export default function PromptStudioPage() {
 
               <Button
                 onClick={handleAnalysis} 
-                disabled={loading || !analysisPrompt.trim() || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)}
+                disabled={loading || !analysisPrompt.trim() || (!!stats && !stats.isPro && stats.remainingPrompts < 10)}
                 className="w-full"
               >
                 {loading ? "Analyzing..." : "Analyze & Improve Prompt"}

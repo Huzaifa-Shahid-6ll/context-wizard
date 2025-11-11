@@ -195,7 +195,7 @@ export default function SettingsPage() {
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <Badge variant="secondary">{stats?.isPro ? "Pro" : "Free"}</Badge>
-          {!stats?.isPro && <Button className="h-11">Upgrade to Pro</Button>}
+          {!stats?.isPro && <Button className="h-11" onClick={() => { try { window.location.href = "/dashboard/billing"; } catch {} }}>Upgrade to Pro</Button>}
           <Button variant="outline" className="h-11" onClick={() => {
             trackSettingsEvent('account_deleted_clicked');
             if (confirm("Delete account? This cannot be undone.")) {

@@ -17,7 +17,7 @@ import { ModeSelector, Mode } from "@/components/forms/ModeSelector";
 import { TemplateLibrary, Template } from "@/components/templates/TemplateLibrary";
 import { getSmartDefaults, suggestFields, recordSubmission } from "@/lib/autofill";
 import { TooltipWrapper } from "@/components/forms/TooltipWrapper";
-import { ToneStyleSelector } from "@/components/forms/ToneStyleSelector";
+import { ToneStyleSelector, ToneAndModifiers, WritingStyleSelector } from "@/components/forms/ToneStyleSelector";
 import { OutputFormatSelector } from "@/components/forms/OutputFormatSelector";
 import { AudienceSelector } from "@/components/forms/AudienceSelector";
 import { PromptPreview } from "@/components/forms/PromptPreview";
@@ -226,7 +226,7 @@ export default function GenericPromptPage() {
       toast.error("Please complete required fields before continuing.");
       return;
     }
-    setStep((s) => Math.min(4, s + 1));
+    setStep((s) => Math.min(7, s + 1));
   }
   function prev() {
     trackEvent("generic_prompt_step_prev", { step });
@@ -296,8 +296,13 @@ export default function GenericPromptPage() {
 
   async function onGenerate() {
     if (!user?.id) return;
-    if (stats && !stats.isPro && stats.remainingPrompts <= 0) {
-      toast.error("Daily limit reached. Please upgrade to continue.");
+    if (stats && !stats.isPro && stats.remainingPrompts < 10) {
+      toast.error(`Daily prompt limit reached. You have ${stats.remainingPrompts} prompts remaining. Please upgrade to Pro for unlimited prompts.`, {
+        action: {
+          label: 'Upgrade',
+          onClick: () => { try { window.location.href = '/dashboard/billing'; } catch {} },
+        },
+      });
       return;
     }
     trackEvent("generic_prompt_generate", { category, tone: toneConfig.tone, format: outputConfig.format });
@@ -378,15 +383,15 @@ export default function GenericPromptPage() {
 
   const modeConfig: ModeConfig = {
     quick: {
-      step1: ["category", "format", "tone"],
+      step1: ["category"],
       step2: { "Email Writing": ["emailRecipient", "emailPurpose"], "Code Generation": ["codeLanguage", "codeTaskType"], "Content Creation": ["contentType", "contentTopic"], "Data Analysis": ["dataType", "analysisGoal"], "Other": ["goal"] },
     },
     standard: {
-      step1: ["category", "format", "tone"],
+      step1: ["category"],
       step2: { "Email Writing": ["emailRecipient", "emailPurpose", "emailKeyPoints", "emailCta"], "Code Generation": ["codeLanguage", "codeFramework", "codeTaskType", "codeComplexity", "codeIncludeTests"], "Content Creation": ["contentType", "contentTopic", "contentAudience", "contentWordCount", "contentKeyPoints"], "Data Analysis": ["dataType", "analysisGoal", "needViz"], "Other": ["goal"] },
     },
     advanced: {
-      step1: ["category", "format", "tone", "goal"],
+      step1: ["category", "goal"],
       step2: { "Email Writing": ["emailRecipient", "emailPurpose", "emailKeyPoints", "emailCta"], "Code Generation": ["codeLanguage", "codeFramework", "codeTaskType", "codeComplexity", "codeIncludeTests", "codeIncludeDocs"], "Content Creation": ["contentType", "contentTopic", "contentAudience", "contentWordCount", "contentKeyPoints", "contentSeo"], "Data Analysis": ["dataType", "analysisGoal", "needViz", "statsMethods"], "Other": ["goal"] },
     },
   };
@@ -491,17 +496,11 @@ export default function GenericPromptPage() {
       {/* Wizard region - ARIA labels and roles */}
       <Card className="p-4 shadow-lg ring-1 ring-border" role="region" aria-label="Prompt generation wizard" aria-labelledby="wizard-step-heading" aria-describedby={autofillMsgId} id={wizardRegionId}>
         <div className="mb-3 flex items-center justify-between">
-          <div className="text-sm font-medium" id="wizard-step-heading">Step {step} of 4</div>
+          <div className="text-sm font-medium" id="wizard-step-heading">Step {step} of 7</div>
           <div className="h-2 w-2/3 rounded bg-secondary/20">
-            <div className="h-2 rounded bg-primary transition-[width] duration-300" style={{ width: `${(step/4)*100}%` }} />
+            <div className="h-2 rounded bg-primary transition-[width] duration-300" style={{ width: `${(step/7)*100}%` }} />
           </div>
         </div>
-        {/* Accessible Prompt Preview Panel (shared) */}
-        <PromptPreview id={previewPanelId} ariaLabel="Prompt live preview section">
-            {buildInputs().builtGoal}
-            {"\n\n"}
-            {buildInputs().builtContext}
-        </PromptPreview>
         {step === 1 && (
           <div className="space-y-4">
             {modeConfig[mode].step1.includes("category") && (
@@ -517,18 +516,6 @@ export default function GenericPromptPage() {
               </>
             )}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {modeConfig[mode].step1.includes("format") && (
-                <OutputFormatSelector
-                  value={outputConfig}
-                  onChange={setOutputConfig}
-                />
-              )}
-              {modeConfig[mode].step1.includes("tone") && (
-                <ToneStyleSelector
-                  value={toneConfig}
-                  onChange={setToneConfig}
-                />
-              )}
               {/* If audience selection is relevant for this prompt mode, add AudienceSelector below */}
               {modeConfig[mode].step1.includes("audience") && (
                 <AudienceSelector
@@ -620,7 +607,7 @@ export default function GenericPromptPage() {
             </div>
           </div>
         )}
-        {/* Step 4: Review unchanged */}
+        {/* Step 3 remains Context; Step 4 Review */}
         {step === 4 && (
           <div className="space-y-2">
             <h2 className="text-base font-semibold tracking-tight">Review & Generate</h2>
@@ -630,12 +617,56 @@ export default function GenericPromptPage() {
           </div>
         )}
 
+        {/* Step 5: Output Format only */}
+        {step === 5 && (
+          <div className="space-y-4">
+            <h2 className="text-base font-semibold tracking-tight">Output Format</h2>
+            <OutputFormatSelector
+              value={outputConfig}
+              onChange={setOutputConfig}
+              showFormats
+              showLength={false}
+              showStructure={false}
+              showConstraints={false}
+            />
+          </div>
+        )}
+
+        {/* Step 6: Tone + Modifiers */}
+        {step === 6 && (
+          <div className="space-y-4">
+            <h2 className="text-base font-semibold tracking-tight">Tone & Modifiers</h2>
+            <ToneAndModifiers value={toneConfig} onChange={setToneConfig} />
+          </div>
+        )}
+
+        {/* Step 7: Writing Style + Length & Structure + Preview */}
+        {step === 7 && (
+          <div className="space-y-4">
+            <h2 className="text-base font-semibold tracking-tight">Writing Style, Length & Structure</h2>
+            <WritingStyleSelector value={toneConfig} onChange={setToneConfig} />
+            <OutputFormatSelector
+              value={outputConfig}
+              onChange={setOutputConfig}
+              showFormats={false}
+              showLength
+              showStructure
+              showConstraints={false}
+            />
+            <PromptPreview id={previewPanelId} ariaLabel="Prompt live preview section">
+              {buildInputs().builtGoal}
+              {"\n\n"}
+              {buildInputs().builtContext}
+            </PromptPreview>
+          </div>
+        )}
+
         <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:justify-between">
           <Button variant="outline" tabIndex={0} onClick={prev} disabled={step === 1} className="h-11 focus-visible:ring-2 ring-offset-2 ring-primary">Back</Button>
-          {step < 4 ? (
+          {step < 7 ? (
             <Button onClick={next} tabIndex={0} className="h-11 focus-visible:ring-2 ring-offset-2 ring-primary">Next</Button>
           ) : (
-            <Button onClick={onGenerate} tabIndex={0} disabled={loading || (!!stats && !stats.isPro && stats.remainingPrompts <= 0)} className="h-11 focus-visible:ring-2 ring-offset-2 ring-primary">
+            <Button onClick={onGenerate} tabIndex={0} disabled={loading || (!!stats && !stats.isPro && stats.remainingPrompts < 10)} className="h-11 focus-visible:ring-2 ring-offset-2 ring-primary">
               {loading ? "Generating..." : "Generate Optimized Prompt"}
             </Button>
           )}

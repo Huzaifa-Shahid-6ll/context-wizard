@@ -219,7 +219,7 @@ export default function Home() {
                   <span className="font-semibold text-destructive">Without Context</span>
                 </div>
                 <div className="mt-4 overflow-hidden rounded-lg">
-                  <Image src="/window.svg" alt="Messy code example" width={800} height={480} className="h-auto w-full" />
+                  <Image src="/badCODE_example.png" alt="Messy code example" width={800} height={480} className="h-auto w-full" />
                 </div>
               </div>
               <div className="rounded-xl depth-layer-3 shadow-depth-lg hover-lift p-6 border border-primary/20">
@@ -228,7 +228,7 @@ export default function Home() {
                   <span className="font-semibold text-primary">With Context</span>
                 </div>
                 <div className="mt-4 overflow-hidden rounded-lg">
-                  <Image src="/file.svg" alt="Clean code example" width={800} height={480} className="h-auto w-full" />
+                  <Image src="/Good Code_example.png" alt="Clean code example" width={800} height={480} className="h-auto w-full" />
                 </div>
               </div>
             </div>
@@ -249,14 +249,14 @@ export default function Home() {
                 <TabsContent value="without" className="mt-0">
                   <div className="rounded-xl depth-layer-1 shadow-inset p-6 border border-destructive/20">
                     <div className="mt-4 overflow-hidden rounded-lg">
-                      <Image src="/window.svg" alt="Messy code example" width={800} height={480} className="h-auto w-full" />
+                      <Image src="/badCODE_example.png" alt="Messy code example" width={800} height={480} className="h-auto w-full" />
                     </div>
                   </div>
                 </TabsContent>
                 <TabsContent value="with" className="mt-0">
                   <div className="rounded-xl depth-layer-3 shadow-depth-lg p-6 border border-primary/20">
                     <div className="mt-4 overflow-hidden rounded-lg">
-                      <Image src="/file.svg" alt="Clean code example" width={800} height={480} className="h-auto w-full" />
+                      <Image src="/Good Code_example.png" alt="Clean code example" width={800} height={480} className="h-auto w-full" />
                     </div>
                   </div>
                 </TabsContent>
@@ -620,7 +620,7 @@ export default function Home() {
               <CardTitle className="text-xl font-semibold text-destructive">Without Context Files</CardTitle>
             </div>
             <div className="rounded-lg depth-layer-1 shadow-inset p-4 mb-4">
-              <Image src="/window.svg" alt="Messy AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
+              <Image src="/badCODE_example.png" alt="Messy AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
             </div>
             <p className="text-sm text-muted-foreground text-center">32 lines of bugs, wrong dependencies, doesn{'\''}t run</p>
           </Card>
@@ -632,7 +632,7 @@ export default function Home() {
               <CardTitle className="text-xl font-semibold text-primary">With Context Files</CardTitle>
             </div>
             <div className="rounded-lg depth-layer-3 shadow-depth-sm p-4 mb-4">
-              <Image src="/file.svg" alt="Clean AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
+              <Image src="/Good Code_example.png" alt="Clean AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
             </div>
             <p className="text-sm font-medium text-primary text-center">Production-ready code, correct patterns, works first try</p>
           </Card>
@@ -657,9 +657,9 @@ export default function Home() {
                   <X className="h-6 w-6 text-destructive" />
                   <CardTitle className="text-xl font-semibold text-destructive">Without Context Files</CardTitle>
                 </div>
-                <div className="rounded-lg depth-layer-1 shadow-inset p-4 mb-4">
-                  <Image src="/window.svg" alt="Messy AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
-                </div>
+            <div className="rounded-lg depth-layer-1 shadow-inset p-4 mb-4">
+              <Image src="/badCODE_example.png" alt="Messy AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
+            </div>
                 <p className="text-sm text-muted-foreground text-center">32 lines of bugs, wrong dependencies, doesn{'\''}t run</p>
               </Card>
             </TabsContent>
@@ -670,7 +670,7 @@ export default function Home() {
                   <CardTitle className="text-xl font-semibold text-primary">With Context Files</CardTitle>
                 </div>
                 <div className="rounded-lg depth-layer-3 shadow-depth-sm p-4 mb-4">
-                  <Image src="/file.svg" alt="Clean AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
+                  <Image src="/Good Code_example.png" alt="Clean AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
                 </div>
                 <p className="text-sm font-medium text-primary text-center">Production-ready code, correct patterns, works first try</p>
               </Card>

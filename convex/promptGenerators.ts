@@ -152,6 +152,12 @@ export const generateCursorAppPrompts = action({
     targetAudience: v.optional(v.string()),
   },
   handler: async (ctx, { projectDescription, techStack, features, userId, targetAudience }): Promise<GenerationResult> => {
+    // Check prompt limit before processing
+    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
+    if (!limitCheck.canCreate) {
+      throw new Error(`Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+    }
+
     // Determine user tier (fallback to free if not found)
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
     const isPro = user?.isPro === true;
@@ -250,9 +256,8 @@ export const generateCursorAppPrompts = action({
       });
     }
 
-    // Update user's promptsCreatedToday counter (optional best-effort)
-    await ctx.runMutation(api.mutations.incrementUserPromptsCreatedToday, { clerkId: userId, delta: 1 });
-
+    // Increment prompt count after successful generation
+    await ctx.runMutation(api.users.incrementPromptCount, { userId });
     return parsed;
   },
 });
@@ -275,6 +280,12 @@ export const generateGenericPrompt = action({
     tips: string[];
     exampleOutput: string;
   }> => {
+    // Check prompt limit before processing
+    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
+    if (!limitCheck.canCreate) {
+      throw new Error(`Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+    }
+
     // Determine user tier
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
     const isPro = user?.isPro === true;
@@ -375,8 +386,8 @@ Return JSON with optimizedPrompt, explanation, tips, exampleOutput
       updatedAt: now,
     });
 
-    await ctx.runMutation(api.mutations.incrementUserPromptsCreatedToday, { clerkId: userId, delta: 1 });
-
+    // Increment prompt count after successful generation
+    await ctx.runMutation(api.users.incrementPromptCount, { userId });
     return parsed;
   },
 });
@@ -400,6 +411,12 @@ export const generateImagePrompt = action({
     tips: string[];
     negativePrompts: string[];
   }> => {
+    // Check prompt limit before processing
+    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
+    if (!limitCheck.canCreate) {
+      throw new Error(`Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+    }
+
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
     const tier: "free" | "pro" = user?.isPro ? "pro" : "free";
 
@@ -520,8 +537,8 @@ Return JSON with platform-optimized prompts and negative prompts
       updatedAt: now,
     });
 
-    await ctx.runMutation(api.mutations.incrementUserPromptsCreatedToday, { clerkId: userId, delta: 1 });
-
+    // Increment prompt count after successful generation
+    await ctx.runMutation(api.users.incrementPromptCount, { userId });
     return parsed;
   },
 });
@@ -549,6 +566,12 @@ export const analyzeAndImprovePrompt = action({
     improvedPrompt: string;
     improvementExplanation: string;
   }> => {
+    // Check prompt limit before processing
+    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
+    if (!limitCheck.canCreate) {
+      throw new Error(`Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+    }
+
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
     const tier: "free" | "pro" = user?.isPro ? "pro" : "free";
 
@@ -662,6 +685,8 @@ Return JSON with analysis scores, issues, suggestions, and improved prompt
       createdAt: now,
     });
 
+    // Increment prompt count after successful generation
+    await ctx.runMutation(api.users.incrementPromptCount, { userId });
     return parsed;
   },
 });
@@ -819,8 +844,8 @@ Return JSON with platform-optimized video prompts and audio elements
       updatedAt: now,
     });
 
-    await ctx.runMutation(api.mutations.incrementUserPromptsCreatedToday, { clerkId: userId, delta: 1 });
-
+    // Increment prompt count after successful generation
+    await ctx.runMutation(api.users.incrementPromptCount, { userId });
     return parsed;
   },
 });
@@ -841,6 +866,12 @@ export const predictPromptOutput = action({
     warnings: string[];
     alternatives: Array<{ modifiedPrompt: string; expectedChange: string }>;
   }> => {
+    // Check prompt limit before processing
+    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
+    if (!limitCheck.canCreate) {
+      throw new Error(`Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+    }
+
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
     const tier: "free" | "pro" = user?.isPro ? "pro" : "free";
 
@@ -883,6 +914,8 @@ export const predictPromptOutput = action({
       createdAt: now,
     });
 
+    // Increment prompt count after successful generation
+    await ctx.runMutation(api.users.incrementPromptCount, { userId });
     return parsed;
   },
 });

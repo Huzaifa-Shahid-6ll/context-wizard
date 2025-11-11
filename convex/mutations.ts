@@ -331,6 +331,8 @@ export const cancelUserSubscription = mutation({
   },
 });
 
+
+
 // Webhook logging mutation
 export const logWebhookEvent = mutation({
   args: {

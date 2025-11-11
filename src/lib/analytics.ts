@@ -17,15 +17,44 @@ declare global {
 export function initPostHog() {
   if (typeof window === 'undefined') return;
   if (window._phInitialized) return;
+  
   const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-  if (!key) return;
-  posthog.init(key, {
-    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
-    autocapture: false,
-    person_profiles: 'identified_only',
-  });
-  window.posthog = posthog;
-  window._phInitialized = true;
+  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
+  
+  // Debug logging (only in development)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[PostHog] Initializing...', {
+      hasKey: !!key,
+      keyPrefix: key ? key.substring(0, 10) + '...' : 'missing',
+      host,
+    });
+  }
+  
+  if (!key) {
+    console.warn('[PostHog] Missing NEXT_PUBLIC_POSTHOG_KEY environment variable');
+    return;
+  }
+  
+  // Ensure host URL has https:// prefix
+  const normalizedHost = host.startsWith('http') ? host : `https://${host}`;
+  
+  try {
+    posthog.init(key, {
+      api_host: normalizedHost,
+      autocapture: false,
+      person_profiles: 'identified_only',
+      loaded: (posthog) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[PostHog] Successfully initialized');
+        }
+      },
+      capture_pageview: false, // We handle this manually
+    });
+    window.posthog = posthog;
+    window._phInitialized = true;
+  } catch (error) {
+    console.error('[PostHog] Initialization failed:', error);
+  }
 }
 
 export function initAnalytics() {

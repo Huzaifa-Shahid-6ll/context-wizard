@@ -120,8 +120,8 @@ export const incrementGenerationCount = mutation({
   },
 });
 
-// Prompt limit: free 20/day; pro unlimited. Resets daily similar to generations
-const DAILY_FREE_PROMPT_LIMIT = 20;
+// Prompt limit: free 50 tokens/day; pro unlimited. Resets daily similar to generations
+const DAILY_FREE_PROMPT_LIMIT = 50;
 
 export const checkPromptLimit = mutation({
   args: { userId: v.string() },
@@ -168,6 +168,7 @@ export const incrementPromptCount = mutation({
   },
 });
 
+
 export const getUserStats = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }): Promise<UserStats> => {
@@ -184,7 +185,7 @@ export const getUserStats = query({
         isPro: false,
         totalPrompts: 0,
         promptsToday: 0,
-        remainingPrompts: 20,
+        remainingPrompts: 50,
         promptTypeBreakdown: {},
         promptsTodayByType: {},
         nextBillingDate: undefined,

@@ -2,14 +2,14 @@
 
 import * as React from 'react';
 import { useUser } from '@clerk/nextjs';
-import { useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Check, CreditCard, Activity, ArrowRight, Calendar, DollarSign, Loader2 } from 'lucide-react';
+import { Check, CreditCard, Activity, ArrowRight, Calendar, DollarSign, Loader2, RefreshCw } from 'lucide-react';
 import { initPostHog, trackEvent } from '@/lib/analytics';
 
 export default function BillingPage() {
@@ -20,6 +20,7 @@ export default function BillingPage() {
 	const { user } = useUser();
 	const userId = user?.id ?? null;
 	const userStats = useQuery(api.users.getUserStats, userId ? { userId } : 'skip');
+	const syncSubscription = useMutation(api.stripeMutations.syncUserSubscriptionFromStripe);
 
 	const isLoading = userId != null && userStats === undefined; // convex returns undefined while loading
 	const isPro = !!userStats?.isPro;
@@ -28,6 +29,25 @@ export default function BillingPage() {
 	const [isUpgrading, setIsUpgrading] = React.useState(false);
 	const [isManagingBilling, setIsManagingBilling] = React.useState(false);
 	const [isCancelling, setIsCancelling] = React.useState(false);
+	const [isSyncing, setIsSyncing] = React.useState(false);
+
+	// Add sync subscription function
+	const handleSyncSubscription = async () => {
+		if (!userId || isSyncing) return;
+
+		setIsSyncing(true);
+		try {
+			const result = await syncSubscription({ userId });
+			toast.success(result.message || 'Subscription status synced successfully!');
+      // Convex live queries will update the UI automatically
+		} catch (error) {
+			console.error('Sync subscription error:', error);
+			const errorMessage = error instanceof Error ? error.message : 'Failed to sync subscription';
+			toast.error(`Failed to sync subscription: ${errorMessage}`);
+		} finally {
+			setIsSyncing(false);
+		}
+	};
 
 	// Wrapper functions for mouse events
 	const handleUpgradeClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -248,6 +268,23 @@ export default function BillingPage() {
 											'Cancel subscription'
 										)}
 									</Button>
+									<Button
+										variant="outline"
+										onClick={handleSyncSubscription}
+										aria-label="Sync subscription"
+										className="w-full"
+										disabled={isSyncing}
+									>
+										{isSyncing ? (
+											<>
+												<Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> Syncing...
+											</>
+										) : (
+											<>
+												<RefreshCw className="mr-2 h-4 w-4" aria-hidden /> Sync Status
+											</>
+										)}
+									</Button>
 								</div>
 							</div>
 						) : (
@@ -365,6 +402,22 @@ export default function BillingPage() {
 											'Already Cancelled'
 										) : (
 											'Cancel subscription'
+										)}
+									</Button>
+									<Button
+										variant="outline"
+										onClick={handleSyncSubscription}
+										aria-label="Sync subscription"
+										disabled={isSyncing}
+									>
+										{isSyncing ? (
+											<>
+												<Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> Syncing...
+											</>
+										) : (
+											<>
+												<RefreshCw className="mr-2 h-4 w-4" aria-hidden /> Sync Status
+											</>
 										)}
 									</Button>
 								</div>

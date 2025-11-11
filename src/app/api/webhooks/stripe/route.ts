@@ -255,6 +255,16 @@ export async function POST(req: NextRequest) {
 
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
+          // current_period_end can be undefined immediately after session completion
+          // Stripe docs: https://docs.stripe.com/api/subscriptions/object#subscription_object-current_period_end
+          // Prefer current_period_end, then trial_end, otherwise fallback to +30 days
+          const currentPeriodEndSec =
+            typeof (subscription as any).current_period_end === 'number'
+              ? Number((subscription as any).current_period_end)
+              : typeof (subscription as any).trial_end === 'number'
+                ? Number((subscription as any).trial_end)
+                : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+
           // Update user in Convex with retry logic
           await retryConvexOperation(
             () => convex.mutation(api.mutations.updateUserSubscription, {
@@ -263,8 +273,8 @@ export async function POST(req: NextRequest) {
               customerId: subscription.customer as string,
               priceId: subscription.items.data[0].price.id,
               status: subscription.status,
-              currentPeriodEnd: subscription.items.data[0]?.current_period_end,
-              cancelAtPeriodEnd: subscription.cancel_at_period_end,
+              currentPeriodEnd: currentPeriodEndSec,
+              cancelAtPeriodEnd: !!(subscription as any).cancel_at_period_end,
             }),
             'updateUserSubscription',
             { eventId: event.id, eventType: event.type }
@@ -312,21 +322,69 @@ export async function POST(req: NextRequest) {
 
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
-        const userId = subscription.metadata?.userId;
+        
+        // Try multiple methods to extract userId
+        let userId = subscription.metadata?.userId;
+        
+        // If not in subscription metadata, try customer metadata
+        if (!userId && typeof subscription.customer === 'string') {
+          try {
+            const customer = await stripe.customers.retrieve(subscription.customer);
+            if (customer && !customer.deleted && 'metadata' in customer) {
+              userId = customer.metadata?.userId;
+            }
+          } catch (err) {
+            console.warn(`[Request ${requestId}] [Webhook ${event.id}] Failed to retrieve customer metadata:`, err);
+          }
+        }
+        
+        // If still not found, try to get from checkout session that created this subscription
+        if (!userId) {
+          try {
+            // Search for checkout sessions for this customer
+            const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id;
+            if (customerId) {
+              const sessions = await stripe.checkout.sessions.list({
+                customer: customerId,
+                limit: 1,
+              });
+              if (sessions.data.length > 0) {
+                const session = sessions.data[0];
+                const clientReferenceId = session.client_reference_id;
+                const extractedUserId = session.metadata?.userId || (clientReferenceId ? String(clientReferenceId) : undefined);
+                if (extractedUserId) {
+                  userId = extractedUserId;
+                }
+              }
+            }
+          } catch (err) {
+            console.warn(`[Request ${requestId}] [Webhook ${event.id}] Failed to retrieve from checkout sessions:`, err);
+          }
+        }
 
         if (!userId) {
-          logWebhookError(event.id, event.type, new Error('No userId in subscription metadata'), {
+          logWebhookError(event.id, event.type, new Error('No userId found in subscription metadata, customer metadata, or checkout sessions'), {
             subscriptionId: subscription.id,
+            customerId: typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id,
           });
           // Permanent failure - return 400
           return NextResponse.json(
-            { error: 'Missing userId in subscription metadata' },
+            { error: 'Missing userId - could not find in subscription metadata, customer metadata, or checkout sessions' },
             { status: 400 }
           );
         }
 
         try {
           // Update subscription status with retry logic
+          // Ensure currentPeriodEnd is always a number to satisfy Convex validator
+          // Stripe docs: https://docs.stripe.com/api/subscriptions/object#subscription_object-current_period_end
+          const currentPeriodEndSec =
+            typeof (subscription as any).current_period_end === 'number'
+              ? Number((subscription as any).current_period_end)
+              : typeof (subscription as any).trial_end === 'number'
+                ? Number((subscription as any).trial_end)
+                : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+
           await retryConvexOperation(
             () => convex.mutation(api.mutations.updateUserSubscription, {
               userId,
@@ -334,14 +392,40 @@ export async function POST(req: NextRequest) {
               customerId: subscription.customer as string,
               priceId: subscription.items.data[0].price.id,
               status: subscription.status,
-              currentPeriodEnd: subscription.items.data[0]?.current_period_end,
-              cancelAtPeriodEnd: subscription.cancel_at_period_end,
+              currentPeriodEnd: currentPeriodEndSec,
+              cancelAtPeriodEnd: !!(subscription as any).cancel_at_period_end,
             }),
             'updateUserSubscription',
             { eventId: event.id, eventType: event.type }
           );
 
           console.log(`[Request ${requestId}] [Webhook ${event.id}] Subscription updated for user ${userId}`);
+
+          // Update user in PostHog as well
+          try {
+            const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+            const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
+            if (apiKey) {
+              await fetch(`${host}/capture/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  api_key: apiKey,
+                  event: subscription.status === 'active' ? 'subscription_activated' : 'subscription_status_updated',
+                  distinct_id: userId,
+                  properties: {
+                    subscription_status: subscription.status,
+                    subscription_id: subscription.id,
+                    price_id: subscription.items.data[0]?.price?.id,
+                    current_period_end: (subscription as any).current_period_end,
+                    cancel_at_period_end: (subscription as any).cancel_at_period_end,
+                  },
+                }),
+              });
+            }
+          } catch (err) {
+            console.error(`[Request ${requestId}] [Webhook ${event.id}] Failed to emit PostHog event:`, err);
+          }
         } catch (error) {
           logWebhookError(event.id, event.type, error, { userId, subscriptionId: subscription.id });
           // Retryable error - return 500 so Stripe retries
@@ -409,8 +493,8 @@ export async function POST(req: NextRequest) {
                   customerId: sub.customer as string,
                   priceId: sub.items.data[0].price.id,
                   status: 'past_due',
-                  currentPeriodEnd: sub.items.data[0]?.current_period_end,
-                  cancelAtPeriodEnd: sub.cancel_at_period_end,
+                  currentPeriodEnd: (sub as any).current_period_end,
+                  cancelAtPeriodEnd: (sub as any).cancel_at_period_end,
                 }),
                 'updateUserSubscription',
                 { eventId: event.id, eventType: event.type }

@@ -29,14 +29,27 @@ import { initPostHog, trackEvent, identify } from "@/lib/analytics";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import ThemeToggleButton from "@/components/ui/ThemeToggleButton";
+import { Badge } from "@/components/ui/badge";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
+import UserInitialization from "@/components/auth/UserInitialization";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const { user, isSignedIn } = useUser();
   const getOrCreateUser = useMutation(api.users.getOrCreateUser);
-  const stats = useQuery(api.users.getUserStats, isSignedIn && user?.id ? { userId: user.id } : "skip") as
+  
+  // We'll fetch stats after user initialization to avoid race conditions
+  const convexUser = useQuery(
+    api.queries.getUserByClerkId,
+    user?.id ? { clerkId: user.id } : "skip"
+  );
+
+  // Fetch stats only after user is confirmed to exist
+  const stats = useQuery(
+    api.users.getUserStats, 
+    isSignedIn && user?.id && convexUser ? { userId: user.id } : "skip"
+  ) as
     | {
         remainingPrompts: number;
         promptsToday: number;
@@ -44,34 +57,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         promptsTodayByType?: Record<string, number>;
       }
     | undefined;
-  const convexUser = useQuery(
-    api.queries.getUserByClerkId,
-    user?.id ? { clerkId: user.id } : "skip"
-  );
 
   const [showOnboarding, setShowOnboarding] = React.useState(false);
 
   React.useEffect(() => {
     // Show onboarding if:
     // 1. User is authenticated
-    // 2. User hasn't completed onboarding
-    // 3. This is their first session
+    // 2. User exists in our system
+    // 3. User hasn't completed onboarding
     if (convexUser && !convexUser.onboardingCompleted) {
       setShowOnboarding(true);
     }
   }, [convexUser]);
   const remainingPrompts = stats?.remainingPrompts ?? 0;
 
+  // Initialize PostHog and user creation separately, only when needed
   React.useEffect(() => {
     initPostHog();
-    if (isSignedIn && user?.id && user?.primaryEmailAddress?.emailAddress) {
-      // Best-effort create to avoid missing user records
+    if (isSignedIn && user?.id && user?.primaryEmailAddress?.emailAddress && !convexUser) {
+      // Only create user if they don't already exist in our system
       getOrCreateUser({ clerkId: user.id, email: user.primaryEmailAddress.emailAddress }).catch(() => {});
       try {
         identify(user.id, { email: user.primaryEmailAddress.emailAddress });
       } catch {}
     }
-  }, [isSignedIn, user?.id, user?.primaryEmailAddress?.emailAddress, getOrCreateUser]);
+  }, [isSignedIn, user?.id, user?.primaryEmailAddress?.emailAddress, convexUser, getOrCreateUser]);
 
   React.useEffect(() => {
     if (!isSignedIn) return;
@@ -194,96 +204,109 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 
   return (
-    <div className="flex min-h-screen w-full">
-      {/* Desktop / Tablet Sidebar - Hide during onboarding */}
-      {!showOnboarding && (
-        <div className="hidden md:block">{Sidebar}</div>
-      )}
-
-      {/* Main Column */}
-      <div className="flex min-h-screen flex-1 flex-col">
-        {/* Top Navigation Bar - Hide during onboarding */}
+    <UserInitialization>
+      <div className="flex min-h-screen w-full">
+        {/* Desktop / Tablet Sidebar - Hide during onboarding */}
         {!showOnboarding && (
-          <header className="sticky top-0 z-40 bg-base/95 backdrop-blur supports-[backdrop-filter]:bg-base/80 ring-1 ring-border shine-top">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-3">
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="icon" className="md:hidden">
-                    <Menu className="h-4 w-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="p-0">
-                  <div className="h-full w-64">{Sidebar}</div>
-                </SheetContent>
-              </Sheet>
-              <Link href="/dashboard" className="text-lg font-semibold tracking-tight text-primary">
-                Conard
-              </Link>
-            </div>
-            <div className="flex items-center gap-4">
-              {/* Usage indicator */}
-              {isSignedIn && (
-                <UsageIndicator remaining={remainingPrompts} breakdown={stats?.promptsTodayByType || {}} isPro={!!stats?.isPro} />
-              )}
-              {/* Pro/Free badge */}
-              {isSignedIn && (
-                stats?.isPro ? (
-                  <span className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-yellow-500">
-                    <Crown className="h-3 w-3" /> Pro
-                  </span>
-                ) : (
-                  <span className="rounded-md border border-border px-2 py-1 text-xs text-foreground/70">Free</span>
-                )
-              )}
-              <ThemeToggleButton className="size-8" />
-              <UserButton />
-            </div>
-          </div>
-        </header>
+          <div className="hidden md:block">{Sidebar}</div>
         )}
 
-        {/* Layered background main area */}
-        <div className="relative isolate flex-1 bg-gradient-to-b from-background to-card">
-          <div className="pointer-events-none absolute inset-0 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white/30 before:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-24 after:bg-black/20 after:blur-3xl after:content-['']" />
-          <main className="relative mx-auto w-full max-w-7xl px-4 py-6">
-            {children}
-            {showOnboarding && user?.id && (
-              <OnboardingModal
-                userId={user.id}
-                onComplete={() => setShowOnboarding(false)}
-              />
-            )}
-          </main>
+        {/* Main Column */}
+        <div className="flex min-h-screen flex-1 flex-col">
+          {/* Top Navigation Bar - Hide during onboarding */}
+          {!showOnboarding && (
+            <header className="sticky top-0 z-40 bg-base/95 backdrop-blur supports-[backdrop-filter]:bg-base/80 ring-1 ring-border shine-top">
+            <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="icon" className="md:hidden">
+                      <Menu className="h-4 w-4" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="p-0">
+                    <div className="h-full w-64">{Sidebar}</div>
+                  </SheetContent>
+                </Sheet>
+                <Link href="/dashboard" className="text-lg font-semibold tracking-tight text-primary">
+                  Conard
+                </Link>
+              </div>
+              <div className="flex items-center gap-4">
+                {/* Usage indicator */}
+                {isSignedIn && (
+                  stats === undefined ? (
+                    <div className="min-h-11 min-w-11 rounded-md border border-border px-3 py-2 text-sm text-foreground/40 bg-secondary/20 animate-pulse">
+                      &nbsp;
+                    </div>
+                  ) : (
+                    <UsageIndicator remaining={remainingPrompts} breakdown={stats?.promptsTodayByType || {}} isPro={!!stats?.isPro} />
+                  )
+                )}
+                {/* Pro/Free badge */}
+                {isSignedIn && (
+                  stats?.isPro ? (
+                    <Badge className="flex items-center gap-1 bg-primary text-primary-foreground">
+                      <Crown className="h-3 w-3" /> Pro
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">Free</Badge>
+                  )
+                )}
+                <ThemeToggleButton className="size-8" />
+                <div className="flex items-center gap-2">
+                  {isSignedIn && stats !== undefined && (
+                    <span className="text-xs text-foreground/60">{stats?.isPro ? "Pro" : "Free"}</span>
+                  )}
+                  <UserButton />
+                </div>
+              </div>
+            </div>
+          </header>
+          )}
+
+          {/* Layered background main area */}
+          <div className="relative isolate flex-1 bg-gradient-to-b from-background to-card">
+            <div className="pointer-events-none absolute inset-0 before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white/30 before:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-24 after:bg-black/20 after:blur-3xl after:content-['']" />
+            <main className="relative mx-auto w-full max-w-7xl px-4 py-6">
+              {children}
+              {showOnboarding && user?.id && (
+                <OnboardingModal
+                  userId={user.id}
+                  onComplete={() => setShowOnboarding(false)}
+                />
+              )}
+            </main>
+          </div>
+
+          {/* Mobile bottom tab bar - Hide during onboarding */}
+          {!showOnboarding && (
+            <nav className="sticky bottom-0 z-40 block border-t border-border bg-base/95 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-base/80 md:hidden">
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { href: "/dashboard", label: "Home", Icon: Home },
+                { href: "/dashboard/cursor-builder", label: "Builder", Icon: AppWindow },
+                { href: "/dashboard/generic-prompt", label: "Generic", Icon: FileText },
+                { href: "/dashboard/image-prompt", label: "Image", Icon: Image },
+                { href: "/dashboard/video-prompt", label: "Video", Icon: Video },
+                { href: "/dashboard/predict", label: "Predict", Icon: Eye },
+                { href: "/dashboard/history", label: "History", Icon: Clock },
+                { href: "/dashboard/prompt-history", label: "Prompts", Icon: Clock },
+                { href: "/dashboard/prompt-studio", label: "Studio", Icon: BarChart2 },
+                { href: "/dashboard/tools", label: "Tools", Icon: Wrench },
+                { href: "/dashboard/settings", label: "Settings", Icon: SettingsIcon },
+              ].map(({ href, label, Icon }) => (
+                <Link key={href} href={href} className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-xs">
+                  <Icon className="h-5 w-5" />
+                  <span>{label}</span>
+                </Link>
+              ))}
+            </div>
+          </nav>
+          )}
         </div>
-
-        {/* Mobile bottom tab bar - Hide during onboarding */}
-        {!showOnboarding && (
-          <nav className="sticky bottom-0 z-40 block border-t border-border bg-base/95 px-2 py-2 backdrop-blur supports-[backdrop-filter]:bg-base/80 md:hidden">
-          <div className="grid grid-cols-4 gap-2">
-            {[
-              { href: "/dashboard", label: "Home", Icon: Home },
-              { href: "/dashboard/cursor-builder", label: "Builder", Icon: AppWindow },
-              { href: "/dashboard/generic-prompt", label: "Generic", Icon: FileText },
-              { href: "/dashboard/image-prompt", label: "Image", Icon: Image },
-              { href: "/dashboard/video-prompt", label: "Video", Icon: Video },
-              { href: "/dashboard/predict", label: "Predict", Icon: Eye },
-              { href: "/dashboard/history", label: "History", Icon: Clock },
-              { href: "/dashboard/prompt-history", label: "Prompts", Icon: Clock },
-              { href: "/dashboard/prompt-studio", label: "Studio", Icon: BarChart2 },
-              { href: "/dashboard/tools", label: "Tools", Icon: Wrench },
-              { href: "/dashboard/settings", label: "Settings", Icon: SettingsIcon },
-            ].map(({ href, label, Icon }) => (
-              <Link key={href} href={href} className="flex flex-col items-center gap-1 rounded-md px-2 py-2 text-xs">
-                <Icon className="h-5 w-5" />
-                <span>{label}</span>
-              </Link>
-            ))}
-          </div>
-        </nav>
-        )}
       </div>
-    </div>
+    </UserInitialization>
   );
 }
 
@@ -291,14 +314,14 @@ function UsageIndicator({ remaining, breakdown, isPro }: { remaining: number; br
   const [open, setOpen] = React.useState(false);
   let color = "text-green-600";
   if (!isPro) {
-    if (remaining < 5) color = "text-red-600";
-    else if (remaining <= 10) color = "text-yellow-600";
+    if (remaining < 10) color = "text-red-600";
+    else if (remaining <= 20) color = "text-yellow-600";
   }
   React.useEffect(() => {
     try {
       if (isPro) {
         window.posthog?.capture('pro_unlimited_accessed');
-      } else if (remaining <= 5) {
+      } else if (remaining <= 10) {
         window.posthog?.capture('free_limit_warning_shown', { remaining_count: remaining });
       }
     } catch {}
@@ -306,18 +329,18 @@ function UsageIndicator({ remaining, breakdown, isPro }: { remaining: number; br
   return (
     <>
       <button
-        onClick={() => { try { window.posthog?.capture('quota_viewed', { used: (breakdown.generic||0)+(breakdown.image||0), remaining, limit: isPro ? Number.MAX_SAFE_INTEGER : 20 }); } catch {}; setOpen(true); }}
+        onClick={() => { try { window.posthog?.capture('quota_viewed', { used: (breakdown.generic||0)+(breakdown.image||0), remaining, limit: isPro ? Number.MAX_SAFE_INTEGER : 50 }); } catch {}; setOpen(true); }}
         className={`min-h-11 min-w-11 rounded-md border border-border px-3 py-2 text-sm ${color}`}
         title="Daily prompt usage"
       >
-        {isPro ? "Pro: Unlimited" : `${remaining} remaining`}
+        {isPro ? "Pro: Unlimited" : `${remaining} prompts/day`}
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <div className="relative w-full max-w-md rounded-lg bg-base p-4 ring-1 ring-border">
             <div className="mb-2 text-base font-semibold">Daily usage</div>
-            <div className="text-sm text-foreground/70">{isPro ? "Unlimited for Pro users" : `${remaining} remaining today`}</div>
+            <div className="text-sm text-foreground/70">{isPro ? "Unlimited for Pro users" : `${remaining} prompts remaining today (50 prompts/day)`}</div>
             {!isPro && (
               <div className="mt-3">
                 <div className="text-xs font-medium text-foreground/60">Today{'\''}s prompts by type</div>
