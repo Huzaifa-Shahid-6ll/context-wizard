@@ -279,7 +279,9 @@ export default function Home() {
               <div className="depth-layer-3 shadow-depth-sm w-12 h-12 rounded-lg flex items-center justify-center">
                 <AlertCircle className="h-6 w-6 text-destructive" />
               </div>
-              <h3 className="text-xl font-semibold text-shadow-sm">Cursor Generates Broken Code</h3>
+              <h3 className="text-xl font-semibold text-shadow-sm">
+                <ShinyText text="Cursor Generates Broken Code" speed={3} className="text-xl font-semibold" />
+              </h3>
             </div>
             <p className="text-muted-foreground text-base leading-relaxed">
               You paste a prompt and get code that doesn{'\''}t match your project structure, uses wrong dependencies, or completely misses your architecture.
@@ -292,7 +294,9 @@ export default function Home() {
               <div className="depth-layer-3 shadow-depth-sm w-12 h-12 rounded-lg flex items-center justify-center">
                 <Clock className="h-6 w-6 text-amber-500" />
               </div>
-              <h3 className="text-xl font-semibold text-shadow-sm">Hours Wasted on Setup</h3>
+              <h3 className="text-xl font-semibold text-shadow-sm">
+                <ShinyText text="Hours Wasted on Setup" speed={3} className="text-xl font-semibold" />
+              </h3>
             </div>
             <p className="text-muted-foreground text-base leading-relaxed">
               Every new project means manually writing .cursorrules, creating documentation, and explaining your codebase to AI—over and over again.
@@ -305,7 +309,9 @@ export default function Home() {
               <div className="depth-layer-3 shadow-depth-sm w-12 h-12 rounded-lg flex items-center justify-center">
                 <DollarSign className="h-6 w-6 text-red-500" />
               </div>
-              <h3 className="text-xl font-semibold text-shadow-sm">Burning API Credits</h3>
+              <h3 className="text-xl font-semibold text-shadow-sm">
+                <ShinyText text="Burning API Credits" speed={3} className="text-xl font-semibold" />
+              </h3>
             </div>
             <p className="text-muted-foreground text-base leading-relaxed">
               Bad context means more back-and-forth, more regenerations, and hundreds of wasted tokens trying to get AI to understand your project.
@@ -325,7 +331,7 @@ export default function Home() {
           className="text-3xl sm:text-4xl font-bold text-center mb-4 text-primary
             text-shadow-md"
         >
-          Build Complete Apps in 3 Simple Steps
+          <ShinyText text="Build Complete Apps in 3 Simple Steps" speed={3} className="text-3xl sm:text-4xl font-bold" />
         </h2>
         <p className="text-muted-foreground text-center mb-12 text-base">From idea to production-ready app with guided Cursor prompts</p>
 
@@ -360,7 +366,7 @@ export default function Home() {
             </div>
             <CardHeader className="pt-2">
               <CardTitle className="text-lg font-semibold">
-                Choose Your App Type
+                <ShinyText text="Choose Your App Type" speed={3} className="text-lg font-semibold" />
               </CardTitle>
             </CardHeader>
             <CardContent className="pb-6">
@@ -400,7 +406,7 @@ export default function Home() {
             </div>
             <CardHeader className="pt-2">
               <CardTitle className="text-lg font-semibold">
-                Get Step-by-Step Prompts
+                <ShinyText text="Get Step-by-Step Prompts" speed={3} className="text-lg font-semibold" />
               </CardTitle>
             </CardHeader>
             <CardContent className="pb-6">
@@ -440,7 +446,7 @@ export default function Home() {
             </div>
             <CardHeader className="pt-2">
               <CardTitle className="text-lg font-semibold">
-                Build Your Complete App
+                <ShinyText text="Build Your Complete App" speed={3} className="text-lg font-semibold" />
               </CardTitle>
             </CardHeader>
             <CardContent className="pb-6">
@@ -462,7 +468,9 @@ export default function Home() {
             {/* Placeholder for video - replace with actual embed */}
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
               <Video className="h-24 w-24 text-muted-foreground mb-4" />
-              <div className="text-xl font-semibold">See Cursor Builder in Action</div>
+              <div className="text-xl font-semibold">
+                <ShinyText text="See Cursor Builder in Action" speed={3} className="text-xl font-semibold" />
+              </div>
               <div className="text-sm text-muted-foreground mt-2">Watch how easy it is to build complete apps with guided prompts</div>
               
               {/* Play button overlay */}
@@ -485,7 +493,7 @@ export default function Home() {
       <ScrollReveal>
       <section id="before-after" className="mx-auto max-w-7xl px-4 sm:px-6 py-20">
         <h2 className="text-center text-3xl sm:text-4xl font-bold text-primary mb-4 text-shadow-md">
-          See The Difference Context Makes
+          <ShinyText text="See The Difference Context Makes" speed={3} className="text-3xl sm:text-4xl font-bold" />
         </h2>
         <p className="text-center text-muted-foreground mb-12 text-base max-w-2xl mx-auto">
           Same prompt, completely different results. See why context files matter.
@@ -497,7 +505,9 @@ export default function Home() {
           <Card className="depth-layer-2 shadow-depth-md border-0 p-6">
             <div className="flex items-center gap-2 mb-4">
               <X className="h-6 w-6 text-destructive" />
-              <CardTitle className="text-xl font-semibold text-destructive">Without Context Files</CardTitle>
+              <CardTitle className="text-xl font-semibold text-destructive">
+                <ShinyText text="Without Context Files" speed={3} className="text-xl font-semibold" />
+              </CardTitle>
             </div>
             <div className="rounded-lg depth-layer-1 shadow-inset p-4 mb-4">
               <Image src="/badCODE_example.png" alt="Messy AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
@@ -509,7 +519,9 @@ export default function Home() {
           <Card className="depth-layer-3 shadow-depth-lg border-0 p-6 hover-lift">
             <div className="flex items-center gap-2 mb-4">
               <Check className="h-6 w-6 text-primary" />
-              <CardTitle className="text-xl font-semibold text-primary">With Context Files</CardTitle>
+              <CardTitle className="text-xl font-semibold text-primary">
+                <ShinyText text="With Context Files" speed={3} className="text-xl font-semibold" />
+              </CardTitle>
             </div>
             <div className="rounded-lg depth-layer-3 shadow-depth-sm p-4 mb-4">
               <Image src="/Good Code_example.png" alt="Clean AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
@@ -535,7 +547,9 @@ export default function Home() {
               <Card className="depth-layer-2 shadow-depth-md border-0 p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <X className="h-6 w-6 text-destructive" />
-                  <CardTitle className="text-xl font-semibold text-destructive">Without Context Files</CardTitle>
+                  <CardTitle className="text-xl font-semibold text-destructive">
+                <ShinyText text="Without Context Files" speed={3} className="text-xl font-semibold" />
+              </CardTitle>
                 </div>
             <div className="rounded-lg depth-layer-1 shadow-inset p-4 mb-4">
               <Image src="/badCODE_example.png" alt="Messy AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
@@ -547,7 +561,9 @@ export default function Home() {
               <Card className="depth-layer-3 shadow-depth-lg border-0 p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Check className="h-6 w-6 text-primary" />
-                  <CardTitle className="text-xl font-semibold text-primary">With Context Files</CardTitle>
+                  <CardTitle className="text-xl font-semibold text-primary">
+                <ShinyText text="With Context Files" speed={3} className="text-xl font-semibold" />
+              </CardTitle>
                 </div>
                 <div className="rounded-lg depth-layer-3 shadow-depth-sm p-4 mb-4">
                   <Image src="/Good Code_example.png" alt="Clean AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
@@ -584,7 +600,7 @@ export default function Home() {
           {/* Section Header with Highlight */}
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl font-bold mb-3">
-              <span className="bg-primary/20 px-3 py-1 rounded">WORLD-CLASS</span> CUSTOMER SUPPORT
+              <span className="bg-primary/20 px-3 py-1 rounded">WORLD-CLASS</span> <ShinyText text="CUSTOMER SUPPORT" speed={3} className="text-3xl sm:text-4xl font-bold" />
             </h2>
             <p className="text-muted-foreground text-sm">
               Don{'\''}t just take our word for it. Our A-team gets tons of praise.
@@ -705,7 +721,7 @@ export default function Home() {
             text-shadow-md
             tracking-tight"
         >
-          Everything You Need to Build Complete Apps
+          <ShinyText text="Everything You Need to Build Complete Apps" speed={3} className="text-3xl sm:text-4xl font-bold" />
         </h2>
         <p className="mx-auto mt-3 max-w-2xl text-center text-foreground/70 text-base">Six powerful features that help you build production-ready applications with Cursor.</p>
         <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -776,7 +792,7 @@ export default function Home() {
             className="text-3xl sm:text-4xl font-bold text-center mb-4 text-primary
               text-shadow-md"
           >
-            Perfect For Every Builder
+            <ShinyText text="Perfect For Every Builder" speed={3} className="text-3xl sm:text-4xl font-bold" />
           </h2>
           <p className="text-muted-foreground text-center mb-12 text-base">From solo developers to teams—build apps faster with guided Cursor prompts</p>
 
@@ -787,7 +803,9 @@ export default function Home() {
                 <div className="depth-layer-3 shadow-depth-sm w-12 h-12 rounded-lg flex items-center justify-center">
                   <Bot className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-2xl font-bold text-primary">App Builders</h3>
+                <h3 className="text-2xl font-bold text-primary">
+                  <ShinyText text="App Builders" speed={3} className="text-2xl font-bold" />
+                </h3>
               </div>
               <p className="text-muted-foreground mb-4 text-base">Want to build complete apps but don't know where to start</p>
               <ul className="space-y-3">
@@ -810,7 +828,9 @@ export default function Home() {
             <Card className="lg:col-span-1 depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
               <div className="flex items-center gap-2 mb-3">
                 <Code2 className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-semibold">Experienced Developers</h3>
+                <h3 className="text-lg font-semibold">
+                  <ShinyText text="Experienced Developers" speed={3} className="text-lg font-semibold" />
+                </h3>
               </div>
               <p className="text-sm text-muted-foreground mb-3">Want to build apps faster with guided prompts</p>
               <ul className="space-y-2 text-sm">
@@ -832,7 +852,9 @@ export default function Home() {
             <Card className="lg:col-span-1 depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
               <div className="flex items-center gap-2 mb-3">
                 <GitFork className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-semibold">Open Source Maintainers</h3>
+                <h3 className="text-lg font-semibold">
+                  <ShinyText text="Open Source Maintainers" speed={3} className="text-lg font-semibold" />
+                </h3>
               </div>
               <p className="text-sm text-muted-foreground mb-3">Want to prototype and build MVPs quickly</p>
               <ul className="space-y-2 text-sm">
@@ -854,7 +876,9 @@ export default function Home() {
             <Card className="lg:col-span-1 depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
               <div className="flex items-center gap-2 mb-3">
                 <Users className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-semibold">Teams & Agencies</h3>
+                <h3 className="text-lg font-semibold">
+                  <ShinyText text="Teams & Agencies" speed={3} className="text-lg font-semibold" />
+                </h3>
               </div>
               <p className="text-sm text-muted-foreground mb-3">Need consistent app building across projects</p>
               <ul className="space-y-2 text-sm">
@@ -882,7 +906,7 @@ export default function Home() {
       <section id="innovation" className="max-w-7xl mx-auto px-4 py-20 bg-muted/20">
         <div className="text-center mb-12">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary mb-4 text-shadow-md">
-            Go Beyond Context Files—Build Entire Apps
+            <ShinyText text="Go Beyond Context Files—Build Entire Apps" speed={3} className="text-3xl sm:text-4xl font-bold" />
           </h2>
           <p className="text-muted-foreground text-base max-w-2xl mx-auto">
             The only tool that generates complete Cursor prompts for building full applications
@@ -905,7 +929,9 @@ export default function Home() {
 
           {/* Right: Benefits */}
           <div className="order-1 lg:order-2">
-            <h3 className="text-2xl font-bold mb-6 text-primary">The Only Tool That Generates Complete Cursor Prompts</h3>
+            <h3 className="text-2xl font-bold mb-6 text-primary">
+              <ShinyText text="The Only Tool That Generates Complete Cursor Prompts" speed={3} className="text-2xl font-bold" />
+            </h3>
             <ul className="space-y-4">
               <li className="flex items-start gap-3">
                 <Check className="h-6 w-6 text-primary shrink-0 mt-0.5" />
@@ -954,7 +980,9 @@ export default function Home() {
       {/* SECTION 11: FAQ (Objection Handling) */}
       <section id="faq" aria-labelledby="faq-heading" className="bg-background">
         <div className="max-w-4xl mx-auto px-4 py-20">
-          <h2 id="faq-heading" className="text-4xl font-bold text-center mb-4 text-shadow-sm">Frequently Asked Questions</h2>
+          <h2 id="faq-heading" className="text-4xl font-bold text-center mb-4 text-shadow-sm">
+            <ShinyText text="Frequently Asked Questions" speed={3} className="text-4xl font-bold" />
+          </h2>
           <p className="text-muted-foreground text-center mb-12">Everything you need to know about Cursor Builder</p>
           <AccordionExpandIconDemo 
             items={faqItems.map((item, index) => ({
@@ -992,7 +1020,7 @@ export default function Home() {
 
         <div className="text-center">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-primary text-shadow-md">
-            Ready to Build Your First App?
+            <ShinyText text="Ready to Build Your First App?" speed={3} className="text-3xl sm:text-4xl md:text-5xl font-bold" />
           </h2>
           <p className="text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             Join 500+ developers building complete apps with guided Cursor prompts.
@@ -1039,4 +1067,8 @@ export default function Home() {
       {/* Structured Data for SEO */}
       <script
         type="application/ld+json"
-        dangerouslySet
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+    </div>
+  );
+}
