@@ -135,7 +135,8 @@ async function handleOpenRouterResponse(res: Response): Promise<OpenRouterRespon
 export async function generateWithOpenRouter(
   prompt: string,
   userTier: 'free' | 'pro',
-  model?: string
+  model?: string,
+  timeoutMs: number = 60000 // Default 60 second timeout
 ): Promise<string> {
   const apiKey = getApiKey(userTier);
   if (!apiKey) throw new OpenRouterError('API key is missing', 401);
@@ -149,19 +150,32 @@ export async function generateWithOpenRouter(
     ],
   };
 
-  const res = await requestWithRetry(
-    `${BASE_URL}/chat/completions`,
-    {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-    },
-    { maxRetries: 3, baseDelayMs: 800 }
-  );
+  // Create AbortController for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  const json = await handleOpenRouterResponse(res);
-  const text = json.choices?.[0]?.message?.content ?? '';
-  return text;
+  try {
+    const res = await requestWithRetry(
+      `${BASE_URL}/chat/completions`,
+      {
+        method: 'POST',
+        headers: buildHeaders(apiKey),
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      },
+      { maxRetries: 3, baseDelayMs: 800 }
+    );
+    clearTimeout(timeoutId);
+    const json = await handleOpenRouterResponse(res);
+    const text = json.choices?.[0]?.message?.content ?? '';
+    return text;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+      throw new Error(`Request timeout: Generation took longer than ${timeoutMs / 1000} seconds`);
+    }
+    throw error;
+  }
 }
 
 export async function analyzePrompt(prompt: string): Promise<PromptAnalysis> {

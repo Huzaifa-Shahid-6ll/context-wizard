@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import { stripe, STRIPE_WEBHOOK_SECRET_EXPORT } from '@/lib/stripe';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../../../../convex/_generated/api';
+import { logger } from '@/lib/logger';
 
 // CRITICAL: Disable body parsing for webhooks
 export const runtime = 'nodejs';
@@ -67,15 +68,19 @@ async function retryConvexOperation<T>(
       const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
       
       if (attempt < MAX_RETRIES) {
-        console.warn(
-          `[Webhook ${context.eventId}] ${operationName} failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms:`,
-          error instanceof Error ? error.message : String(error)
-        );
+        logger.warn(`${operationName} failed, retrying`, {
+          eventId: context.eventId,
+          attempt: attempt + 1,
+          maxRetries: MAX_RETRIES + 1,
+          delay,
+          error: error instanceof Error ? error.message : String(error)
+        });
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
-        console.error(
-          `[Webhook ${context.eventId}] ${operationName} failed after ${MAX_RETRIES + 1} attempts:`,
-          error instanceof Error ? error.message : String(error),
+        logger.error(`${operationName} failed after all retries`, {
+          eventId: context.eventId,
+          attempts: MAX_RETRIES + 1,
+          error: error instanceof Error ? error.message : String(error),
           error instanceof Error ? error.stack : undefined
         );
       }
@@ -95,7 +100,9 @@ function logWebhookError(
   const errorMessage = error instanceof Error ? error.message : String(error);
   const errorStack = error instanceof Error ? error.stack : undefined;
   
-  console.error(`[Webhook ${eventId}] Error processing ${eventType}:`, {
+  logger.error(`Error processing webhook event`, {
+    eventId,
+    eventType,
     eventId,
     eventType,
     error: errorMessage,
@@ -117,7 +124,7 @@ export async function POST(req: NextRequest) {
                'unknown';
     
     if (!checkRateLimit(ip)) {
-      console.error(`[Request ${requestId}] Rate limit exceeded for IP: ${ip}`);
+      logger.error("Rate limit exceeded", { requestId, ip });
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
         { status: 429 }
@@ -130,7 +137,7 @@ export async function POST(req: NextRequest) {
     const signature = headersList.get('stripe-signature');
 
     if (!signature) {
-      console.error(`[Request ${requestId}] Missing stripe-signature header from IP: ${ip}`);
+      logger.error("Missing stripe-signature header", { requestId, ip });
       return NextResponse.json(
         { error: 'Missing signature', requestId },
         { status: 400 }
@@ -157,7 +164,7 @@ export async function POST(req: NextRequest) {
         signatureLength: signature.length,
       };
       
-      console.error(`[Request ${requestId}] Webhook signature verification failed:`, errorDetails);
+      logger.error("Webhook signature verification failed", { requestId, ...errorDetails });
       
       // Provide more specific error messages
       let errorMessage = 'Webhook signature verification failed';
@@ -178,9 +185,12 @@ export async function POST(req: NextRequest) {
     // Validate webhook timestamp (reject events older than 5 minutes)
     const eventAge = Date.now() / 1000 - event.created;
     if (eventAge > MAX_WEBHOOK_AGE_SECONDS) {
-      console.error(
-        `[Request ${requestId}] [Webhook ${eventId}] Rejected old webhook event: ${eventAge.toFixed(0)}s old (max: ${MAX_WEBHOOK_AGE_SECONDS}s)`
-      );
+      logger.error("Rejected old webhook event", {
+        requestId,
+        eventId,
+        age: eventAge.toFixed(0),
+        maxAge: MAX_WEBHOOK_AGE_SECONDS
+      });
       return NextResponse.json(
         { error: 'Webhook event too old', requestId, eventId },
         { status: 400 }
@@ -189,9 +199,13 @@ export async function POST(req: NextRequest) {
 
     // Log webhook event with ID, timestamp, and request ID
     const eventTimestamp = new Date(event.created * 1000).toISOString();
-    console.log(
-      `[Request ${requestId}] [Webhook ${event.id}] Processing event: ${event.type} at ${eventTimestamp} (age: ${eventAge.toFixed(1)}s)`
-    );
+    logger.info("Processing webhook event", {
+      requestId,
+      eventId: event.id,
+      eventType: event.type,
+      timestamp: eventTimestamp,
+      age: eventAge.toFixed(1)
+    });
 
     // Helper to extract userId from event
     const extractUserId = (event: Stripe.Event): string | undefined => {
@@ -209,7 +223,7 @@ export async function POST(req: NextRequest) {
       retryCount: 0,
       requestId,
     }).catch(err => {
-      console.error(`[Request ${requestId}] Failed to log webhook event start:`, err);
+      logger.error("Failed to log webhook event start", { requestId, error: err instanceof Error ? err.message : String(err) });
     });
 
     // Validate event type
@@ -222,7 +236,7 @@ export async function POST(req: NextRequest) {
     ];
 
     if (!supportedEventTypes.includes(event.type)) {
-      console.log(`[Webhook ${event.id}] Unhandled event type: ${event.type}`);
+      logger.warn("Unhandled event type", { eventId: event.id, eventType: event.type });
       // Return 200 for unhandled events to acknowledge receipt
       return NextResponse.json({ received: true, eventType: event.type });
     }
@@ -259,10 +273,10 @@ export async function POST(req: NextRequest) {
           // Stripe docs: https://docs.stripe.com/api/subscriptions/object#subscription_object-current_period_end
           // Prefer current_period_end, then trial_end, otherwise fallback to +30 days
           const currentPeriodEndSec =
-            typeof (subscription as any).current_period_end === 'number'
-              ? Number((subscription as any).current_period_end)
-              : typeof (subscription as any).trial_end === 'number'
-                ? Number((subscription as any).trial_end)
+            typeof subscription.current_period_end === 'number'
+              ? Number(subscription.current_period_end)
+              : typeof subscription.trial_end === 'number' && subscription.trial_end !== null
+                ? Number(subscription.trial_end)
                 : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
 
           // Update user in Convex with retry logic
@@ -274,13 +288,13 @@ export async function POST(req: NextRequest) {
               priceId: subscription.items.data[0].price.id,
               status: subscription.status,
               currentPeriodEnd: currentPeriodEndSec,
-              cancelAtPeriodEnd: !!(subscription as any).cancel_at_period_end,
+              cancelAtPeriodEnd: !!subscription.cancel_at_period_end,
             }),
             'updateUserSubscription',
             { eventId: event.id, eventType: event.type }
           );
 
-          console.log(`[Request ${requestId}] [Webhook ${event.id}] Subscription activated for user ${userId}`);
+          logger.info("Subscription activated", { requestId, eventId: event.id, userId });
 
           // Emit payment_completed to PostHog (server-side)
           try {
@@ -310,7 +324,7 @@ export async function POST(req: NextRequest) {
             }
           } catch (err) {
             // PostHog failures are non-critical, log but don't fail the webhook
-            console.error(`[Request ${requestId}] [Webhook ${event.id}] Failed to emit PostHog payment_completed:`, err);
+            logger.error("Failed to emit PostHog payment_completed", { requestId, eventId: event.id, error: err instanceof Error ? err.message : String(err) });
           }
         } catch (error) {
           logWebhookError(event.id, event.type, error, { userId });
@@ -334,7 +348,7 @@ export async function POST(req: NextRequest) {
               userId = customer.metadata?.userId;
             }
           } catch (err) {
-            console.warn(`[Request ${requestId}] [Webhook ${event.id}] Failed to retrieve customer metadata:`, err);
+            logger.warn("Failed to retrieve customer metadata", { requestId, eventId: event.id, error: err instanceof Error ? err.message : String(err) });
           }
         }
         
@@ -358,7 +372,7 @@ export async function POST(req: NextRequest) {
               }
             }
           } catch (err) {
-            console.warn(`[Request ${requestId}] [Webhook ${event.id}] Failed to retrieve from checkout sessions:`, err);
+            logger.warn("Failed to retrieve from checkout sessions", { requestId, eventId: event.id, error: err instanceof Error ? err.message : String(err) });
           }
         }
 
@@ -379,10 +393,10 @@ export async function POST(req: NextRequest) {
           // Ensure currentPeriodEnd is always a number to satisfy Convex validator
           // Stripe docs: https://docs.stripe.com/api/subscriptions/object#subscription_object-current_period_end
           const currentPeriodEndSec =
-            typeof (subscription as any).current_period_end === 'number'
-              ? Number((subscription as any).current_period_end)
-              : typeof (subscription as any).trial_end === 'number'
-                ? Number((subscription as any).trial_end)
+            typeof subscription.current_period_end === 'number'
+              ? Number(subscription.current_period_end)
+              : typeof subscription.trial_end === 'number' && subscription.trial_end !== null
+                ? Number(subscription.trial_end)
                 : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
 
           await retryConvexOperation(
@@ -393,13 +407,13 @@ export async function POST(req: NextRequest) {
               priceId: subscription.items.data[0].price.id,
               status: subscription.status,
               currentPeriodEnd: currentPeriodEndSec,
-              cancelAtPeriodEnd: !!(subscription as any).cancel_at_period_end,
+              cancelAtPeriodEnd: !!subscription.cancel_at_period_end,
             }),
             'updateUserSubscription',
             { eventId: event.id, eventType: event.type }
           );
 
-          console.log(`[Request ${requestId}] [Webhook ${event.id}] Subscription updated for user ${userId}`);
+          logger.info("Subscription updated", { requestId, eventId: event.id, userId });
 
           // Update user in PostHog as well
           try {
@@ -417,14 +431,14 @@ export async function POST(req: NextRequest) {
                     subscription_status: subscription.status,
                     subscription_id: subscription.id,
                     price_id: subscription.items.data[0]?.price?.id,
-                    current_period_end: (subscription as any).current_period_end,
-                    cancel_at_period_end: (subscription as any).cancel_at_period_end,
+                    current_period_end: subscription.current_period_end,
+                    cancel_at_period_end: subscription.cancel_at_period_end,
                   },
                 }),
               });
             }
           } catch (err) {
-            console.error(`[Request ${requestId}] [Webhook ${event.id}] Failed to emit PostHog event:`, err);
+            logger.error("Failed to emit PostHog event", { requestId, eventId: event.id, error: err instanceof Error ? err.message : String(err) });
           }
         } catch (error) {
           logWebhookError(event.id, event.type, error, { userId, subscriptionId: subscription.id });
@@ -459,7 +473,7 @@ export async function POST(req: NextRequest) {
             { eventId: event.id, eventType: event.type }
           );
 
-          console.log(`[Request ${requestId}] [Webhook ${event.id}] Subscription canceled for user ${userId}`);
+          logger.info("Subscription canceled", { requestId, eventId: event.id, userId });
         } catch (error) {
           logWebhookError(event.id, event.type, error, { userId, subscriptionId: subscription.id });
           // Retryable error - return 500 so Stripe retries
@@ -471,7 +485,7 @@ export async function POST(req: NextRequest) {
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice;
         // Payment succeeded - subscription is active
-        console.log(`[Request ${requestId}] [Webhook ${event.id}] Payment succeeded for invoice ${invoice.id}`);
+        logger.info("Payment succeeded", { requestId, eventId: event.id, invoiceId: invoice.id });
         break;
       }
 
@@ -493,14 +507,14 @@ export async function POST(req: NextRequest) {
                   customerId: sub.customer as string,
                   priceId: sub.items.data[0].price.id,
                   status: 'past_due',
-                  currentPeriodEnd: (sub as any).current_period_end,
-                  cancelAtPeriodEnd: (sub as any).cancel_at_period_end,
+                  currentPeriodEnd: typeof sub.current_period_end === 'number' ? sub.current_period_end : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+                  cancelAtPeriodEnd: !!sub.cancel_at_period_end,
                 }),
                 'updateUserSubscription',
                 { eventId: event.id, eventType: event.type }
               );
             } else {
-              console.warn(`[Request ${requestId}] [Webhook ${event.id}] No userId in subscription metadata for payment failed event`);
+              logger.warn("No userId in subscription metadata for payment failed event", { requestId, eventId: event.id });
             }
           } catch (error) {
             logWebhookError(event.id, event.type, error, {
@@ -512,21 +526,23 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        console.log(`[Request ${requestId}] [Webhook ${event.id}] Payment failed for invoice ${invoice.id}`);
+        logger.info("Payment failed", { requestId, eventId: event.id, invoiceId: invoice.id });
         break;
       }
 
       default:
         // This should not happen due to validation above, but keep for safety
-        console.log(`[Request ${requestId}] [Webhook ${event.id}] Unhandled event type: ${event.type}`);
+        logger.warn("Unhandled event type", { requestId, eventId: event.id, eventType: event.type });
     }
 
     // Return 200 to acknowledge receipt
     const processingTime = Date.now() - startTime;
     const finalUserId = extractUserId(event);
-    console.log(
-      `[Request ${requestId}] [Webhook ${event.id}] Successfully processed in ${processingTime}ms`
-    );
+    logger.info("Webhook successfully processed", {
+      requestId,
+      eventId: event.id,
+      processingTimeMs: processingTime
+    });
     
     // Log successful webhook processing (non-blocking)
     convex.mutation(api.mutations.logWebhookEvent, {
@@ -538,7 +554,7 @@ export async function POST(req: NextRequest) {
       requestId,
       processingTimeMs: processingTime,
     }).catch(err => {
-      console.error(`[Request ${requestId}] Failed to log webhook success:`, err);
+      logger.error("Failed to log webhook success", { requestId, error: err instanceof Error ? err.message : String(err) });
     });
     
     return NextResponse.json({ 
@@ -563,7 +579,7 @@ export async function POST(req: NextRequest) {
       requestId,
       processingTimeMs: processingTime,
     }).catch(err => {
-      console.error(`[Request ${requestId}] Failed to log webhook failure:`, err);
+      logger.error("Failed to log webhook failure", { requestId, error: err instanceof Error ? err.message : String(err) });
     });
     
     // Return 500 for retryable errors (Stripe will retry)

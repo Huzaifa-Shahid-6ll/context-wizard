@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useSpring } from "framer-motion";
-import { Play, Plus } from "lucide-react";
+import { Play, Plus } from "@/lib/icons";
 import {
   MediaControlBar,
   MediaController,

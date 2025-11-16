@@ -549,10 +549,11 @@ export const analyzeAndImprovePrompt = action({
     prompt: v.string(),
     context: v.optional(v.string()),
     userId: v.string(),
+    tokenModel: v.optional(v.string()), // Model to use for token counting (e.g., 'gpt-4', 'claude')
   },
   handler: async (
     ctx,
-    { prompt, context: extraContext, userId }
+    { prompt, context: extraContext, userId, tokenModel }
   ): Promise<{
     overallScore: number;
     scores: {
@@ -565,6 +566,14 @@ export const analyzeAndImprovePrompt = action({
     suggestions: string[];
     improvedPrompt: string;
     improvementExplanation: string;
+    tokenEstimate?: {
+      originalPrompt: number;
+      improvedPrompt: number;
+      systemContext: number;
+      totalEstimate: number;
+      method: string;
+      model?: string;
+    };
   }> => {
     // Check prompt limit before processing
     const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
@@ -687,6 +696,9 @@ Return JSON with analysis scores, issues, suggestions, and improved prompt
 
     // Increment prompt count after successful generation
     await ctx.runMutation(api.users.incrementPromptCount, { userId });
+    
+    // Token counting will be done client-side for accuracy
+    // The tokenEstimate will be calculated and merged on the client
     return parsed;
   },
 });

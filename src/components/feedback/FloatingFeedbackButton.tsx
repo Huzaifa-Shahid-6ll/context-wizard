@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FeedbackModal } from './FeedbackModal';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle } from '@/lib/icons';
 import { trackEvent } from '@/lib/analytics';
 
 export const FloatingFeedbackButton: React.FC = () => {

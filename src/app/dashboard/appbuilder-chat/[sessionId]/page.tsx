@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, Send, Save, X, MessageSquare } from "lucide-react";
+import { ChevronLeft, Send, Save, X, MessageSquare } from "@/lib/icons";
 import { toast } from "sonner";
 
 export default function ChatPage() {
@@ -19,9 +19,9 @@ export default function ChatPage() {
   const { user } = useUser();
   const sessionId = params?.sessionId as string | undefined;
 
-  const session = useQuery(api.chatQueries.getChatSession, sessionId ? { sessionId: sessionId as any } : "skip");
-  const chatHistory = useQuery(api.chatQueries.getChatHistory, sessionId ? { sessionId: sessionId as any } : "skip");
-  const context = useQuery(api.chatQueries.getContextForSession, sessionId ? { sessionId: sessionId as any } : "skip");
+  const session = useQuery(api.chatQueries.getChatSession, sessionId ? { sessionId: sessionId as import("@/types/convex").ChatSessionId } : "skip");
+  const chatHistory = useQuery(api.chatQueries.getChatHistory, sessionId ? { sessionId: sessionId as import("@/types/convex").ChatSessionId } : "skip");
+  const context = useQuery(api.chatQueries.getContextForSession, sessionId ? { sessionId: sessionId as import("@/types/convex").ChatSessionId } : "skip");
 
   const sendMessage = useAction(api.chatMutations.sendMessage);
   const updateContext = useMutation(api.chatMutations.updateContext);
@@ -30,7 +30,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [contextCollapsed, setContextCollapsed] = React.useState(false);
   const [editingContext, setEditingContext] = React.useState<string | null>(null);
-  const [editedContext, setEditedContext] = React.useState<any>(null);
+  const [editedContext, setEditedContext] = React.useState<Record<string, unknown> | null>(null);
 
   React.useEffect(() => {
     if (context) {
@@ -44,13 +44,14 @@ export default function ChatPage() {
     setIsLoading(true);
     try {
       await sendMessage({
-        sessionId: sessionId as any,
+        sessionId: sessionId as import("@/types/convex").ChatSessionId,
         userId: user.id,
         message: message.trim(),
       });
       setMessage("");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send message");
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      toast.error(err.message || "Failed to send message");
     } finally {
       setIsLoading(false);
     }
@@ -61,14 +62,15 @@ export default function ChatPage() {
 
     try {
       await updateContext({
-        sessionId: sessionId as any,
+        sessionId: sessionId as import("@/types/convex").ChatSessionId,
         userId: user.id,
         context: editedContext,
       });
       toast.success("Context updated");
       setEditingContext(null);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update context");
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      toast.error(err.message || "Failed to update context");
     }
   };
 
@@ -128,7 +130,7 @@ export default function ChatPage() {
                   <div>
                     <Label>PRD</Label>
                     <Textarea
-                      value={editedContext.prd}
+                      value={typeof editedContext.prd === 'string' ? editedContext.prd : ''}
                       onChange={(e) =>
                         setEditedContext({ ...editedContext, prd: e.target.value })
                       }
@@ -142,7 +144,7 @@ export default function ChatPage() {
                   <div>
                     <Label>User Flows</Label>
                     <Textarea
-                      value={editedContext.userFlows}
+                      value={typeof editedContext.userFlows === 'string' ? editedContext.userFlows : ''}
                       onChange={(e) =>
                         setEditedContext({ ...editedContext, userFlows: e.target.value })
                       }
@@ -156,7 +158,7 @@ export default function ChatPage() {
                   <div>
                     <Label>Tasks</Label>
                     <Textarea
-                      value={editedContext.taskFile}
+                      value={typeof editedContext.taskFile === 'string' ? editedContext.taskFile : ''}
                       onChange={(e) =>
                         setEditedContext({ ...editedContext, taskFile: e.target.value })
                       }
@@ -170,11 +172,11 @@ export default function ChatPage() {
                   <div>
                     <Label>Generated Prompts</Label>
                     <div className="mt-2 space-y-2">
-                      {Object.entries(editedContext.generatedPrompts).map(([type, prompts]: [string, any]) => (
+                      {Object.entries(editedContext.generatedPrompts as Record<string, unknown>).map(([type, prompts]: [string, unknown]) => (
                         <div key={type} className="border border-border rounded p-2">
                           <div className="font-medium text-xs mb-1">{type}</div>
                           {Array.isArray(prompts) &&
-                            prompts.map((prompt: any, idx: number) => (
+                            prompts.map((prompt: { title?: string }, idx: number) => (
                               <div key={idx} className="text-xs text-foreground/70 mb-1">
                                 {prompt.title || `Prompt ${idx + 1}`}
                               </div>
@@ -218,7 +220,7 @@ export default function ChatPage() {
             </div>
           )}
 
-          {messages.map((msg: any, idx: number) => (
+          {messages.map((msg: { role: string; content: string }, idx: number) => (
             <div
               key={idx}
               className={`flex ${

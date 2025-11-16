@@ -1,5 +1,5 @@
 import { trackEvent } from "@/lib/analytics";
-import { Twitter, Github, Linkedin, MessageCircle } from "lucide-react";
+import { Twitter, Github, Linkedin, MessageCircle } from "@/lib/icons";
 import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -36,10 +36,9 @@ export const Footer: React.FC = () => {
             <div className="h-8 w-8 bg-gray-300" />
             <span className="text-lg font-bold">Conard</span>
           </div>
-          <p className="mt-2">AI-powered context generation for better code</p>
+          <p className="mt-2">Build complete apps with guided Cursor prompts</p>
           <p className="mt-2">
-            Transform your development workflow with intelligent context files that make AI coding assistants understand your
-            projects perfectly.
+            Transform your app building workflow with step-by-step prompts that guide you from idea to production-ready application.
           </p>
           <div className="flex space-x-4 mt-4">
             <a href="https://twitter.com/contextwizard" aria-label="Twitter" className="hover:text-primary transition-colors" target="_blank" rel="noreferrer noopener" onClick={() => trackEvent('footer_link_clicked', { link_name: 'twitter' })}>

@@ -24,7 +24,10 @@ import {
   Wrench,
   Shield,
   MessageSquare,
-} from "lucide-react";
+  Bell,
+  HelpCircle,
+  Rocket,
+} from "@/lib/icons";
 import { useUser } from "@clerk/nextjs";
 import { initPostHog, trackEvent, identify } from "@/lib/analytics";
 import { useMutation, useQuery } from "convex/react";
@@ -33,6 +36,7 @@ import ThemeToggleButton from "@/components/ui/ThemeToggleButton";
 import { Badge } from "@/components/ui/badge";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
 import UserInitialization from "@/components/auth/UserInitialization";
+import { Card } from "@/components/ui/card";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -152,12 +156,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const Sidebar = (
     <aside
       className={
-        "flex h-full flex-col justify-between bg-dark p-4 text-foreground ring-1 ring-border transition-[width] duration-300 ease-in-out " +
+        "flex h-full flex-col bg-dark text-foreground ring-1 ring-border transition-[width] duration-300 ease-in-out " +
         (isCollapsed ? "w-20" : "w-64 md:w-56 lg:w-64")
       }
     >
-      <div>
-        <div className="mb-2 flex justify-end">
+      {/* Top Section: Brand */}
+      <div className="p-4 border-b border-border">
+        <div className="mb-3 flex items-center justify-between">
+          {!isCollapsed && (
+            <Link href="/dashboard" className="text-2xl font-bold tracking-tight text-primary">
+              Conard
+            </Link>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -168,6 +178,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         </div>
+      </div>
+
+      {/* Middle Section: Navigation */}
+      <div className="flex-1 overflow-y-auto p-4">
         <nav>
           <ul className="space-y-1">
             {navItems.map(({ href, label, icon: Icon }) => {
@@ -177,16 +191,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <Link
                     href={href}
                     className={
-                      "group flex rounded-md px-3 py-2 text-sm transition-all " +
-                      (isCollapsed ? "justify-center" : "items-center gap-2") +
+                      "group flex items-center rounded-md px-3 py-2 text-sm transition-all " +
+                      (isCollapsed ? "justify-center" : "gap-3") +
                       " " +
                       (active
-                        ? "bg-light shadow-sm ring-1 ring-border"
-                        : "hover:bg-secondary/10 hover:shadow-sm")
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-foreground/70 hover:bg-secondary/10 hover:text-foreground")
                     }
                   >
-                    <Icon className="h-4 w-4 text-primary" />
-                    {!isCollapsed && <span className="font-medium">{label}</span>}
+                    <Icon className={`h-4 w-4 ${active ? "text-primary" : "text-foreground/60"}`} />
+                    {!isCollapsed && <span>{label}</span>}
                   </Link>
                 </li>
               );
@@ -194,11 +208,114 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </ul>
         </nav>
       </div>
-      <div className="pt-4">
-        {!stats?.isPro && (
-          <Link href="/dashboard/billing">
-            <Button className="w-full gap-2 rounded-md bg-gradient-to-r from-primary to-purple-600 text-primary-foreground shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg">
-              <Sparkles className="h-4 w-4" /> Upgrade to Pro
+
+      {/* Bottom Section: Help, Notifications, User, Promotional Card */}
+      <div className="border-t border-border p-4 space-y-3">
+        {/* Help Center */}
+        {!isCollapsed && (
+          <Link
+            href="/dashboard/settings"
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-foreground/70 hover:bg-secondary/10 hover:text-foreground transition-colors"
+          >
+            <HelpCircle className="h-4 w-4 text-foreground/60" />
+            <span>Help center</span>
+          </Link>
+        )}
+        {isCollapsed && (
+          <Link
+            href="/dashboard/settings"
+            className="flex justify-center rounded-md p-2 text-foreground/70 hover:bg-secondary/10 transition-colors"
+          >
+            <HelpCircle className="h-4 w-4 text-foreground/60" />
+          </Link>
+        )}
+
+        {/* Notifications */}
+        {!isCollapsed && (
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-foreground/70 hover:bg-secondary/10 hover:text-foreground transition-colors relative"
+          >
+            <Bell className="h-4 w-4 text-foreground/60" />
+            <span>Notifications</span>
+            <Badge className="ml-auto h-5 w-5 rounded-full bg-red-500 p-0 text-xs text-white flex items-center justify-center">
+              3
+            </Badge>
+          </Link>
+        )}
+        {isCollapsed && (
+          <Link
+            href="/dashboard"
+            className="flex justify-center rounded-md p-2 text-foreground/70 hover:bg-secondary/10 transition-colors relative"
+          >
+            <Bell className="h-4 w-4 text-foreground/60" />
+            <Badge className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 p-0 text-xs text-white flex items-center justify-center">
+              3
+            </Badge>
+          </Link>
+        )}
+
+        {/* User Profile */}
+        {!isCollapsed && isSignedIn && (
+          <div className="flex items-center gap-3 rounded-md px-3 py-2">
+            <UserButton />
+            <span className="text-sm font-medium text-foreground">{user?.firstName || user?.emailAddresses[0]?.emailAddress || "User"}</span>
+          </div>
+        )}
+        {isCollapsed && isSignedIn && (
+          <div className="flex justify-center">
+            <UserButton />
+          </div>
+        )}
+
+        {/* Promotional Card */}
+        {!isCollapsed && (
+          <Card className="rounded-lg border border-border bg-secondary/30 p-4">
+            <div className="mb-2">
+              <h3 className="text-sm font-semibold text-foreground">
+                {stats?.isPro ? "Pro plan active" : "Starter plan overview"}
+              </h3>
+              <p className="text-xs text-foreground/60 mt-1">
+                {stats?.isPro 
+                  ? "Unlimited prompts available" 
+                  : `${remainingPrompts} of 50 prompts remaining today`}
+              </p>
+            </div>
+            {!stats?.isPro && (
+              <>
+                {/* Visual progress indicator */}
+                <div className="mb-3 flex gap-1">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-8 flex-1 rounded border ${
+                        i < Math.ceil((50 - remainingPrompts) / 10)
+                          ? "bg-primary/20 border-primary/30"
+                          : "bg-secondary/50 border-border"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <Link href="/dashboard/billing">
+                  <Button className="w-full gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Rocket className="h-3 w-3" />
+                    Get full access
+                  </Button>
+                </Link>
+              </>
+            )}
+            {stats?.isPro && (
+              <div className="flex items-center gap-2 text-xs text-foreground/60">
+                <Crown className="h-3 w-3 text-primary" />
+                <span>Pro features enabled</span>
+              </div>
+            )}
+          </Card>
+        )}
+        {isCollapsed && !stats?.isPro && (
+          <Link href="/dashboard/billing" className="flex justify-center">
+            <Button size="icon" className="rounded-md bg-primary text-primary-foreground hover:bg-primary/90">
+              <Rocket className="h-4 w-4" />
             </Button>
           </Link>
         )}
@@ -219,51 +336,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Top Navigation Bar - Hide during onboarding */}
           {!showOnboarding && (
             <header className="sticky top-0 z-40 bg-base/95 backdrop-blur supports-[backdrop-filter]:bg-base/80 ring-1 ring-border shine-top">
-            <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-              <div className="flex items-center gap-3">
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" size="icon" className="md:hidden">
-                      <Menu className="h-4 w-4" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="p-0">
-                    <div className="h-full w-64">{Sidebar}</div>
-                  </SheetContent>
-                </Sheet>
-                <Link href="/dashboard" className="text-lg font-semibold tracking-tight text-primary">
-                  Conard
-                </Link>
-              </div>
-              <div className="flex items-center gap-4">
-                {/* Usage indicator */}
-                {isSignedIn && (
-                  stats === undefined ? (
-                    <div className="min-h-11 min-w-11 rounded-md border border-border px-3 py-2 text-sm text-foreground/40 bg-secondary/20 animate-pulse">
-                      &nbsp;
-                    </div>
-                  ) : (
-                    <UsageIndicator remaining={remainingPrompts} breakdown={stats?.promptsTodayByType || {}} isPro={!!stats?.isPro} />
-                  )
-                )}
-                {/* Pro/Free badge */}
-                {isSignedIn && (
-                  stats?.isPro ? (
-                    <Badge className="flex items-center gap-1 bg-primary text-primary-foreground">
-                      <Crown className="h-3 w-3" /> Pro
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary">Free</Badge>
-                  )
-                )}
-                <ThemeToggleButton className="size-8" />
-                <div className="flex items-center gap-2">
-                  {isSignedIn && stats !== undefined && (
-                    <span className="text-xs text-foreground/60">{stats?.isPro ? "Pro" : "Free"}</span>
-                  )}
-                  <UserButton />
-                </div>
-              </div>
+            <div className="mx-auto flex max-w-7xl items-center justify-start px-4 py-3">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="icon" className="md:hidden">
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0">
+                  <div className="h-full w-64">{Sidebar}</div>
+                </SheetContent>
+              </Sheet>
             </div>
           </header>
           )}

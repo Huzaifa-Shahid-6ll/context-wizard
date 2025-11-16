@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Check, CreditCard, Activity, ArrowRight, Calendar, DollarSign, Loader2, RefreshCw } from 'lucide-react';
+import { Check, CreditCard, Activity, ArrowRight, Calendar, DollarSign, Loader2, RefreshCw } from '@/lib/icons';
 import { initPostHog, trackEvent } from '@/lib/analytics';
 
 export default function BillingPage() {

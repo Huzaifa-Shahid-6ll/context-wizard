@@ -3,20 +3,12 @@ import { v } from "convex/values";
 
 export type UserDoc = import("./_generated/dataModel").Doc<"users">;
 
-type CheckGenerationLimitResult = {
-  canGenerate: boolean;
-  remaining: number; // use large number for pro users
-};
-
 type CheckPromptLimitResult = {
   canCreate: boolean;
   remaining: number; // use large number for pro users
 };
 
 type UserStats = {
-  totalGenerations: number;
-  generationsToday: number;
-  remaining: number;
   isPro: boolean;
   // Prompt metrics
   totalPrompts: number;
@@ -31,8 +23,6 @@ type UserStats = {
   subscriptionCancelAtPeriodEnd?: boolean;
   subscriptionCurrentPeriodEnd?: number;
 };
-
-const DAILY_FREE_LIMIT = 5;
 
 function startOfUtcDayTimestampMs(dateMs: number): number {
   const d = new Date(dateMs);
@@ -60,7 +50,6 @@ export const getOrCreateUser = mutation({
     const newId = await ctx.db.insert("users", {
       clerkId,
       email,
-      generationsToday: 0,
       lastResetDate: String(startOfUtcDayTimestampMs(now)),
       isPro: false,
       createdAt: now,
@@ -75,52 +64,7 @@ export const getOrCreateUser = mutation({
   },
 });
 
-export const checkGenerationLimit = mutation({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }): Promise<CheckGenerationLimitResult> => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerkId", q => q.eq("clerkId", userId))
-      .unique();
-    if (!user) throw new Error("User not found");
-
-    const key = todayKey();
-    let generationsToday = user.generationsToday ?? 0;
-    if (user.lastResetDate !== key) {
-      generationsToday = 0;
-      await ctx.db.patch(user._id, { generationsToday, lastResetDate: key });
-    }
-
-    const isPro = user.isPro ?? false;
-    if (isPro) {
-      return { canGenerate: true, remaining: Number.MAX_SAFE_INTEGER };
-    }
-
-    const remaining = Math.max(0, DAILY_FREE_LIMIT - generationsToday);
-    return { canGenerate: remaining > 0, remaining };
-  },
-});
-
-export const incrementGenerationCount = mutation({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }): Promise<void> => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerkId", q => q.eq("clerkId", userId))
-      .unique();
-    if (!user) throw new Error("User not found");
-
-    const key = todayKey();
-    const shouldReset = user.lastResetDate !== key;
-    const nextCount = (shouldReset ? 0 : (user.generationsToday ?? 0)) + 1;
-    await ctx.db.patch(user._id, {
-      generationsToday: nextCount,
-      lastResetDate: key,
-    });
-  },
-});
-
-// Prompt limit: free 50 tokens/day; pro unlimited. Resets daily similar to generations
+// Prompt limit: free 50 tokens/day; pro unlimited. Resets daily
 const DAILY_FREE_PROMPT_LIMIT = 50;
 
 export const checkPromptLimit = mutation({
@@ -179,9 +123,6 @@ export const getUserStats = query({
     if (!user) {
       // Return safe defaults if user record doesn't exist yet.
       return {
-        totalGenerations: 0,
-        generationsToday: 0,
-        remaining: DAILY_FREE_LIMIT,
         isPro: false,
         totalPrompts: 0,
         promptsToday: 0,
@@ -196,18 +137,7 @@ export const getUserStats = query({
       };
     }
 
-    // Count total generations for this user
-    const gens = await ctx.db
-      .query("generations")
-      .withIndex("by_userId", q => q.eq("userId", userId))
-      .collect();
-    const totalGenerations = gens.length;
-
-    // Compute today's count (without mutating)
-    const key = todayKey();
-    const generationsToday = user.lastResetDate === key ? (user.generationsToday ?? 0) : 0;
     const isPro = user.isPro ?? false;
-    const remaining = isPro ? Number.MAX_SAFE_INTEGER : Math.max(0, DAILY_FREE_LIMIT - generationsToday);
 
     // Prompt stats
     const prompts = await ctx.db
@@ -237,9 +167,6 @@ export const getUserStats = query({
     }
 
     return {
-      totalGenerations,
-      generationsToday,
-      remaining,
       isPro,
       totalPrompts,
       promptsToday,

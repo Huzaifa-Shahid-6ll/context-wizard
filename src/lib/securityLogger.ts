@@ -1,4 +1,5 @@
 import { trackEvent } from './analytics';
+import { logger } from './logger';
 
 export function logSecurityEvent(
   eventType: 'rate_limit' | 'bot_detected' | 'honeypot_triggered' | 'suspicious_ip',
@@ -11,9 +12,10 @@ export function logSecurityEvent(
     timestamp: Date.now(),
   });
 
-  // Log to console in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[SECURITY]', eventType, details);
-  }
+  // Log security events
+  logger.warn('Security event detected', {
+    eventType,
+    ...details,
+  });
 }
 

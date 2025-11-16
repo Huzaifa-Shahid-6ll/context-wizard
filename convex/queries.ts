@@ -1,14 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 
-export const getGeneration = query({
-  args: { id: v.id("generations") },
-  handler: async (ctx, { id }) => {
-    const generation = await ctx.db.get(id);
-    return generation;
-  },
-});
-
 export const getUserByClerkId = query({
   args: { clerkId: v.string() },
   handler: async (ctx, { clerkId }) => {
@@ -17,18 +9,6 @@ export const getUserByClerkId = query({
       .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
       .unique();
     return user;
-  },
-});
-
-export const listGenerationsByUser = query({
-  args: { userId: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { userId, limit }) => {
-    const items = await ctx.db
-      .query("generations")
-      .withIndex("by_userId", q => q.eq("userId", userId))
-      .order("desc")
-      .collect();
-    return (limit ? items.slice(0, limit) : items);
   },
 });
 

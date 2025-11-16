@@ -16,7 +16,7 @@ import {
   TrendingUp,
   Download,
   RefreshCw
-} from 'lucide-react';
+} from '@/lib/icons';
 import {
   LineChart,
   Line,

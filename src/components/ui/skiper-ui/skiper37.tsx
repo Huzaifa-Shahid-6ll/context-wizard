@@ -3,7 +3,7 @@
 import NumberFlow from "@number-flow/react";
 import { AnimatePresence, motion, useSpring } from "framer-motion";
 import { animate, useMotionValue } from "framer-motion";
-import { Plus } from "lucide-react";
+import { Plus } from "@/lib/icons";
 import React, { useEffect, useRef, useState } from "react";
 import { useInView } from "react-intersection-observer";
 

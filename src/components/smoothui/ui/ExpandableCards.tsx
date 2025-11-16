@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
-import { Play } from "lucide-react"
+import { Play } from "@/lib/icons"
 import { AnimatePresence, motion } from "motion/react"
 
 import { getAllPeople, getAvatarUrl } from "@/app/doc/data/peopleData"

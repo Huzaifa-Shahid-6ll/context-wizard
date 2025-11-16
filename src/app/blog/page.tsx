@@ -2,7 +2,7 @@ import Link from "next/link";
 import React from "react";
 import { initPostHog, trackEvent } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
-import { FileText } from "lucide-react";
+import { FileText } from "@/lib/icons";
 
 export default function BlogPage() {
   React.useEffect(() => { 

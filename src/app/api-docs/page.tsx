@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { initPostHog, trackEvent } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Code2 } from "lucide-react";
+import { Code2 } from "@/lib/icons";
 import { toast } from "sonner";
 
 export default function ApiDocsPage() {

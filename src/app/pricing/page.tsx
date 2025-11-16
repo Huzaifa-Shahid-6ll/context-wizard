@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast, Toaster } from 'sonner';
-import { Check, X, Sparkles, Shield, Zap, ArrowLeft } from 'lucide-react';
+import { Check, X, Sparkles, Shield, Zap, ArrowLeft } from '@/lib/icons';
 import Link from 'next/link';
 
 type BillingPeriod = 'monthly' | 'annual';

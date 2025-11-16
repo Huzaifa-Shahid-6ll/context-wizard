@@ -130,31 +130,31 @@ export function TechnicalDetailsBuilder({ value, onChange, className = '' }: Tec
       fields: [
         {
           name: 'architecture',
-          label: 'Architecture Pattern',
+          label: 'How should your app be structured?',
           type: 'select',
           options: ['MVC', 'MVP', 'MVVM', 'Microservices', 'Monolithic', 'Serverless', 'Event-driven'],
-          tooltip: 'Overall system design approach'
+          tooltip: 'The overall way your app is organized and structured. Different patterns organize code in different ways to make it easier to maintain and scale.'
         },
         {
           name: 'codeStyle',
-          label: 'Code Style',
+          label: 'What programming approach should be used?',
           type: 'select',
           options: ['Functional', 'Object-oriented', 'Declarative', 'Procedural', 'Mixed'],
-          tooltip: 'Programming paradigm and approach'
+          tooltip: 'The style and approach used when writing code. Different approaches organize code differently and have different benefits.'
         },
         {
           name: 'testing',
-          label: 'Testing Approach',
+          label: 'What types of testing should be included?',
           type: 'multiselect',
           options: ['Unit tests', 'Integration tests', 'E2E tests', 'Visual regression', 'Performance tests'],
-          tooltip: 'Types of testing to include'
+          tooltip: 'Different ways to test your app to ensure it works correctly. Each type tests different aspects of functionality.'
         },
         {
           name: 'documentation',
-          label: 'Documentation Level',
+          label: 'How much code documentation is needed?',
           type: 'select',
           options: ['Minimal', 'Pragmatic', 'Comprehensive'],
-          tooltip: 'Amount of code documentation to generate'
+          tooltip: 'How much written explanation is needed to help developers understand how the code works. More documentation helps future developers but takes more time.'
         }
       ]
     }
@@ -249,7 +249,7 @@ export function TechnicalDetailsBuilder({ value, onChange, className = '' }: Tec
     <div className={`space-y-6 ${className}`}>
       <div>
         <label className="block text-sm font-medium text-foreground mb-3">
-          <TooltipWrapper content="Select the technical category you want to specify">
+          <TooltipWrapper content="Select the category of technical details you want to specify. Choose the area that's most relevant to your project.">
             Technical Category
           </TooltipWrapper>
         </label>

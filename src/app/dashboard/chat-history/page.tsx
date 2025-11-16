@@ -7,7 +7,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, Search, Calendar } from "lucide-react";
+import { MessageSquare, Search, Calendar } from "@/lib/icons";
 import Link from "next/link";
 
 export default function ChatHistoryPage() {

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp } from '@/lib/icons';
 
 export const BackToTop: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);

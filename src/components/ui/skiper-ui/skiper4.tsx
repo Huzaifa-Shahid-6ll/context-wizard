@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { GripHorizontal, RefreshCcw } from "lucide-react";
+import { GripHorizontal, RefreshCcw } from "@/lib/icons";
 import React, { useState } from "react";
 
 import { cn } from "@/lib/utils";

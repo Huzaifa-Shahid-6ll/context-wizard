@@ -2,88 +2,6 @@ import { mutation } from "./_generated/server";
 // remove unused api import
 import { v, JSONValue } from "convex/values";
 
-const DAILY_FREE_LIMIT = 5;
-
-function startOfUtcDayTimestampMs(dateMs: number): number {
-  const d = new Date(dateMs);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0);
-}
-
-export const createGeneration = mutation({
-  args: {
-    userId: v.string(),
-    repoUrl: v.string(),
-  },
-  handler: async (ctx, { userId, repoUrl }) => {
-    const now = Date.now();
-    const todayKey = startOfUtcDayTimestampMs(now).toString();
-
-    // Find user by clerkId == userId or by id? Our schema stores clerkId, email, etc.
-    // Here we assume userId is the Convex users.clerkId
-    const user = await ctx.db.query("users").withIndex("by_clerkId", q => q.eq("clerkId", userId)).unique();
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const lastReset = user.lastResetDate; // string key for date
-    const shouldReset = lastReset !== todayKey;
-    const generationsToday = shouldReset ? 0 : (user.generationsToday ?? 0);
-
-    const isPro = user.isPro ?? false;
-    if (!isPro && generationsToday >= DAILY_FREE_LIMIT) {
-      throw new Error("Daily generation limit reached (free tier)");
-    }
-
-    // Update counters
-    if (shouldReset) {
-      await ctx.db.patch(user._id, { lastResetDate: todayKey, generationsToday: 1 });
-    } else {
-      await ctx.db.patch(user._id, { generationsToday: generationsToday + 1 });
-    }
-
-    // Insert generation with processing status
-    const generationId = await ctx.db.insert("generations", {
-      userId,
-      repoUrl,
-      repoName: "", // fill later after fetch
-      techStack: [],
-      files: [],
-      status: "processing",
-      createdAt: now,
-    });
-
-    return generationId;
-  },
-});
-
-export const updateGeneration = mutation({
-  args: {
-    id: v.id("generations"),
-    patch: v.object({
-      status: v.optional(v.union(v.literal("processing"), v.literal("completed"), v.literal("failed"))),
-      files: v.optional(v.array(v.object({ name: v.string(), content: v.string() }))),
-      techStack: v.optional(v.array(v.string())),
-      repoName: v.optional(v.string()),
-      errorMessage: v.optional(v.string()),
-    }),
-  },
-  handler: async (ctx, { id, patch }) => {
-    await ctx.db.patch(id, patch);
-  },
-});
-
-export const deleteGeneration = mutation({
-  args: { id: v.id("generations"), userId: v.string() },
-  handler: async (ctx, { id, userId }) => {
-    const gen = await ctx.db.get(id);
-    if (!gen) return;
-    if (gen.userId !== userId) {
-      throw new Error("Not authorized to delete this generation");
-    }
-    await ctx.db.delete(id);
-  },
-});
-
 export const deletePrompt = mutation({
   args: { id: v.id("prompts"), userId: v.string() },
   handler: async (ctx, { id, userId }) => {
@@ -332,6 +250,29 @@ export const cancelUserSubscription = mutation({
 });
 
 
+
+// Migration: Remove generationsToday field from existing user documents
+// Run this once after pushing the schema, then remove generationsToday from schema.ts
+export const removeGenerationsToday = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    
+    let updated = 0;
+    for (const user of users) {
+      // Check if the user has the generationsToday field
+      if ("generationsToday" in user && user.generationsToday !== undefined) {
+        // Remove the field by patching with undefined
+        await ctx.db.patch(user._id, {
+          generationsToday: undefined,
+        });
+        updated++;
+      }
+    }
+    
+    return { updated, total: users.length };
+  },
+});
 
 // Webhook logging mutation
 export const logWebhookEvent = mutation({

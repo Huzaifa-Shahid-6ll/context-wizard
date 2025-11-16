@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { toast } from "sonner";
-import { Video, Play, Camera, Film } from "lucide-react";
+import { Video, Play, Camera, Film } from "@/lib/icons";
 import { TooltipWrapper } from "@/components/forms/TooltipWrapper";
 import { PromptPreview } from "@/components/forms/PromptPreview";
 import { PlatformTargetSelector } from "@/components/forms/PlatformTargetSelector";

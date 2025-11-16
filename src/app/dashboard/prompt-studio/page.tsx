@@ -18,6 +18,7 @@ import { OutputFormatSelector } from "@/components/forms/OutputFormatSelector";
 import { AudienceSelector } from "@/components/forms/AudienceSelector";
 
 import { initPostHog, trackEvent, trackPromptEvent } from "@/lib/analytics";
+import { countTokensAccurate, countPromptTokens } from "@/lib/tokenCounter";
 
 export default function PromptStudioPage() {
   React.useEffect(() => {
@@ -94,6 +95,7 @@ export default function PromptStudioPage() {
   const [analysisFrequency, setAnalysisFrequency] = React.useState("One-time");
   const [analysisUseCase, setAnalysisUseCase] = React.useState("Personal use");
   const [analysisSuccessCriteria, setAnalysisSuccessCriteria] = React.useState("");
+  const [tokenModel, setTokenModel] = React.useState("gpt-4"); // Model for token counting
 
   function toggleIn(list: string[], setter: (v: string[]) => void, value: string) {
     setter(list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
@@ -188,8 +190,77 @@ export default function PromptStudioPage() {
         prompt: analysisPrompt.trim(),
         context: structuredContext || undefined,
         userId: user.id,
+        tokenModel: tokenModel,
       });
-      setResults({ type: "analysis", data: res });
+      
+      // Calculate token estimates client-side for accuracy
+      const originalTokens = countTokensAccurate(analysisPrompt.trim(), tokenModel);
+      const improvedTokens = res.improvedPrompt 
+        ? countTokensAccurate(res.improvedPrompt as string, tokenModel)
+        : { count: 0, method: 'unknown' };
+      
+      // Use the actual system prompt for accurate token counting
+      const systemPrompt = `You are an expert prompt analyst and context engineer specializing in advanced prompt optimization.
+
+## Core Expertise
+- Expert in prompt engineering, context engineering, and AI interaction optimization
+- Specialized in the 6-part prompting framework and context management
+- 10+ years experience in AI system design and prompt optimization
+
+## Your Role
+Analyze prompts using advanced context engineering principles:
+
+### Evaluation Criteria
+1. **Command Structure**: Clear, direct action verbs and specific goals
+2. **Context Richness**: Comprehensive background using Rule of Three (Who, What, When)
+3. **Logic Framework**: Step-by-step reasoning and output structure
+4. **Expert Persona**: Domain-specific knowledge and professional tone
+5. **Format Specification**: Precise output formatting and organization
+6. **Context Engineering**: XML structure, scenario coverage, constraints
+
+### Analysis Framework
+- **Clarity**: How clear and unambiguous are the instructions?
+- **Specificity**: How detailed and specific are the requirements?
+- **Structure**: How well-organized and logical is the prompt?
+- **Completeness**: How comprehensive is the context and coverage?
+- **Context Engineering**: How well does it follow advanced context principles?
+
+## Output Requirements
+Return STRICT JSON only with keys: overallScore (0-100), scores { clarity, specificity, structure, completeness }, issues (array of {severity: 'low'|'medium'|'high', description}), suggestions (string[]), improvedPrompt (string), improvementExplanation (string)
+
+## Context Engineering Principles
+- Use XML tags for structure and clarity
+- Include comprehensive scenario coverage
+- Provide specific examples and constraints
+- Use professional terminology and domain expertise
+- Ensure self-contained, actionable instructions
+- Include escalation procedures and edge cases
+
+Be concise, deterministic (temperature ~0.2), and ensure numeric fields are numbers. No markdown fences.`;
+      
+      const systemTokens = countTokensAccurate(systemPrompt, tokenModel);
+      
+      // Calculate total with system + user prompt
+      const totalEstimate = countPromptTokens(
+        systemPrompt,
+        analysisPrompt.trim(),
+        tokenModel
+      );
+      
+      // Merge token estimates into results
+      const resultsWithTokens = {
+        ...res,
+        tokenEstimate: {
+          originalPrompt: originalTokens.count,
+          improvedPrompt: improvedTokens.count,
+          systemContext: systemTokens.count,
+          totalEstimate: totalEstimate.totalTokens,
+          method: originalTokens.method,
+          model: originalTokens.model || tokenModel,
+        },
+      };
+      
+      setResults({ type: "analysis", data: resultsWithTokens });
       toast.success("Prompt analysis completed!");
     } catch {
       toast.error("Failed to analyze prompt");
@@ -346,7 +417,14 @@ export default function PromptStudioPage() {
             <h2 className="text-xl font-semibold mb-4">Prompt Analysis & Improvement</h2>
             <div className="grid grid-cols-1 gap-4">
               <div>
-                <Label className="mb-2 block">Prompt to Analyze</Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Prompt to Analyze</Label>
+                  {analysisPrompt.trim() && (
+                    <span className="text-xs text-foreground/60">
+                      {countTokensAccurate(analysisPrompt.trim(), tokenModel).count} tokens
+                    </span>
+                  )}
+                </div>
                 <textarea
                   className="w-full rounded-md border border-border bg-background p-3 text-base"
                   rows={6}
@@ -375,6 +453,23 @@ export default function PromptStudioPage() {
                     {["One-time","Weekly","Daily","Multiple times per day"].map((opt) => <option key={opt}>{opt}</option>)}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <Label className="mb-2 block">Token Counting Model</Label>
+                <select 
+                  className="w-full rounded-md border border-border bg-background p-2 text-sm" 
+                  value={tokenModel} 
+                  onChange={(e) => setTokenModel(e.target.value)}
+                >
+                  <option value="gpt-4">GPT-4 / GPT-3.5 (OpenAI)</option>
+                  <option value="gpt-4o">GPT-4o (OpenAI)</option>
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo (OpenAI)</option>
+                  <option value="claude">Claude (Anthropic)</option>
+                </select>
+                <p className="mt-1 text-xs text-foreground/60">
+                  Select the model family for accurate token counting. This ensures your token counts match official token predictors.
+                </p>
               </div>
 
               <div>
@@ -544,6 +639,48 @@ export default function PromptStudioPage() {
 
           {results.type === "analysis" && (
             <div className="space-y-4">
+              {/* Token Estimate Card */}
+              {results.data.tokenEstimate && (
+                <Card className="p-4 shadow-sm ring-1 ring-border bg-muted/50">
+                  <h3 className="text-sm font-semibold mb-3">Token Estimate</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-foreground/70">Original Prompt:</span>
+                      <span className="ml-2 font-semibold">
+                        {results.data.tokenEstimate.originalPrompt} tokens
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-foreground/70">Improved Prompt:</span>
+                      <span className="ml-2 font-semibold">
+                        {results.data.tokenEstimate.improvedPrompt} tokens
+                      </span>
+                    </div>
+                    {results.data.tokenEstimate.systemContext && (
+                      <div>
+                        <span className="text-foreground/70">System Context:</span>
+                        <span className="ml-2 font-semibold">
+                          {results.data.tokenEstimate.systemContext} tokens
+                        </span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-foreground/70">Total Estimate:</span>
+                      <span className="ml-2 font-semibold text-primary">
+                        {results.data.tokenEstimate.totalEstimate} tokens
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-foreground/60 border-t border-border pt-3">
+                    Estimated using <span className="font-medium">{results.data.tokenEstimate.method}</span> method
+                    {results.data.tokenEstimate.model && (
+                      <> for <span className="font-medium">{results.data.tokenEstimate.model}</span> model</>
+                    )}
+                    . These counts match official token predictors for accurate cost estimation.
+                  </p>
+                </Card>
+              )}
+              
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Card className="p-3 shadow-sm ring-1 ring-border">
                   <h3 className="text-sm font-medium">Overall Score: {results.data.overallScore as number}/100</h3>

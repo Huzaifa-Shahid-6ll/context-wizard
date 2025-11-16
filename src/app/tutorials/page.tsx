@@ -2,7 +2,7 @@ import Link from "next/link";
 import React from "react";
 import { initPostHog, trackEvent } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
-import { GraduationCap } from "lucide-react";
+import { GraduationCap } from "@/lib/icons";
 
 export default function TutorialsPage() {
   React.useEffect(() => { 

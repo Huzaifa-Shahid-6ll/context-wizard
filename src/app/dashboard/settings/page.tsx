@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import DebugPanel from "@/components/DebugPanel";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
 
 type Prefs = {
@@ -33,13 +32,11 @@ const DEFAULT_PREFS: Prefs = {
 export default function SettingsPage() {
   const { user } = useUser();
   const stats = useQuery(api.users.getUserStats, user?.id ? { userId: user.id } : "skip") as
-    | { totalGenerations: number; generationsToday: number; remaining: number; isPro: boolean; totalPrompts: number; promptsToday: number; remainingPrompts: number }
+    | { isPro: boolean; totalPrompts: number; promptsToday: number; remainingPrompts: number }
     | undefined;
 
   const [prefs, setPrefs] = React.useState<Prefs>(DEFAULT_PREFS);
   const [saving, setSaving] = React.useState(false);
-  const [debugEnabled, setDebugEnabled] = React.useState<boolean>(false);
-  const [debugInfo, setDebugInfo] = React.useState<unknown>(null);
   const [showReOnboarding, setShowReOnboarding] = React.useState(false);
   const resetOnboarding = useMutation(api.onboarding.resetOnboarding);
 
@@ -76,16 +73,6 @@ export default function SettingsPage() {
       localStorage.setItem("cw_settings_prefs", JSON.stringify(prefs));
     } finally {
       setTimeout(() => setSaving(false), 400);
-    }
-  }
-
-  async function runDebugCheck() {
-    try {
-      const res = await fetch("/api/debug", { cache: "no-store" });
-      const json = await res.json();
-      setDebugInfo(json);
-    } catch (e) {
-      setDebugInfo({ error: (e as Error).message });
     }
   }
 
@@ -255,26 +242,9 @@ export default function SettingsPage() {
         </div>
       </Card>
 
-      {/* Debug */}
-      <Card className="p-4 shadow-sm ring-1 ring-border">
-        <h2 className="text-base font-semibold">Debug Mode</h2>
-        <div className="mt-4 flex items-center gap-3">
-          <Button variant={debugEnabled ? "default" : "outline"} onClick={() => setDebugEnabled((v) => !v)} className="h-11">
-            {debugEnabled ? "Disable" : "Enable"} Debug Mode
-          </Button>
-          <Button variant="secondary" onClick={runDebugCheck} className="h-11">Run Debug Check</Button>
-        </div>
-        <div className="mt-4">
-          <pre className="overflow-auto rounded-md bg-secondary/10 p-3 text-xs">
-{JSON.stringify(debugInfo, null, 2)}
-          </pre>
-        </div>
-      </Card>
-
       <div className="flex justify-end">
         <Button onClick={save} disabled={saving} className="h-11">{saving ? "Saving..." : "Save Preferences"}</Button>
       </div>
-      <DebugPanel enabled={debugEnabled} />
       
       {/* Re-onboarding modal */}
       {showReOnboarding && user?.id && (

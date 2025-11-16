@@ -6,7 +6,7 @@ import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@cl
 import { trackEvent } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu } from 'lucide-react';
+import { Menu } from '@/lib/icons';
 import ThemeToggleButton from '@/components/ui/ThemeToggleButton';
 
 type NavItem = {

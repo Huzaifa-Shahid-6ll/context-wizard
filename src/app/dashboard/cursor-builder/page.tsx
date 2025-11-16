@@ -22,16 +22,13 @@ import { PromptPreview } from "@/components/forms/PromptPreview";
 import { AudienceSelector } from "@/components/forms/AudienceSelector";
 import { TechnicalDetailsBuilder } from "@/components/forms/TechnicalDetailsBuilder";
 import { TemplateLibrary, type Template } from "@/components/templates/TemplateLibrary";
+import type { GenerationId, GenerationResult, GeneratedLists, GeneratedPrompts, CurrentPromptIndex } from "@/types/generation";
+import type { UserStats } from "@/types/convex";
+import type { PromptType, PromptTypeArray } from "@/types/prompts";
+import { logger } from "@/lib/logger";
 
+// Re-export types for backward compatibility
 type GeneratedItem = { title: string; prompt: string; order: number };
-type GenerationResult = {
-  projectRequirements: string;
-  frontendPrompts: GeneratedItem[];
-  backendPrompts: GeneratedItem[];
-  cursorRules: string;
-  errorFixPrompts: { error: string; fix: string }[];
-  estimatedComplexity?: string;
-};
 
 const steps = [
   "Overview",
@@ -75,10 +72,11 @@ export default function CursorBuilderPage() {
   const generateLists = useAction(api.appBuilderGenerations.generateLists);
   const generateItemPrompt = useAction(api.appBuilderGenerations.generateItemPrompt);
   const approveStep = useMutation(api.appBuilderGenerations.approveStep);
+  const updateGenerationStatus = useMutation(api.appBuilderGenerations.updateGenerationStatus);
   const createChatSession = useMutation(api.chatMutations.createChatSession);
   const batchStoreEmbeddings = useAction(api.vectorSearch.batchStoreEmbeddings);
   const stats = useQuery(api.users.getUserStats, user?.id ? { userId: user.id } : "skip") as
-    | { remainingPrompts: number; isPro: boolean }
+    | UserStats
     | undefined;
 
   React.useEffect(() => {
@@ -94,19 +92,32 @@ export default function CursorBuilderPage() {
 
   // Sequential generation state
   const [generationId, setGenerationId] = React.useState<string | null>(null);
+  
+  // Get generation progress (must be after generationId state declaration)
+  const getGenerationProgress = useQuery(
+    api.appBuilderGenerations.getGenerationProgress,
+    generationId ? { generationId: generationId as GenerationId } : "skip"
+  );
   const [generationStep, setGenerationStep] = React.useState<"form" | "prd" | "user_flows" | "tasks" | "lists" | "prompts" | "summary">("form");
   const [prdContent, setPrdContent] = React.useState<string | null>(null);
   const [userFlowsContent, setUserFlowsContent] = React.useState<string | null>(null);
   const [taskFileContent, setTaskFileContent] = React.useState<string | null>(null);
-  const [generatedLists, setGeneratedLists] = React.useState<any>(null);
-  const [currentPromptIndex, setCurrentPromptIndex] = React.useState<{ type: string; name: string; index: number } | null>(null);
-  const [generatedPrompts, setGeneratedPrompts] = React.useState<any>({});
+  const [generatedLists, setGeneratedLists] = React.useState<GeneratedLists | null>(null);
+  const [currentPromptIndex, setCurrentPromptIndex] = React.useState<CurrentPromptIndex>(null);
+  const [generatedPrompts, setGeneratedPrompts] = React.useState<GeneratedPrompts>({});
 
   // Enhanced loading UI state
   const [loadingTip, setLoadingTip] = React.useState("");
   const [estimatedTime, setEstimatedTime] = React.useState(0);
   const [avgGenerationTime, setAvgGenerationTime] = React.useState(5); // Default 5 seconds per prompt
   const [generationStartTime, setGenerationStartTime] = React.useState(0);
+  const [generationError, setGenerationError] = React.useState<string | null>(null);
+  const lastAvgUpdateRef = React.useRef<number>(0); // Track last avg update to prevent infinite loops
+  const avgGenerationTimeRef = React.useRef<number>(5); // Track avg time in ref to avoid dependency issues
+  const generatedListsRef = React.useRef<GeneratedLists | null>(null); // Track lists in ref to avoid state timing issues
+  const isGeneratingRef = React.useRef<boolean>(false); // Prevent concurrent generation calls
+  const lastGeneratedItemRef = React.useRef<{ type: string; name: string } | null>(null); // Track last item to prevent duplicate toasts
+  const generatedPromptsRef = React.useRef<GeneratedPrompts>({}); // Track prompts in ref to avoid dependency issues
 
   // Form state
   const [projectName, setProjectName] = React.useState("");
@@ -374,24 +385,49 @@ export default function CursorBuilderPage() {
     }
   }, [isSubmitting, generationStep]);
 
-  // Time estimation effect
+  // Sync generatedPrompts to ref whenever it changes
   React.useEffect(() => {
-    if (currentPromptIndex && generatedPrompts && generatedLists) {
-      const completed = Object.values(generatedPrompts).flat().length;
-      const total = calculateTotalPrompts();
-      const remaining = total - completed;
-      const estimated = remaining * avgGenerationTime;
-      setEstimatedTime(Math.max(0, estimated));
-      
-      // Update average generation time based on actual performance
-      if (generationStartTime > 0 && completed > 0) {
-        const elapsed = (Date.now() - generationStartTime) / 1000;
-        const newAvg = elapsed / completed;
-        setAvgGenerationTime(newAvg);
+    generatedPromptsRef.current = generatedPrompts;
+  }, [generatedPrompts]);
+
+  // Time estimation effect - use refs to avoid dependency issues
+  React.useEffect(() => {
+    // Extract dependencies to variables to avoid complex expressions in dependency array
+    const currentIndex = currentPromptIndex ?? null;
+    const startTime = generationStartTime ?? 0;
+    
+    // Use refs to avoid dependency on state that changes frequently
+    const prompts = generatedPromptsRef.current;
+    const lists = generatedListsRef.current || generatedLists;
+    
+    // Only run if we have all required data
+    if (!currentIndex || !prompts || !lists) {
+      return;
+    }
+    
+    const completed = Object.values(prompts).flat().length;
+    const total = calculateTotalPrompts();
+    const remaining = total - completed;
+    const estimated = remaining * avgGenerationTimeRef.current; // Use ref value
+    setEstimatedTime(Math.max(0, estimated));
+    
+    // Update average generation time based on actual performance
+    // Use ref to prevent infinite loops by tracking when we last updated
+    if (startTime > 0 && completed > 0) {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const newAvg = elapsed / completed;
+      // Only update if the difference is significant (more than 0.1 seconds)
+      // and we haven't updated recently (within 1 second) to prevent loops
+      const now = Date.now();
+      if (Math.abs(newAvg - avgGenerationTimeRef.current) > 0.1 && (now - lastAvgUpdateRef.current) > 1000) {
+        lastAvgUpdateRef.current = now;
+        avgGenerationTimeRef.current = newAvg; // Update ref
+        setAvgGenerationTime(newAvg); // Also update state for display if needed
       }
     }
+    // Use stable dependencies with fixed length - extract complex expressions to variables
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPromptIndex, generatedPrompts, generatedLists, avgGenerationTime, generationStartTime]);
+  }, [currentPromptIndex, generationStartTime]);
 
   function next() {
     // basic validations on early steps
@@ -588,9 +624,9 @@ export default function CursorBuilderPage() {
     }
 
     // Validate at least one prompt type selected
-    const selectedTypes = Object.entries(selectedPromptTypes)
+    const selectedTypes: PromptType[] = Object.entries(selectedPromptTypes)
       .filter(([_, selected]) => selected)
-      .map(([key, _]) => key === "errorFixing" ? "error_fixing" : key) as any[];
+      .map(([key, _]) => (key === "errorFixing" ? "error_fixing" : key) as PromptType);
 
     if (selectedTypes.length === 0) {
       toast.error("Please select at least one prompt type to generate.");
@@ -620,14 +656,15 @@ export default function CursorBuilderPage() {
 
       // Generate PRD
       setProgress(20);
+      setGenerationStep("prd"); // Set step first to show loading screen
+      setIsSubmitting(true);
       toast.info("Generating PRD...");
       const { prd } = await generatePRD({
-        generationId: genId as any,
+        generationId: genId as GenerationId,
         userId: user.id,
         formData,
       });
       setPrdContent(prd);
-      setGenerationStep("prd");
       setProgress(30);
       toast.success("PRD generated! Please review and approve.");
       setIsSubmitting(false);
@@ -641,9 +678,10 @@ export default function CursorBuilderPage() {
         tools,
         featureCount: features.length,
       }, user.id);
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e.message || "Failed to generate PRD");
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      logger.error("Failed to generate PRD", { error: error.message });
+      toast.error(error.message || "Failed to generate PRD");
       setIsSubmitting(false);
       setProgress(0);
     }
@@ -658,26 +696,30 @@ export default function CursorBuilderPage() {
     
     try {
       await approveStep({
-        generationId: generationId as any,
+        generationId: generationId as GenerationId,
         step: "prd",
       });
 
       toast.info("Generating User Flows...");
+      setGenerationStep("user_flows"); // Set step first to show loading screen
+      setProgress(40);
+      setIsSubmitting(true);
       const formData = buildFormData();
       const { userFlows } = await generateUserFlows({
-        generationId: generationId as any,
+        generationId: generationId as GenerationId,
         userId: user.id,
         formData,
         prd: prdContent,
       });
       
       setUserFlowsContent(userFlows);
-      setGenerationStep("user_flows");
       setProgress(50);
       toast.success("User Flows generated! Please review and approve.");
       setIsSubmitting(false);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to generate User Flows");
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      logger.error("Failed to generate User Flows", { error: error.message });
+      toast.error(error.message || "Failed to generate User Flows");
       setIsSubmitting(false);
     }
   }
@@ -691,14 +733,17 @@ export default function CursorBuilderPage() {
     
     try {
       await approveStep({
-        generationId: generationId as any,
+        generationId: generationId as GenerationId,
         step: "user_flows",
       });
 
       toast.info("Generating Task File...");
+      setGenerationStep("tasks"); // Set step first to show loading screen
+      setProgress(60);
+      setIsSubmitting(true);
       const formData = buildFormData();
       const { taskFile } = await generateTaskFile({
-        generationId: generationId as any,
+        generationId: generationId as GenerationId,
         userId: user.id,
         formData,
         prd: prdContent,
@@ -706,12 +751,13 @@ export default function CursorBuilderPage() {
       });
       
       setTaskFileContent(taskFile);
-      setGenerationStep("tasks");
       setProgress(70);
       toast.success("Task File generated! Please review and approve.");
       setIsSubmitting(false);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to generate Task File");
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      logger.error("Failed to generate Task File", { error: error.message });
+      toast.error(error.message || "Failed to generate Task File");
       setIsSubmitting(false);
     }
   }
@@ -725,18 +771,20 @@ export default function CursorBuilderPage() {
     
     try {
       await approveStep({
-        generationId: generationId as any,
+        generationId: generationId as GenerationId,
         step: "tasks",
       });
 
       toast.info("Generating screen/feature lists...");
+      setProgress(75);
+      setIsSubmitting(true);
       const formData = buildFormData();
       const selectedTypes = Object.entries(selectedPromptTypes)
         .filter(([_, selected]) => selected)
-        .map(([key, _]) => key === "errorFixing" ? "error_fixing" : key) as any[];
+        .map(([key, _]) => (key === "errorFixing" ? "error_fixing" : key) as PromptType);
 
       const lists = await generateLists({
-        generationId: generationId as any,
+        generationId: generationId as GenerationId,
         userId: user.id,
         formData,
         prd: prdContent,
@@ -745,89 +793,226 @@ export default function CursorBuilderPage() {
       });
       
       setGeneratedLists(lists);
-      setGenerationStep("prompts");
+      generatedListsRef.current = lists; // Also update ref
       setProgress(80);
       setGenerationStartTime(Date.now());
       
+      // Transition to prompts step
+      setGenerationStep("prompts");
+      setGenerationError(null);
+      setIsSubmitting(true); // Set to true before starting generation
+      
       // Start generating prompts for first item
-      await generateNextPrompt();
-    } catch (e: any) {
-      toast.error(e.message || "Failed to generate lists");
+      // Pass lists directly to avoid race condition with state update
+      await generateNextPrompt(lists);
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      logger.error("Failed to generate lists", { error: error.message });
+      toast.error(error.message || "Failed to generate lists");
       setIsSubmitting(false);
     }
   }
 
-  // Generate next prompt in sequence
-  async function generateNextPrompt() {
-    if (!generationId || !taskFileContent || !userFlowsContent || !prdContent || !user?.id || !generatedLists) return;
+  // Utility function: Timeout wrapper
+  function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => 
+        setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+      )
+    ]);
+  }
+
+  // Utility function: Retry with exponential backoff
+  async function retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelayMs: number = 1000
+  ): Promise<T> {
+    let lastError: Error | null = null;
     
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        // Don't retry on validation errors or user errors
+        const errorMsg = lastError.message.toLowerCase();
+        if (errorMsg.includes("validation") || 
+            errorMsg.includes("limit reached") || 
+            errorMsg.includes("permission") ||
+            errorMsg.includes("cannot generate")) {
+          throw lastError;
+        }
+        
+        // If this is the last attempt, throw the error
+        if (attempt === maxRetries - 1) {
+          throw lastError;
+        }
+        
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        logger.debug(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms delay...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    throw lastError || new Error("Retry failed");
+  }
+
+  // Generate next prompt in sequence
+  async function generateNextPrompt(lists?: GeneratedLists) {
+    // Use provided lists parameter, ref, or fall back to state
+    const listsToUse = lists || generatedListsRef.current || generatedLists;
+    
+    // Update ref when we have lists
+    if (listsToUse && !generatedListsRef.current) {
+      generatedListsRef.current = listsToUse;
+    }
+    
+    // Validation with detailed error messages
+    const missing: string[] = [];
+    if (!generationId) missing.push("Generation ID");
+    if (!taskFileContent) missing.push("Task File");
+    if (!userFlowsContent) missing.push("User Flows");
+    if (!prdContent) missing.push("PRD");
+    if (!user?.id) missing.push("User ID");
+    if (!listsToUse) missing.push("Generated Lists");
+    
+    if (missing.length > 0) {
+      const errorMsg = `Cannot generate prompts: Missing required data (${missing.join(", ")})`;
+      logger.error("generateNextPrompt validation failed", { missing });
+      toast.error(errorMsg);
+      setIsSubmitting(false);
+      setGenerationError(errorMsg);
+      return;
+    }
+    
+    // Add generation lock to prevent concurrent calls
+    if (isGeneratingRef.current) {
+      logger.debug("Generation already in progress, skipping...");
+      return;
+    }
+    
+    isGeneratingRef.current = true;
     setIsSubmitting(true);
+    setGenerationError(null);
     
     try {
+      // Sync state from backend before generating
+      let syncedPrompts = generatedPromptsRef.current || generatedPrompts;
+      if (getGenerationProgress?.generatedPrompts) {
+        setGeneratedPrompts(getGenerationProgress.generatedPrompts);
+        generatedPromptsRef.current = getGenerationProgress.generatedPrompts; // Update ref immediately
+        syncedPrompts = getGenerationProgress.generatedPrompts; // Use synced prompts for duplicate detection
+        // Small delay to ensure state updates
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
       const formData = buildFormData();
       const selectedTypes = Object.entries(selectedPromptTypes)
         .filter(([_, selected]) => selected)
         .map(([key, _]) => key === "errorFixing" ? "error_fixing" : key);
 
+      // Helper function to check if item already generated - use synced prompts and ref
+      function itemAlreadyGenerated(type: string, name: string): boolean {
+        const syncedPromptsList = syncedPrompts[type] || [];
+        const refPromptsList = generatedPromptsRef.current[type] || [];
+        // Check both synced and ref to catch all cases
+        return syncedPromptsList.some((p: GeneratedItem) => p.title === name) ||
+               refPromptsList.some((p: GeneratedItem) => p.title === name);
+      }
+
       // Determine which item to generate next
       let nextItem: { type: string; name: string; index: number } | null = null;
       
-      // Check frontend screens
-      if (selectedTypes.includes("frontend") && generatedLists.screenList) {
-        const frontendPrompts = generatedPrompts.frontend || [];
-        if (frontendPrompts.length < generatedLists.screenList.length) {
+      // Check frontend screens - with duplicate detection
+      if (selectedTypes.includes("frontend") && listsToUse.screenList) {
+        const frontendPrompts = syncedPrompts.frontend || [];
+        const remainingScreens = listsToUse.screenList.filter(
+          (screen: string) => !itemAlreadyGenerated("frontend", screen)
+        );
+        
+        if (remainingScreens.length > 0) {
+          const nextScreen = remainingScreens[0];
+          const originalIndex = listsToUse.screenList.indexOf(nextScreen);
           nextItem = {
             type: "frontend",
-            name: generatedLists.screenList[frontendPrompts.length],
-            index: frontendPrompts.length,
+            name: nextScreen,
+            index: originalIndex,
           };
         }
       }
       
-      // Check backend endpoints
-      if (!nextItem && selectedTypes.includes("backend") && generatedLists.endpointList) {
-        const backendPrompts = generatedPrompts.backend || [];
-        if (backendPrompts.length < generatedLists.endpointList.length) {
+      // Check backend endpoints - with duplicate detection
+      if (!nextItem && selectedTypes.includes("backend") && listsToUse.endpointList) {
+        const backendPrompts = syncedPrompts.backend || [];
+        const remainingEndpoints = listsToUse.endpointList.filter(
+          (endpoint: string) => !itemAlreadyGenerated("backend", endpoint)
+        );
+        
+        if (remainingEndpoints.length > 0) {
+          const nextEndpoint = remainingEndpoints[0];
+          const originalIndex = listsToUse.endpointList.indexOf(nextEndpoint);
           nextItem = {
             type: "backend",
-            name: generatedLists.endpointList[backendPrompts.length],
-            index: backendPrompts.length,
+            name: nextEndpoint,
+            index: originalIndex,
           };
         }
       }
       
-      // Check security features
-      if (!nextItem && selectedTypes.includes("security") && generatedLists.securityFeatureList) {
-        const securityPrompts = generatedPrompts.security || [];
-        if (securityPrompts.length < generatedLists.securityFeatureList.length) {
+      // Check security features - with duplicate detection
+      if (!nextItem && selectedTypes.includes("security") && listsToUse.securityFeatureList) {
+        const securityPrompts = syncedPrompts.security || [];
+        const remainingFeatures = listsToUse.securityFeatureList.filter(
+          (feature: string) => !itemAlreadyGenerated("security", feature)
+        );
+        
+        if (remainingFeatures.length > 0) {
+          const nextFeature = remainingFeatures[0];
+          const originalIndex = listsToUse.securityFeatureList.indexOf(nextFeature);
           nextItem = {
             type: "security",
-            name: generatedLists.securityFeatureList[securityPrompts.length],
-            index: securityPrompts.length,
+            name: nextFeature,
+            index: originalIndex,
           };
         }
       }
       
-      // Check functionality features
-      if (!nextItem && selectedTypes.includes("functionality") && generatedLists.functionalityFeatureList) {
-        const functionalityPrompts = generatedPrompts.functionality || [];
-        if (functionalityPrompts.length < generatedLists.functionalityFeatureList.length) {
+      // Check functionality features - with duplicate detection
+      if (!nextItem && selectedTypes.includes("functionality") && listsToUse.functionalityFeatureList) {
+        const functionalityPrompts = syncedPrompts.functionality || [];
+        const remainingFeatures = listsToUse.functionalityFeatureList.filter(
+          (feature: string) => !itemAlreadyGenerated("functionality", feature)
+        );
+        
+        if (remainingFeatures.length > 0) {
+          const nextFeature = remainingFeatures[0];
+          const originalIndex = listsToUse.functionalityFeatureList.indexOf(nextFeature);
           nextItem = {
             type: "functionality",
-            name: generatedLists.functionalityFeatureList[functionalityPrompts.length],
-            index: functionalityPrompts.length,
+            name: nextFeature,
+            index: originalIndex,
           };
         }
       }
       
-      // Check error scenarios
-      if (!nextItem && selectedTypes.includes("error_fixing") && generatedLists.errorScenarioList) {
-        const errorPrompts = generatedPrompts.error_fixing || [];
-        if (errorPrompts.length < generatedLists.errorScenarioList.length) {
+      // Check error scenarios - with duplicate detection
+      if (!nextItem && selectedTypes.includes("error_fixing") && listsToUse.errorScenarioList) {
+        const errorPrompts = syncedPrompts.error_fixing || [];
+        const remainingScenarios = listsToUse.errorScenarioList.filter(
+          (scenario: string) => !itemAlreadyGenerated("error_fixing", scenario)
+        );
+        
+        if (remainingScenarios.length > 0) {
+          const nextScenario = remainingScenarios[0];
+          const originalIndex = listsToUse.errorScenarioList.indexOf(nextScenario);
           nextItem = {
             type: "error_fixing",
-            name: generatedLists.errorScenarioList[errorPrompts.length],
-            index: errorPrompts.length,
+            name: nextScenario,
+            index: originalIndex,
           };
         }
       }
@@ -838,40 +1023,105 @@ export default function CursorBuilderPage() {
         setIsSubmitting(false);
         setShowConfetti(true);
         toast.success("All prompts generated!");
+        isGeneratingRef.current = false;
         return;
       }
 
-      setCurrentPromptIndex(nextItem);
-      toast.info(`Generating prompt for ${nextItem.name}...`);
+      // Only show toast if this is a new item (not a retry or duplicate)
+      const isRetry = currentPromptIndex?.name === nextItem.name && currentPromptIndex?.type === nextItem.type;
+      const isDuplicateToast = lastGeneratedItemRef.current?.name === nextItem.name && 
+                                lastGeneratedItemRef.current?.type === nextItem.type;
       
-      const { prompt } = await generateItemPrompt({
-        generationId: generationId as any,
-        userId: user.id,
-        itemType: nextItem.type as any,
-        itemName: nextItem.name,
-        formData,
-        prd: prdContent,
-        userFlows: userFlowsContent,
-        taskFile: taskFileContent,
-      });
+      // Don't show toast if it's a retry, duplicate, or if item is already generated
+      if (!isRetry && !isDuplicateToast && !itemAlreadyGenerated(nextItem.type, nextItem.name)) {
+        toast.info(`Generating prompt for ${nextItem.name}...`);
+        lastGeneratedItemRef.current = { type: nextItem.type, name: nextItem.name };
+      }
+      
+      setCurrentPromptIndex(nextItem);
+      
+      // Validate required data before calling API
+      if (!user?.id || !prdContent || !userFlowsContent || !taskFileContent) {
+        throw new Error("Missing required data for prompt generation");
+      }
 
-      // Update generated prompts state
-      setGeneratedPrompts((prev: any) => ({
-        ...prev,
-        [nextItem!.type]: [
-          ...(prev[nextItem!.type] || []),
-          { title: nextItem!.name, prompt },
-        ],
-      }));
+      const { prompt } = await retryWithBackoff(
+        () => withTimeout(
+          generateItemPrompt({
+            generationId: generationId as GenerationId,
+            userId: user.id,
+            itemType: nextItem.type as PromptType,
+            itemName: nextItem.name,
+            formData,
+            prd: prdContent,
+            userFlows: userFlowsContent,
+            taskFile: taskFileContent,
+          }),
+          60000, // 60 second timeout
+          `Timeout: Prompt generation for "${nextItem.name}" took longer than 60 seconds. Please try again.`
+        ),
+        3, // 3 retry attempts
+        1000 // Base delay of 1 second
+      );
+
+      // Update generated prompts state - use functional update to ensure we have latest state
+      setGeneratedPrompts((prev: GeneratedPrompts) => {
+        // Check if already exists to prevent duplicates - use both prev and ref for safety
+        const existingPrompts = prev[nextItem!.type as keyof GeneratedPrompts] || [];
+        const refPrompts = generatedPromptsRef.current[nextItem!.type as keyof GeneratedPrompts] || [];
+        const allExisting = [...existingPrompts, ...refPrompts];
+        const alreadyExists = allExisting.some((p: GeneratedItem) => p.title === nextItem!.name);
+        
+        if (alreadyExists) {
+          logger.warn(`Prompt for ${nextItem!.name} already exists, skipping duplicate`);
+          return prev;
+        }
+        
+        const updated = {
+          ...prev,
+          [nextItem!.type]: [
+            ...existingPrompts,
+            { title: nextItem!.name, prompt },
+          ],
+        };
+        
+        // Update ref immediately to prevent race conditions
+        generatedPromptsRef.current = updated;
+        
+        // Persist progress to localStorage
+        if (generationId) {
+          try {
+            localStorage.setItem(
+              `cursorBuilder.progress.${generationId}`,
+              JSON.stringify({
+                generatedPrompts: updated,
+                timestamp: Date.now(),
+              })
+            );
+          } catch (e) {
+            logger.warn("Failed to save progress to localStorage", { error: e instanceof Error ? e.message : String(e) });
+          }
+        }
+        return updated;
+      });
 
       setCurrentPromptIndex(null);
       setIsSubmitting(false);
+      setGenerationError(null);
+      isGeneratingRef.current = false;
+      lastGeneratedItemRef.current = null; // Clear last item on success
       
-      // Continue to next prompt
-      setTimeout(() => generateNextPrompt(), 500);
+      // Continue to next prompt - pass lists via ref to avoid state timing issues
+      setTimeout(() => generateNextPrompt(generatedListsRef.current || listsToUse), 500);
     } catch (e: any) {
-      toast.error(e.message || "Failed to generate prompt");
+      const errorMsg = e.message || "Failed to generate prompt";
+      logger.error("generateNextPrompt error", { errorMsg, error: e instanceof Error ? e.message : String(e) });
+      toast.error(errorMsg);
       setIsSubmitting(false);
+      setGenerationError(`Failed to generate prompt for ${currentPromptIndex?.name || "unknown item"}: ${errorMsg}`);
+      setCurrentPromptIndex(null);
+      isGeneratingRef.current = false;
+      // Don't clear lastGeneratedItemRef on error - this prevents showing toast again on retry
     }
   }
 
@@ -909,9 +1159,9 @@ export default function CursorBuilderPage() {
       ];
 
       // Add prompt embeddings
-      Object.entries(generatedPrompts).forEach(([type, prompts]: [string, any]) => {
+      Object.entries(generatedPrompts).forEach(([type, prompts]: [string, GeneratedItem[] | undefined]) => {
         if (Array.isArray(prompts)) {
-          prompts.forEach((p: any, idx: number) => {
+          prompts.forEach((p: GeneratedItem, idx: number) => {
             const promptType = type === "frontend" ? "frontend_prompt" :
                              type === "backend" ? "backend_prompt" :
                              type === "security" ? "security_prompt" :
@@ -920,10 +1170,10 @@ export default function CursorBuilderPage() {
             embeddingItems.push({
               content: p.prompt,
               metadata: {
-                type: promptType as any,
+                type: promptType,
                 section: p.title,
                 promptId: `${type}_${idx}`,
-              } as any,
+              },
             });
           });
         }
@@ -937,8 +1187,10 @@ export default function CursorBuilderPage() {
 
       // Navigate to chat
       router.push(`/dashboard/appbuilder-chat/${sessionId}`);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to create chat session");
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      logger.error("Failed to create chat session", { error: error.message });
+      toast.error(error.message || "Failed to create chat session");
     }
   }
 
@@ -995,20 +1247,189 @@ export default function CursorBuilderPage() {
       name: 'CRM App',
       description: 'Customer Relationship Management system for sales teams.',
       fields: {
+        // Overview
         projectName: 'Acme CRM',
+        projectDescription: 'A comprehensive Customer Relationship Management system designed for sales teams to manage contacts, track leads, monitor deals, and improve sales efficiency.',
         projectType: 'web app',
-        oneSentence: 'Manage contacts, leads, and deals.',
-        audienceSummary: { ageRange: '26-35', profession: 'Manager', expertiseLevel: 'intermediate', industry: 'Technology', useCase: 'Team collaboration' },
-        problemStatement: 'Sales teams need a better way to track leads.',
+        oneSentence: 'Manage contacts, leads, and deals efficiently.',
+        isNewApp: 'new' as const,
+        githubUrl: '',
+        timeline: 'MVP in 8 weeks, full launch in 4 months',
+        budget: 'Small team (2-3 developers)',
+        resourceConstraints: 'Standard cloud hosting, standard development tools',
+        competitors: 'Salesforce, HubSpot, Pipedrive',
+        
+        // Audience
+        audienceSummary: { 
+          ageRange: '26-35', 
+          profession: 'Manager', 
+          expertiseLevel: 'intermediate', 
+          industry: 'Technology', 
+          useCase: 'Team collaboration' 
+        },
+        platforms: ['Web', 'Mobile (responsive)'],
+        
+        // Problem & Goals
+        problemStatement: 'Sales teams struggle with scattered customer data, lack of visibility into deal pipelines, and inefficient lead tracking processes.',
         primaryGoal: 'Increase efficiency',
-        features: [
-          { id: 'f1', name: 'Contact Management', description: 'Store and filter contacts' },
-          { id: 'f2', name: 'Deal Tracking', description: 'Visualize deal pipeline' }
+        successCriteria: [
+          'Reduce time spent on data entry by 40%',
+          'Increase deal closure rate by 25%',
+          'Improve team collaboration and visibility'
         ],
+        
+        // Features
+        features: [
+          { id: 'f1', name: 'Contact Management', description: 'Store, organize, and filter contacts with custom fields and tags' },
+          { id: 'f2', name: 'Deal Tracking', description: 'Visualize deal pipeline with stages, probabilities, and forecasting' },
+          { id: 'f3', name: 'Lead Management', description: 'Capture, qualify, and convert leads into opportunities' },
+          { id: 'f4', name: 'Activity Tracking', description: 'Log calls, emails, meetings, and tasks with timeline view' },
+          { id: 'f5', name: 'Reporting & Analytics', description: 'Sales performance dashboards and custom reports' }
+        ],
+        featurePriorities: {
+          'f1': 'must-have',
+          'f2': 'must-have',
+          'f3': 'must-have',
+          'f4': 'must-have',
+          'f5': 'nice-to-have'
+        },
+        dataHandling: 'Customer data, contact information, deal history, communication logs',
+        offlineSupport: false,
+        pushNotifications: true,
+        backgroundProcesses: true,
+        errorHandling: 'Graceful error handling with user-friendly messages, retry mechanisms for API calls',
+        thirdPartyIntegrations: 'Email providers (Gmail, Outlook), calendar systems, payment processors, analytics tools',
+        realTimeFeatures: true,
+        analyticsTracking: 'User engagement, feature usage, sales metrics, conversion funnels',
+        
+        // User Experience & Design
+        lookAndFeel: 'Professional, clean, modern interface with emphasis on data visualization',
+        brandingGuidelines: 'Corporate blue and white color scheme, professional typography',
+        uiuxPatterns: ['Dashboard-first design', 'Data tables with filtering', 'Modal workflows', 'Responsive grid layouts'],
+        navigationStructure: 'Sidebar navigation with main sections: Dashboard, Contacts, Deals, Activities, Reports',
+        keyScreens: ['Dashboard', 'Contact List', 'Contact Detail', 'Deal Pipeline', 'Deal Detail', 'Activity Timeline', 'Reports'],
+        multiLanguageSupport: false,
+        themeCustomization: true,
+        accessibilityFeatures: ['Keyboard navigation', 'Screen reader support', 'High contrast mode', 'ARIA labels'],
+        prebuiltComponents: 'shadcn-ui',
+        
+        // Tech Stack - Frontend
         frontend: 'React',
+        frontendFrameworks: ['Next.js'],
+        buildTools: 'Vite',
+        browserCompatibility: 'Modern browsers (Chrome, Firefox, Safari, Edge)',
+        stateManagement: 'Zustand',
+        uiLibraries: 'shadcn-ui, Radix UI',
+        frontendOptimization: ['Code splitting', 'Lazy loading', 'Image optimization', 'Bundle size optimization'],
+        apiStructure: 'RESTful API with React Query for data fetching',
+        frontendTesting: 'Jest, React Testing Library, Playwright for E2E',
+        
+        // Tech Stack - Backend
         backend: 'Node.js',
-        database: 'PostgreSQL',
-        tools: ['Auth', 'Analytics'],
+        backendFrameworks: ['Express'],
+        hostingPreferences: 'Cloud hosting (AWS, Vercel, or similar)',
+        cachingNeeds: 'Redis for session management and frequently accessed data',
+        apiVersioning: 'REST API v1',
+        expectedTraffic: '100-1000 concurrent users',
+        dataFetching: 'REST API with pagination, filtering, and sorting',
+        loggingMonitoring: 'Winston for logging, Sentry for error tracking, DataDog for monitoring',
+        
+        // Constraints
+        mvpDate: '8 weeks',
+        launchDate: '4 months',
+        devBudget: 'Small team (2-3 developers)',
+        infraBudget: 'Standard cloud hosting costs',
+        teamSize: '2-3 developers',
+        
+        // Performance & Scale
+        expectedUsers: '100-1K',
+        perfRequirements: [
+          'Real-time updates',
+          'Low latency (<200ms)',
+          'High availability (99.9%+)'
+        ],
+        performanceBenchmarks: 'Lighthouse score > 90, Core Web Vitals in green',
+        deviceNetworkOptimization: 'Optimize for both desktop and mobile, handle slow network connections',
+        scalabilityPlans: 'Horizontal scaling with load balancers, database read replicas',
+        cachingStrategies: 'CDN for static assets, Redis for API responses, browser caching',
+        seoConsiderations: 'Public marketing pages should be SEO optimized',
+        mobileOptimizations: 'Responsive design, touch-friendly interactions, mobile-first approach',
+        loadTesting: true,
+        environmentalConsiderations: 'Optimize bundle size, minimize API calls, efficient database queries',
+        successMetrics: 'User engagement, feature adoption, sales metrics, system performance',
+        
+        // Security & Compliance
+        securityReqs: [
+          'Auth required',
+          'RBAC',
+          'Encrypt at rest',
+          'Encrypt in transit',
+          '2FA'
+        ],
+        compliance: ['GDPR', 'CCPA'],
+        sensitiveData: 'Customer contact information, financial data, communication history',
+        authenticationMethods: ['Email/Password', 'OAuth (Google, GitHub)'],
+        authorizationLevels: 'Role-based access control (Admin, Manager, Sales Rep, Viewer)',
+        encryptionHashing: 'BCrypt for passwords, TLS for data in transit, AES-256 for data at rest',
+        vulnerabilityPrevention: ['SQL Injection', 'XSS', 'CSRF', 'Rate Limiting', 'Input Validation', 'Dependency Scanning'],
+        securityAuditing: true,
+        dataRetention: '7 years for financial records, 2 years for communication logs',
+        backupFrequency: 'Daily automated backups with 30-day retention',
+        rateLimiting: 'API rate limiting: 100 requests per minute per user',
+        dataPrivacy: ['Right to deletion', 'Data portability', 'Consent management', 'Privacy by design', 'Data minimization'],
+        
+        // Functionality & Logic
+        coreBusinessLogic: 'Contact management, deal pipeline management, activity tracking, sales forecasting, reporting',
+        aiMlIntegrations: 'Optional: Lead scoring, sales forecasting predictions',
+        paymentsMonetization: 'Subscription-based pricing tiers',
+        customFunctionalities: 'Custom fields, workflow automation, email templates, document generation',
+        externalSystems: 'Email providers, calendar systems, payment gateways, analytics platforms',
+        validationRules: 'Email format validation, phone number validation, required field checks, data type validation',
+        backgroundJobs: 'Scheduled reports, email notifications, data synchronization, cleanup tasks',
+        multiTenancy: false,
+        updateMigrations: 'Database migration scripts, backward compatibility, rollback procedures',
+        
+        // Error-Fixing & Maintenance
+        commonErrors: 'API timeout errors, validation errors, authentication failures, data sync issues',
+        errorLogTemplates: true,
+        debuggingStrategies: 'Comprehensive logging, error tracking with stack traces, user-friendly error messages',
+        versioningUpdates: 'Semantic versioning, changelog, backward compatibility',
+        maintenanceTasks: 'Database optimization, cache clearing, log rotation, security updates',
+        testingTypes: ['Unit tests', 'Integration tests', 'E2E tests', 'Visual regression', 'Performance tests'],
+        cicdTools: 'GitHub Actions',
+        rollbackPlans: 'Automated rollback on deployment failure, database migration rollback procedures',
+        userFeedbackLoops: 'In-app feedback forms, user surveys, support ticket system',
+        
+        // Dev Preferences
+        codeStyle: 'Clean, readable, TypeScript with strict mode, ESLint and Prettier',
+        testingApproach: 'Test-driven development with unit and integration tests, 80%+ code coverage',
+        docsLevel: 'Comprehensive API documentation, inline code comments, README with setup instructions',
+        versionControl: 'Git with feature branches, pull request reviews, semantic commits',
+        deploymentDetails: 'CI/CD pipeline, automated testing, staging environment, blue-green deployment',
+        
+        // Additional Context
+        similarProjects: 'Salesforce, HubSpot, Pipedrive, Zoho CRM',
+        designInspiration: 'Modern SaaS dashboards, clean data visualization, intuitive navigation',
+        specialRequirements: 'Must support bulk operations, export functionality, API access for integrations',
+        ethicalGuidelines: 'Respect user privacy, transparent data usage, secure data handling',
+        legalRequirements: 'GDPR compliance, data protection, user consent management',
+        sustainabilityGoals: 'Efficient resource usage, minimize server load, optimize database queries',
+        futureExpansions: 'Mobile apps, AI-powered insights, advanced analytics, integrations marketplace',
+        uniqueAspects: 'Focus on ease of use, fast performance, customizable workflows, strong reporting capabilities',
+        
+        // Tools
+        tools: ['Auth', 'Analytics', 'Email Service', 'Payment Processing'],
+        
+        // Technical Details (for TechnicalDetailsBuilder component)
+        techDetails: {
+          category: 'code',
+          details: {
+            architecture: 'Microservices',
+            codeStyle: 'Object-oriented',
+            testing: ['Unit tests', 'Integration tests', 'E2E tests', 'Performance tests'],
+            documentation: 'Comprehensive'
+          }
+        },
       },
     },
     // Add more static templates here
@@ -1016,20 +1437,167 @@ export default function CursorBuilderPage() {
 
   function applyTemplate(template: Template) {
     try { trackEvent('generic_prompt_template_selected', { template_name: template.name }); } catch {}
-    // Set state for all known fields from the template.fields
-    setProjectName(String(template.fields.projectName || ''));
-    setProjectType(String(template.fields.projectType || 'web app'));
-    setOneSentence(String(template.fields.oneSentence || ''));
-    setAudienceSummary(template.fields.audienceSummary as { ageRange: string; profession: string; expertiseLevel: string; industry: string; useCase: string; } || { ageRange: "", profession: "", expertiseLevel: "", industry: "", useCase: "" });
-    setProblemStatement(String(template.fields.problemStatement || ''));
-    setPrimaryGoal(String(template.fields.primaryGoal || ''));
+    
+    const fields = template.fields;
+    
+    // Overview
+    setProjectName(String(fields.projectName || ''));
+    setProjectDescription(String(fields.projectDescription || ''));
+    setProjectType(String(fields.projectType || 'web app'));
+    setOneSentence(String(fields.oneSentence || ''));
+    setIsNewApp((fields.isNewApp as "new" | "enhancement" | "prototype") || 'new');
+    setGithubUrl(String(fields.githubUrl || ''));
+    setTimeline(String(fields.timeline || ''));
+    setBudget(String(fields.budget || ''));
+    setResourceConstraints(String(fields.resourceConstraints || ''));
+    setCompetitors(String(fields.competitors || ''));
+    
+    // Audience
+    setAudienceSummary((fields.audienceSummary as { ageRange: string; profession: string; expertiseLevel: string; industry: string; useCase: string; }) || { ageRange: "", profession: "", expertiseLevel: "", industry: "", useCase: "" });
+    setPlatforms(Array.isArray(fields.platforms) ? fields.platforms as string[] : []);
+    
+    // Problem & Goals
+    setProblemStatement(String(fields.problemStatement || ''));
+    setPrimaryGoal(String(fields.primaryGoal || ''));
+    setSuccessCriteria(Array.isArray(fields.successCriteria) ? fields.successCriteria as string[] : []);
+    
+    // Features
     type FeatureItem = { id: string; name: string; description: string };
-    setFeatures(Array.isArray(template.fields.features) ? (template.fields.features as FeatureItem[]) : []);
-    setFrontend(String(template.fields.frontend || 'React'));
-    setBackend(String(template.fields.backend || 'Node.js'));
-    setDatabase(String(template.fields.database || 'PostgreSQL'));
-    setTools(Array.isArray(template.fields.tools) ? template.fields.tools as string[] : []);
-    // Set more as needed...
+    setFeatures(Array.isArray(fields.features) ? (fields.features as FeatureItem[]) : []);
+    setFeaturePriorities((fields.featurePriorities as Record<string, "must-have" | "nice-to-have">) || {});
+    setDataHandling(String(fields.dataHandling || ''));
+    setOfflineSupport(Boolean(fields.offlineSupport));
+    setPushNotifications(Boolean(fields.pushNotifications));
+    setBackgroundProcesses(Boolean(fields.backgroundProcesses));
+    setErrorHandling(String(fields.errorHandling || ''));
+    setThirdPartyIntegrations(String(fields.thirdPartyIntegrations || ''));
+    setRealTimeFeatures(Boolean(fields.realTimeFeatures));
+    setAnalyticsTracking(String(fields.analyticsTracking || ''));
+    
+    // User Experience & Design
+    setLookAndFeel(String(fields.lookAndFeel || ''));
+    setBrandingGuidelines(String(fields.brandingGuidelines || ''));
+    setUiuxPatterns(Array.isArray(fields.uiuxPatterns) ? fields.uiuxPatterns as string[] : []);
+    setNavigationStructure(String(fields.navigationStructure || ''));
+    setKeyScreens(Array.isArray(fields.keyScreens) ? fields.keyScreens as string[] : []);
+    setMultiLanguageSupport(Boolean(fields.multiLanguageSupport));
+    setThemeCustomization(Boolean(fields.themeCustomization));
+    setAccessibilityFeatures(Array.isArray(fields.accessibilityFeatures) ? fields.accessibilityFeatures as string[] : []);
+    setPrebuiltComponents(String(fields.prebuiltComponents || 'shadcn-ui'));
+    
+    // Tech Stack - Frontend
+    setFrontend(String(fields.frontend || 'React'));
+    setFrontendFrameworks(Array.isArray(fields.frontendFrameworks) ? fields.frontendFrameworks as string[] : []);
+    setBuildTools(String(fields.buildTools || ''));
+    setBrowserCompatibility(String(fields.browserCompatibility || ''));
+    setStateManagement(String(fields.stateManagement || ''));
+    setUiLibraries(String(fields.uiLibraries || ''));
+    setFrontendOptimization(Array.isArray(fields.frontendOptimization) ? fields.frontendOptimization as string[] : []);
+    setApiStructure(String(fields.apiStructure || ''));
+    setFrontendTesting(String(fields.frontendTesting || ''));
+    
+    // Tech Stack - Backend
+    setBackend(String(fields.backend || 'Node.js'));
+    setBackendFrameworks(Array.isArray(fields.backendFrameworks) ? fields.backendFrameworks as string[] : []);
+    setHostingPreferences(String(fields.hostingPreferences || ''));
+    setCachingNeeds(String(fields.cachingNeeds || ''));
+    setApiVersioning(String(fields.apiVersioning || ''));
+    setExpectedTraffic(String(fields.expectedTraffic || ''));
+    setDataFetching(String(fields.dataFetching || ''));
+    setLoggingMonitoring(String(fields.loggingMonitoring || ''));
+    
+    // Constraints
+    setMvpDate(String(fields.mvpDate || ''));
+    setLaunchDate(String(fields.launchDate || ''));
+    setDevBudget(String(fields.devBudget || ''));
+    setInfraBudget(String(fields.infraBudget || ''));
+    setTeamSize(String(fields.teamSize || ''));
+    
+    // Performance & Scale
+    setExpectedUsers(String(fields.expectedUsers || ''));
+    setPerfRequirements(Array.isArray(fields.perfRequirements) ? fields.perfRequirements as string[] : []);
+    setPerformanceBenchmarks(String(fields.performanceBenchmarks || ''));
+    setDeviceNetworkOptimization(String(fields.deviceNetworkOptimization || ''));
+    setScalabilityPlans(String(fields.scalabilityPlans || ''));
+    setCachingStrategies(String(fields.cachingStrategies || ''));
+    setSeoConsiderations(String(fields.seoConsiderations || ''));
+    setMobileOptimizations(String(fields.mobileOptimizations || ''));
+    setLoadTesting(Boolean(fields.loadTesting));
+    setEnvironmentalConsiderations(String(fields.environmentalConsiderations || ''));
+    setSuccessMetrics(String(fields.successMetrics || ''));
+    
+    // Security & Compliance
+    setSecurityReqs(Array.isArray(fields.securityReqs) ? fields.securityReqs as string[] : []);
+    setCompliance(Array.isArray(fields.compliance) ? fields.compliance as string[] : []);
+    setSensitiveData(String(fields.sensitiveData || ''));
+    setAuthenticationMethods(Array.isArray(fields.authenticationMethods) ? fields.authenticationMethods as string[] : []);
+    setAuthorizationLevels(String(fields.authorizationLevels || ''));
+    setEncryptionHashing(String(fields.encryptionHashing || ''));
+    setVulnerabilityPrevention(Array.isArray(fields.vulnerabilityPrevention) ? fields.vulnerabilityPrevention as string[] : []);
+    setSecurityAuditing(Boolean(fields.securityAuditing));
+    setDataRetention(String(fields.dataRetention || ''));
+    setBackupFrequency(String(fields.backupFrequency || ''));
+    setRateLimiting(String(fields.rateLimiting || ''));
+    setDataPrivacy(Array.isArray(fields.dataPrivacy) ? fields.dataPrivacy as string[] : []);
+    
+    // Functionality & Logic
+    setCoreBusinessLogic(String(fields.coreBusinessLogic || ''));
+    setAiMlIntegrations(String(fields.aiMlIntegrations || ''));
+    setPaymentsMonetization(String(fields.paymentsMonetization || ''));
+    setCustomFunctionalities(String(fields.customFunctionalities || ''));
+    setExternalSystems(String(fields.externalSystems || ''));
+    setValidationRules(String(fields.validationRules || ''));
+    setBackgroundJobs(String(fields.backgroundJobs || ''));
+    setMultiTenancy(Boolean(fields.multiTenancy));
+    setUpdateMigrations(String(fields.updateMigrations || ''));
+    
+    // Error-Fixing & Maintenance
+    setCommonErrors(String(fields.commonErrors || ''));
+    setErrorLogTemplates(Boolean(fields.errorLogTemplates));
+    setDebuggingStrategies(String(fields.debuggingStrategies || ''));
+    setVersioningUpdates(String(fields.versioningUpdates || ''));
+    setMaintenanceTasks(String(fields.maintenanceTasks || ''));
+    setTestingTypes(Array.isArray(fields.testingTypes) ? fields.testingTypes as string[] : []);
+    setCicdTools(String(fields.cicdTools || ''));
+    setRollbackPlans(String(fields.rollbackPlans || ''));
+    setUserFeedbackLoops(String(fields.userFeedbackLoops || ''));
+    
+    // Dev Preferences
+    setCodeStyle(String(fields.codeStyle || 'Clean, readable, typed where applicable'));
+    setTestingApproach(String(fields.testingApproach || 'Unit + integration with mocks'));
+    setDocsLevel(String(fields.docsLevel || 'Pragmatic with examples'));
+    setVersionControl(String(fields.versionControl || ''));
+    setDeploymentDetails(String(fields.deploymentDetails || ''));
+    
+    // Additional Context
+    setSimilarProjects(String(fields.similarProjects || ''));
+    setDesignInspiration(String(fields.designInspiration || ''));
+    setSpecialRequirements(String(fields.specialRequirements || ''));
+    setEthicalGuidelines(String(fields.ethicalGuidelines || ''));
+    setLegalRequirements(String(fields.legalRequirements || ''));
+    setSustainabilityGoals(String(fields.sustainabilityGoals || ''));
+    setFutureExpansions(String(fields.futureExpansions || ''));
+    setUniqueAspects(String(fields.uniqueAspects || ''));
+    
+    // Tools
+    setTools(Array.isArray(fields.tools) ? fields.tools as string[] : []);
+    
+    // Technical Details (for TechnicalDetailsBuilder component)
+    if (fields.techDetails && typeof fields.techDetails === 'object') {
+      const techDetailsValue = fields.techDetails as { category: string; details: Record<string, unknown> };
+      const detailsValue = techDetailsValue.details || {};
+      setTechDetails({
+        category: techDetailsValue.category || 'code',
+        details: {
+          frontend: (detailsValue.frontend as string) || frontend || '',
+          backend: (detailsValue.backend as string) || backend || '',
+          database: (detailsValue.database as string) || database || '',
+          tools: Array.isArray(detailsValue.tools) ? (detailsValue.tools as string[]) : (Array.isArray(tools) ? tools : []),
+        }
+      });
+    }
+    
+    toast.success(`Template "${template.name}" applied successfully!`);
   }
 
   // [Track if restore happened for helper message]
@@ -1049,6 +1617,27 @@ export default function CursorBuilderPage() {
       setTimeout(() => setShowRestoreHelper(false), 4200);
     }
   }, []);
+
+  // Restore generation progress from localStorage on mount
+  React.useEffect(() => {
+    if (generationId && generationStep === "prompts") {
+      try {
+        const saved = localStorage.getItem(`cursorBuilder.progress.${generationId}`);
+        if (saved) {
+          const progress = JSON.parse(saved);
+          // Only restore if it's recent (within 24 hours)
+          const age = Date.now() - (progress.timestamp || 0);
+          if (age < 24 * 60 * 60 * 1000 && progress.generatedPrompts) {
+            setGeneratedPrompts(progress.generatedPrompts);
+            generatedPromptsRef.current = progress.generatedPrompts; // Update ref
+            logger.debug("Restored generation progress from localStorage");
+          }
+        }
+      } catch (e) {
+        logger.warn("Failed to restore progress from localStorage", { error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+  }, [generationId, generationStep]);
 
   // Add keyboard shortcut for power users: Ctrl+Alt+R
   React.useEffect(() => {
@@ -1101,6 +1690,47 @@ export default function CursorBuilderPage() {
   if (generationStep !== "form") {
     return (
       <div className="space-y-6 max-w-5xl mx-auto">
+        {/* Loading Screen for PRD Generation */}
+        {generationStep === "prd" && isSubmitting && !prdContent && (
+          <Card className="p-8">
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+              <div className="relative mb-8">
+                {/* Animated spinner with pulsing effect */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute w-16 h-16 border-4 border-primary/20 rounded-full"></div>
+                  <div className="absolute w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                {/* Pulsing dots */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                  </div>
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Generating Product Requirements Document</h2>
+              <p className="text-foreground/60 mb-6 max-w-md">
+                Analyzing your project details and creating a comprehensive PRD...
+              </p>
+              <div className="w-full max-w-md">
+                <div className="h-2 w-full rounded-full bg-secondary/20 overflow-hidden mb-2">
+                  <div 
+                    className="h-full bg-gradient-to-r from-primary via-primary/90 to-primary rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-foreground/50">{progress}% complete</p>
+              </div>
+              <div className="mt-8 p-4 bg-secondary/10 rounded-lg border border-border max-w-md">
+                <p className="text-sm text-foreground/80">
+                  💡 This may take 30-60 seconds. We're analyzing your requirements and creating a detailed document.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* PRD Review */}
         {generationStep === "prd" && prdContent && (
           <Card className="p-6">
@@ -1124,6 +1754,47 @@ export default function CursorBuilderPage() {
                 <div className="h-2 rounded bg-primary transition-[width] duration-300" style={{ width: `${progress}%` }} />
               </div>
             )}
+          </Card>
+        )}
+
+        {/* Loading Screen for User Flows Generation */}
+        {generationStep === "user_flows" && isSubmitting && !userFlowsContent && (
+          <Card className="p-8">
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+              <div className="relative mb-8">
+                {/* Animated spinner with pulsing effect */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute w-16 h-16 border-4 border-primary/20 rounded-full"></div>
+                  <div className="absolute w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                {/* Pulsing dots */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                  </div>
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Generating User Flows</h2>
+              <p className="text-foreground/60 mb-6 max-w-md">
+                Creating detailed user journey maps based on your PRD...
+              </p>
+              <div className="w-full max-w-md">
+                <div className="h-2 w-full rounded-full bg-secondary/20 overflow-hidden mb-2">
+                  <div 
+                    className="h-full bg-gradient-to-r from-primary via-primary/90 to-primary rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-foreground/50">{progress}% complete</p>
+              </div>
+              <div className="mt-8 p-4 bg-secondary/10 rounded-lg border border-border max-w-md">
+                <p className="text-sm text-foreground/80">
+                  💡 Mapping out user interactions and navigation paths for your application.
+                </p>
+              </div>
+            </div>
           </Card>
         )}
 
@@ -1153,6 +1824,47 @@ export default function CursorBuilderPage() {
           </Card>
         )}
 
+        {/* Loading Screen for Tasks Generation */}
+        {generationStep === "tasks" && isSubmitting && !taskFileContent && (
+          <Card className="p-8">
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+              <div className="relative mb-8">
+                {/* Animated spinner with pulsing effect */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute w-16 h-16 border-4 border-primary/20 rounded-full"></div>
+                  <div className="absolute w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                {/* Pulsing dots */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                  </div>
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Generating Task Breakdown</h2>
+              <p className="text-foreground/60 mb-6 max-w-md">
+                Breaking down your project into actionable development tasks...
+              </p>
+              <div className="w-full max-w-md">
+                <div className="h-2 w-full rounded-full bg-secondary/20 overflow-hidden mb-2">
+                  <div 
+                    className="h-full bg-gradient-to-r from-primary via-primary/90 to-primary rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-foreground/50">{progress}% complete</p>
+              </div>
+              <div className="mt-8 p-4 bg-secondary/10 rounded-lg border border-border max-w-md">
+                <p className="text-sm text-foreground/80">
+                  💡 Organizing tasks by priority and dependencies for efficient development.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Tasks Review */}
         {generationStep === "tasks" && taskFileContent && (
           <Card className="p-6">
@@ -1179,19 +1891,161 @@ export default function CursorBuilderPage() {
           </Card>
         )}
 
+        {/* Loading Screen for Lists Generation (before prompts) */}
+        {generationStep === "prompts" && isSubmitting && !generatedLists && (
+          <Card className="p-8">
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+              <div className="relative mb-8">
+                {/* Animated spinner with pulsing effect */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute w-16 h-16 border-4 border-primary/20 rounded-full"></div>
+                  <div className="absolute w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                {/* Pulsing dots */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                  </div>
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Generating Feature Lists</h2>
+              <p className="text-foreground/60 mb-6 max-w-md">
+                Creating lists of screens, endpoints, and features for prompt generation...
+              </p>
+              <div className="w-full max-w-md">
+                <div className="h-2 w-full rounded-full bg-secondary/20 overflow-hidden mb-2">
+                  <div 
+                    className="h-full bg-gradient-to-r from-primary via-primary/90 to-primary rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-foreground/50">{progress}% complete</p>
+              </div>
+              <div className="mt-8 p-4 bg-secondary/10 rounded-lg border border-border max-w-md">
+                <p className="text-sm text-foreground/80">
+                  💡 Analyzing your project structure to identify all components that need prompts.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Prompt Generation Progress - Enhanced UI */}
-        {generationStep === "prompts" && (
+        {generationStep === "prompts" && generatedLists && (
           <Card className="p-6">
             <div className="mb-6 text-center">
-              <div className="mb-4">
-                {/* Animated spinner */}
-                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              {/* Resume Generation Button - if stopped but not complete */}
+              {!isSubmitting && !generationError && getGenerationProgress && 
+               getGenerationProgress.completedPrompts < getGenerationProgress.totalPrompts && (
+                <div className="mb-4 p-4 bg-secondary/10 border border-border rounded-lg">
+                  <p className="text-sm text-foreground/80 mb-3">
+                    Generation paused. {getGenerationProgress.completedPrompts} of {getGenerationProgress.totalPrompts} prompts completed.
+                  </p>
+                  <Button 
+                    onClick={() => {
+                      // Sync state from backend
+                      if (getGenerationProgress.generatedPrompts) {
+                        setGeneratedPrompts(getGenerationProgress.generatedPrompts);
+                        generatedPromptsRef.current = getGenerationProgress.generatedPrompts; // Update ref
+                      }
+                      if (getGenerationProgress.screenList && !generatedLists.screenList) {
+                        const updatedLists = {
+                          ...generatedLists,
+                          screenList: getGenerationProgress.screenList,
+                        };
+                        setGeneratedLists(updatedLists);
+                        generatedListsRef.current = updatedLists; // Update ref
+                      }
+                      setGenerationError(null);
+                      setIsSubmitting(true);
+                      generateNextPrompt(generatedListsRef.current || generatedLists);
+                    }}
+                    variant="default"
+                    size="sm"
+                  >
+                    Resume Generation
+                  </Button>
+                </div>
+              )}
+              
+              {/* Error Display */}
+              {generationError && (
+                <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-left">
+                  <div className="flex items-start gap-2">
+                    <div className="text-destructive text-lg">⚠️</div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-destructive mb-1">Generation Error</h3>
+                      <p className="text-sm text-foreground/80 mb-3">{generationError}</p>
+                      <Button 
+                        onClick={() => {
+                          setGenerationError(null);
+                          setIsSubmitting(true);
+                          generateNextPrompt();
+                        }}
+                        variant="default"
+                        size="sm"
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {!generationError && (
+                <div className="mb-4">
+                  {/* Enhanced animated spinner */}
+                  <div className="relative inline-block">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="absolute w-12 h-12 border-4 border-primary/20 rounded-full"></div>
+                      <div className="absolute w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                    {/* Pulsing center dot */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-3 h-3 bg-primary rounded-full animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold">Generating Prompts</h2>
+                {isSubmitting && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      if (confirm("Are you sure you want to cancel generation? You can resume later.")) {
+                        setIsSubmitting(false);
+                        setCurrentPromptIndex(null);
+                        setGenerationError(null);
+                        // Update backend status to cancelled
+                        if (generationId) {
+                          try {
+                            await updateGenerationStatus({
+                              generationId: generationId as GenerationId,
+                              status: "cancelled",
+                            });
+                          } catch (e) {
+                            logger.error("Failed to update status to cancelled", { error: e instanceof Error ? e.message : String(e) });
+                          }
+                        }
+                        toast.info("Generation cancelled. You can resume later.");
+                      }
+                    }}
+                  >
+                    Cancel Generation
+                  </Button>
+                )}
               </div>
-              <h2 className="text-2xl font-bold mb-2">Generating Prompts</h2>
               <p className="text-foreground/60 mb-4">
-                {currentPromptIndex 
-                  ? `Creating prompt for: ${currentPromptIndex.name} (${currentPromptIndex.type})`
-                  : "Preparing to generate prompts..."}
+                {generationError 
+                  ? "Generation paused due to error"
+                  : currentPromptIndex 
+                    ? `Creating prompt for: ${currentPromptIndex.name} (${currentPromptIndex.type})`
+                    : "Preparing to generate prompts..."}
               </p>
               
               {/* Progress with stats */}
@@ -1281,10 +2135,10 @@ export default function CursorBuilderPage() {
               <div>
                 <h3 className="font-semibold mb-2">Generated Prompts</h3>
                 <div className="space-y-2 max-h-[40vh] overflow-y-auto">
-                  {Object.entries(generatedPrompts).map(([type, prompts]: [string, any]) => (
+                  {Object.entries(generatedPrompts).map(([type, prompts]: [string, GeneratedItem[] | undefined]) => (
                     <div key={type} className="border border-border rounded p-3">
                       <div className="font-medium text-sm mb-2 capitalize">{type.replace("_", " ")}</div>
-                      {Array.isArray(prompts) && prompts.map((p: any, idx: number) => (
+                      {Array.isArray(prompts) && prompts.map((p: GeneratedItem, idx: number) => (
                         <div key={idx} className="text-xs text-foreground/70 mb-1">
                           {idx + 1}. {p.title}
                         </div>
@@ -1386,7 +2240,14 @@ export default function CursorBuilderPage() {
                   <Label htmlFor="projectType">
                     <TooltipWrapper content="What kind of app are you building?" glossaryTerm="Project Type">Project Type</TooltipWrapper>
                   </Label>
-                  <select id="projectType" title="Select Project Type" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm focus-visible:ring-2 ring-primary" value={projectType} onChange={(e) => setProjectType(e.target.value)} required>
+                  <select 
+                    id="projectType" 
+                    aria-label="Select Project Type"
+                    className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm focus-visible:ring-2 ring-primary" 
+                    value={projectType} 
+                    onChange={(e) => setProjectType(e.target.value)} 
+                    required
+                  >
                     { ["web app","mobile app","API","desktop app","library","cli"].map((t) => <option key={t}>{t}</option>) }
                   </select>
                 </div>
@@ -1398,36 +2259,86 @@ export default function CursorBuilderPage() {
                 <Input className="mt-2" maxLength={100} value={oneSentence} onChange={(e) => setOneSentence(e.target.value)} placeholder="Describe the core purpose in one sentence" required />
               </div>
               <div>
-                <Label>Overview / Main Purpose</Label>
+                <Label>
+                  <TooltipWrapper content="A detailed description of what you're building, who it's for, and how it will be used. This helps us understand your project's purpose and goals.">
+                    Overview / Main Purpose
+                  </TooltipWrapper>
+                </Label>
                 <Textarea className="mt-2" rows={4} value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} placeholder="What are you building? Who is it for? Key workflows?" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Describe your app's purpose, target users, and main features. The more detail, the better we can help you.
+                </p>
               </div>
               <div>
-                <Label htmlFor="isNewApp">Is this a new app, enhancement, or prototype?</Label>
-                <select id="isNewApp" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" value={isNewApp} onChange={(e) => setIsNewApp(e.target.value as any)} required>
+                <Label htmlFor="isNewApp">
+                  <TooltipWrapper content="Whether you're starting fresh, improving an existing app, or creating a prototype to test ideas.">
+                    Is this a new app, enhancement, or prototype?
+                  </TooltipWrapper>
+                </Label>
+                <select 
+                  id="isNewApp" 
+                  aria-label="Is this a new app, enhancement, or prototype?"
+                  className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" 
+                  value={isNewApp} 
+                  onChange={(e) => setIsNewApp(e.target.value as "new" | "enhancement" | "prototype")} 
+                  required
+                >
                   <option value="new">New app from scratch</option>
                   <option value="enhancement">Enhancement to existing app</option>
                   <option value="prototype">Prototype</option>
                 </select>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: New = starting from nothing. Enhancement = adding to existing app. Prototype = testing ideas before full build.
+                </p>
               </div>
               <div>
-                <Label htmlFor="githubUrl">Existing GitHub Repository URL (optional)</Label>
+                <Label htmlFor="githubUrl">
+                  <TooltipWrapper content="If you already have code in a GitHub repository, share the link so we can analyze it and auto-fill relevant information.">
+                    Existing GitHub Repository URL (optional)
+                  </TooltipWrapper>
+                </Label>
                 <Input id="githubUrl" className="mt-2" value={githubUrl} onChange={(e) => setGithubUrl(e.target.value)} placeholder="https://github.com/username/repo" />
                 <p className="text-xs text-foreground/60 mt-1">We'll analyze it for auto-population</p>
               </div>
               <div>
-                <Label htmlFor="timeline">Desired Timeline</Label>
+                <Label htmlFor="timeline">
+                  <TooltipWrapper content="When you want to complete different phases of your project. This helps plan the development process.">
+                    Desired Timeline
+                  </TooltipWrapper>
+                </Label>
                 <Input id="timeline" className="mt-2" value={timeline} onChange={(e) => setTimeline(e.target.value)} placeholder="e.g., MVP in 2 weeks, full launch in 3 months" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Be realistic about timelines. Consider MVP (minimum viable product) first, then full launch.
+                </p>
               </div>
               <div>
-                <Label htmlFor="budget">Budget or Resource Constraints</Label>
-                <Input id="budget" className="mt-2" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="e.g., solo developer, small team, specific tools" required />
+                <Label htmlFor="budget">
+                  <TooltipWrapper content="Your available resources, team size, or budget constraints. This helps determine what's feasible for your project.">
+                    Budget or Resource Constraints
+                  </TooltipWrapper>
+                </Label>
+                <Input id="budget" className="mt-2" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="e.g., solo developer, small team, specific tools, or budget range" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Describe your team size, budget, or any constraints (like specific tools you must use).
+                </p>
               </div>
               <div>
-                <Label htmlFor="competitors">Similar Apps or Competitors</Label>
+                <Label htmlFor="competitors">
+                  <TooltipWrapper content="Apps or services similar to what you're building. This helps us understand the market and what makes your app unique.">
+                    Similar Apps or Competitors
+                  </TooltipWrapper>
+                </Label>
                 <Textarea id="competitors" className="mt-2" rows={3} value={competitors} onChange={(e) => setCompetitors(e.target.value)} placeholder="List them and what you'd like to differentiate (e.g., 'Like Strava but with AI coaching')" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Mention similar apps and explain how yours will be different or better. This helps define your unique value.
+                </p>
               </div>
               <div>
-                <Label>Upload Documents, Design Inspirations, Wireframes, or Mockups</Label>
+                <Label>
+                  <TooltipWrapper content="Upload any design files, wireframes, mockups, or inspiration images that show what you want your app to look like. These help us understand your vision.">
+                    Upload Documents, Design Inspirations, Wireframes, or Mockups
+                  </TooltipWrapper>
+                </Label>
                 <Input 
                   type="file" 
                   className="mt-2" 
@@ -1457,7 +2368,11 @@ export default function CursorBuilderPage() {
                 onChange={(v) => setAudienceSummary(v)}
               />
               <div>
-                <Label>Platforms to Support</Label>
+                <Label>
+                  <TooltipWrapper content="Which devices and platforms should your app work on? You can select multiple platforms if your app needs to work across different devices.">
+                    Platforms to Support
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["Web", "iOS", "Android", "Desktop", "Cross-platform"].map((platform) => {
                     const active = platforms.includes(platform);
@@ -1476,6 +2391,9 @@ export default function CursorBuilderPage() {
                     );
                   })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Web = browsers. iOS = iPhones/iPads. Android = Android phones/tablets. Desktop = Windows/Mac/Linux apps. Cross-platform = works on multiple platforms.
+                </p>
               </div>
             </div>
           )}
@@ -1484,31 +2402,82 @@ export default function CursorBuilderPage() {
             <div className="space-y-4">
               <h2 className="text-base font-semibold tracking-tight">Problem & Goals</h2>
               <div>
-                <Label>Problem statement</Label>
-                <Textarea className="mt-2" rows={3} value={problemStatement} onChange={(e) => setProblemStatement(e.target.value)} placeholder="What problem does this solve?" required />
+                <Label>
+                  <TooltipWrapper content="The specific problem or challenge your app addresses. Clearly defining the problem helps ensure your app solves a real need.">
+                    Problem statement
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={problemStatement} onChange={(e) => setProblemStatement(e.target.value)} placeholder="What problem does this solve? (e.g., 'People struggle to find reliable local service providers')" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Be specific about the problem. Who has this problem? Why is it a problem? What makes it worth solving?
+                </p>
               </div>
               <div>
-                <Label htmlFor="primaryGoal">Primary goal</Label>
-                <select id="primaryGoal" title="Select Primary Goal" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" value={primaryGoal} onChange={(e) => setPrimaryGoal(e.target.value)} required>
+                <Label htmlFor="primaryGoal">
+                  <TooltipWrapper content="The main objective you want to achieve with your app. This is the primary reason you're building it.">
+                    Primary goal
+                  </TooltipWrapper>
+                </Label>
+                <select 
+                  id="primaryGoal" 
+                  aria-label="Select Primary Goal"
+                  className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" 
+                  value={primaryGoal} 
+                  onChange={(e) => setPrimaryGoal(e.target.value)} 
+                  required
+                >
                   <option value="">Select...</option>
                   {["Increase efficiency","Reduce costs","Improve user experience","Enable new capability","Other"].map((t) => <option key={t}>{t}</option>)}
                 </select>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Choose the main goal that drives your project. This helps prioritize features and decisions.
+                </p>
               </div>
               <div>
-                <Label>Success criteria</Label>
+                <Label>
+                  <TooltipWrapper content="Measurable outcomes that define success for your app. These are specific, trackable goals that show your app is working.">
+                    Success criteria
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 space-y-2">
                   {successCriteria.map((c, i) => (
                     <div key={i} className="flex gap-2">
-                      <Input title="Enter Success Criteria" value={c} onChange={(e) => updateCriteria(i, e.target.value)} placeholder="Measurable outcome" required />
+                      <Label htmlFor={`success-criteria-${i}`} className="sr-only">Success Criteria {i + 1}</Label>
+                      <Input 
+                        id={`success-criteria-${i}`}
+                        value={c} 
+                        onChange={(e) => updateCriteria(i, e.target.value)} 
+                        placeholder="Measurable outcome (e.g., '1000 users in first month')" 
+                        required 
+                      />
                       <Button variant="outline" size="sm" onClick={() => removeCriteria(i)}>Remove</Button>
                     </div>
                   ))}
                 </div>
                 <Button className="mt-2" variant="outline" size="sm" onClick={addCriteria}>Add Criteria</Button>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Make criteria specific and measurable. Examples: "1000 signups in first month" or "90% user satisfaction rating".
+                </p>
               </div>
               <div>
-                <Label>Analytics & Tracking Requirements</Label>
-                <Textarea className="mt-2" rows={3} value={analyticsTracking} onChange={(e) => setAnalyticsTracking(e.target.value)} placeholder="What metrics do you want to track? (e.g., user engagement, conversion rates, performance metrics)" required />
+                <Label>
+                  <TooltipWrapper content="What data and metrics you want to track to understand how users interact with your app and measure its success.">
+                    Analytics & Tracking Requirements
+                  </TooltipWrapper>
+                </Label>
+                <Label htmlFor="analyticsTracking" className="sr-only">Analytics & Tracking Requirements</Label>
+                <Textarea 
+                  id="analyticsTracking"
+                  className="mt-2" 
+                  rows={3} 
+                  value={analyticsTracking} 
+                  onChange={(e) => setAnalyticsTracking(e.target.value)} 
+                  placeholder="What metrics do you want to track? (e.g., user engagement, conversion rates, performance metrics)" 
+                  required 
+                />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Think about what you want to measure: user signups, page views, feature usage, conversion rates, etc.
+                </p>
               </div>
             </div>
           )}
@@ -1537,11 +2506,20 @@ export default function CursorBuilderPage() {
                           }
                         }}
                       >{idx + 1}</Badge>
-                      <Input value={f.name} onChange={(e) => setFeatures((arr) => arr.map((x) => x.id === f.id ? { ...x, name: e.target.value } : x))} className="flex-1" aria-label={`Feature ${idx + 1} name`} required />
+                      <Input 
+                        id={`feature-name-${f.id}`}
+                        value={f.name} 
+                        onChange={(e) => setFeatures((arr) => arr.map((x) => x.id === f.id ? { ...x, name: e.target.value } : x))} 
+                        className="flex-1" 
+                        aria-label={`Feature ${idx + 1} name`} 
+                        required 
+                      />
                       <select 
+                        id={`feature-priority-${f.id}`}
+                        aria-label={`Feature ${idx + 1} priority`}
                         className="rounded-md border border-border bg-background p-2 text-sm"
                         value={featurePriorities[f.id] || "must-have"}
-                        onChange={(e) => setFeaturePriorities((prev) => ({ ...prev, [f.id]: e.target.value as any }))}
+                        onChange={(e) => setFeaturePriorities((prev) => ({ ...prev, [f.id]: e.target.value as "must-have" | "nice-to-have" }))}
                       >
                         <option value="must-have">Must Have</option>
                         <option value="nice-to-have">Nice to Have</option>
@@ -1550,42 +2528,91 @@ export default function CursorBuilderPage() {
                     </div>
                     <div className="mt-2">
                       <Label>Description</Label>
-                      <textarea className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" rows={3} value={f.description} onChange={(e) => setFeatures((arr) => arr.map((x) => x.id === f.id ? { ...x, description: e.target.value } : x))} aria-label={`Feature ${idx + 1} description`} required />
+                      <Label htmlFor={`feature-description-${f.id}`} className="sr-only">Feature {idx + 1} Description</Label>
+                      <textarea 
+                        id={`feature-description-${f.id}`}
+                        className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" 
+                        rows={3} 
+                        value={f.description} 
+                        onChange={(e) => setFeatures((arr) => arr.map((x) => x.id === f.id ? { ...x, description: e.target.value } : x))} 
+                        required 
+                      />
                     </div>
                   </li>
                 ))}
                 {!features.length && <li className="text-sm text-foreground/60">No features yet. Add at least one.</li>}
               </ul>
               <div>
-                <Label>Data Handling & Storage</Label>
+                <Label>
+                  <TooltipWrapper content="How your app will store, process, and manage data. This includes user information, files, media, and any other data your app needs.">
+                    Data Handling & Storage
+                  </TooltipWrapper>
+                </Label>
                 <Textarea className="mt-2" rows={3} value={dataHandling} onChange={(e) => setDataHandling(e.target.value)} placeholder="How will data be stored, processed, and managed? (e.g., user data, files, media)" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Describe what data you'll store (user profiles, files, images, etc.) and how it will be organized and managed.
+                </p>
               </div>
               <div className="space-y-2">
-                <Label>Additional Feature Capabilities</Label>
+                <Label>
+                  <TooltipWrapper content="Additional capabilities your app might need beyond basic features. These enhance functionality and user experience.">
+                    Additional Feature Capabilities
+                  </TooltipWrapper>
+                </Label>
                 <div className="flex items-center gap-2">
                   <input type="checkbox" id="offlineSupport" checked={offlineSupport} onChange={(e) => setOfflineSupport(e.target.checked)} />
-                  <Label htmlFor="offlineSupport" className="font-normal">Offline Support</Label>
+                  <Label htmlFor="offlineSupport" className="font-normal">
+                    <TooltipWrapper content="Your app works even when users don't have internet connection. Data syncs when connection is restored.">
+                      Offline Support
+                    </TooltipWrapper>
+                  </Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <input type="checkbox" id="pushNotifications" checked={pushNotifications} onChange={(e) => setPushNotifications(e.target.checked)} />
-                  <Label htmlFor="pushNotifications" className="font-normal">Push Notifications</Label>
+                  <Label htmlFor="pushNotifications" className="font-normal">
+                    <TooltipWrapper content="Notifications sent to users' devices even when they're not using your app. Like text messages from your app.">
+                      Push Notifications
+                    </TooltipWrapper>
+                  </Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <input type="checkbox" id="backgroundProcesses" checked={backgroundProcesses} onChange={(e) => setBackgroundProcesses(e.target.checked)} />
-                  <Label htmlFor="backgroundProcesses" className="font-normal">Background Processes</Label>
+                  <Label htmlFor="backgroundProcesses" className="font-normal">
+                    <TooltipWrapper content="Tasks your app does automatically in the background, like syncing data or processing files, without user interaction.">
+                      Background Processes
+                    </TooltipWrapper>
+                  </Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <input type="checkbox" id="realTimeFeatures" checked={realTimeFeatures} onChange={(e) => setRealTimeFeatures(e.target.checked)} />
-                  <Label htmlFor="realTimeFeatures" className="font-normal">Real-time Features</Label>
+                  <Label htmlFor="realTimeFeatures" className="font-normal">
+                    <TooltipWrapper content="Features that update instantly, like live chat, real-time collaboration, or live updates that appear immediately.">
+                      Real-time Features
+                    </TooltipWrapper>
+                  </Label>
                 </div>
               </div>
               <div>
-                <Label>Error Handling Strategy</Label>
-                <Textarea className="mt-2" rows={3} value={errorHandling} onChange={(e) => setErrorHandling(e.target.value)} placeholder="How should errors be handled and displayed to users?" required />
+                <Label>
+                  <TooltipWrapper content="How your app will handle and display errors to users. Good error handling shows helpful messages instead of confusing technical errors.">
+                    Error Handling Strategy
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={errorHandling} onChange={(e) => setErrorHandling(e.target.value)} placeholder="How should errors be handled and displayed to users? (e.g., friendly error messages, retry options)" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Think about how users should see errors. Friendly messages like "Something went wrong, please try again" are better than technical error codes.
+                </p>
               </div>
               <div>
-                <Label>Third-Party Integrations</Label>
+                <Label>
+                  <TooltipWrapper content="External services or tools your app needs to connect with, like payment processors, email services, or cloud storage.">
+                    Third-Party Integrations
+                  </TooltipWrapper>
+                </Label>
                 <Textarea className="mt-2" rows={3} value={thirdPartyIntegrations} onChange={(e) => setThirdPartyIntegrations(e.target.value)} placeholder="List any third-party services, APIs, or tools to integrate (e.g., Stripe, SendGrid, AWS)" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: List services you need: payment (Stripe, PayPal), email (SendGrid, Mailchimp), storage (AWS, Google Cloud), etc.
+                </p>
               </div>
             </div>
           )}
@@ -1594,24 +2621,57 @@ export default function CursorBuilderPage() {
             <div className="space-y-4">
               <h2 className="text-base font-semibold tracking-tight">User Experience & Design</h2>
               <div>
-                <Label>Pre-built Component Library</Label>
-                <select className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" value={prebuiltComponents} onChange={(e) => setPrebuiltComponents(e.target.value)} required>
+                <Label>
+                  <TooltipWrapper content="Pre-built design components and UI elements you want to use. These provide ready-made buttons, forms, and other interface elements.">
+                    Pre-built Component Library
+                  </TooltipWrapper>
+                </Label>
+                <Label htmlFor="prebuiltComponents" className="sr-only">Pre-built Component Library</Label>
+                <select 
+                  id="prebuiltComponents"
+                  aria-label="Pre-built Component Library"
+                  className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" 
+                  value={prebuiltComponents} 
+                  onChange={(e) => setPrebuiltComponents(e.target.value)} 
+                  required
+                >
                   <option value="shadcn-ui">shadcn-ui</option>
                   <option value="kero-ui">Kero UI</option>
                   <option value="tweak-cn">Tweak CN</option>
                   <option value="custom">Custom/Build from scratch</option>
                 </select>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Component libraries provide ready-made UI elements. shadcn-ui is popular and customizable. Custom means building everything from scratch.
+                </p>
               </div>
               <div>
-                <Label>Look & Feel / Design Style</Label>
+                <Label>
+                  <TooltipWrapper content="The visual style and aesthetic you want for your app. This describes how it should look and feel to users.">
+                    Look & Feel / Design Style
+                  </TooltipWrapper>
+                </Label>
                 <Textarea className="mt-2" rows={3} value={lookAndFeel} onChange={(e) => setLookAndFeel(e.target.value)} placeholder="Describe the desired look and feel (e.g., modern, minimalist, colorful, professional)" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Use descriptive words like: modern, minimalist, colorful, professional, playful, elegant, bold, etc.
+                </p>
               </div>
               <div>
-                <Label>Branding Guidelines</Label>
-                <Textarea className="mt-2" rows={3} value={brandingGuidelines} onChange={(e) => setBrandingGuidelines(e.target.value)} placeholder="Brand colors, fonts, logo usage, tone of voice" required />
+                <Label>
+                  <TooltipWrapper content="Your brand's visual identity including colors, fonts, logo usage, and the tone of voice used in your app.">
+                    Branding Guidelines
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={brandingGuidelines} onChange={(e) => setBrandingGuidelines(e.target.value)} placeholder="Brand colors, fonts, logo usage, tone of voice (e.g., 'Blue and white, modern sans-serif font, friendly and approachable')" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Describe your brand colors, fonts, logo placement, and the tone (professional, friendly, playful, etc.).
+                </p>
               </div>
               <div>
-                <Label>UI/UX Patterns</Label>
+                <Label>
+                  <TooltipWrapper content="Design patterns and styles that guide how your app's interface is organized and how users interact with it.">
+                    UI/UX Patterns
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["Material Design", "iOS Human Interface", "Custom", "Minimalist", "Card-based", "Dashboard-style"].map((pattern) => {
                     const active = uiuxPatterns.includes(pattern);
@@ -1630,36 +2690,76 @@ export default function CursorBuilderPage() {
                     );
                   })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Material Design = Google's style. iOS Human Interface = Apple's style. Custom = your own style. Select patterns that match your vision.
+                </p>
               </div>
               <div>
-                <Label>Navigation Structure</Label>
+                <Label>
+                  <TooltipWrapper content="How users will move around your app and access different sections. This is like the menu system of your app.">
+                    Navigation Structure
+                  </TooltipWrapper>
+                </Label>
                 <Textarea className="mt-2" rows={3} value={navigationStructure} onChange={(e) => setNavigationStructure(e.target.value)} placeholder="How should users navigate? (e.g., sidebar, top nav, tabs, bottom nav)" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Describe the navigation style: sidebar menu, top navigation bar, bottom tabs (like mobile apps), or a combination.
+                </p>
               </div>
               <div>
-                <Label>Key Screens / Pages</Label>
+                <Label>
+                  <TooltipWrapper content="The main pages or screens your app will have. These are the different views users will see as they use your app.">
+                    Key Screens / Pages
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 space-y-2">
                   {keyScreens.map((screen, i) => (
                     <div key={i} className="flex gap-2">
-                      <Input value={screen} onChange={(e) => setKeyScreens((arr) => arr.map((s, idx) => idx === i ? e.target.value : s))} placeholder="Screen name (e.g., Home, Dashboard, Profile)" required />
+                      <Label htmlFor={`key-screen-${i}`} className="sr-only">Key Screen {i + 1}</Label>
+                      <Input 
+                        id={`key-screen-${i}`}
+                        value={screen} 
+                        onChange={(e) => setKeyScreens((arr) => arr.map((s, idx) => idx === i ? e.target.value : s))} 
+                        placeholder="Screen name (e.g., Home, Dashboard, Profile)" 
+                        required 
+                      />
                       <Button variant="outline" size="sm" onClick={() => setKeyScreens((arr) => arr.filter((_, idx) => idx !== i))}>Remove</Button>
                     </div>
                   ))}
                 </div>
                 <Button className="mt-2" variant="outline" size="sm" onClick={() => setKeyScreens((arr) => [...arr, ""])}>Add Screen</Button>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: List the main pages: Home, Login, Dashboard, Profile, Settings, etc. Think about what screens users need to accomplish their goals.
+                </p>
               </div>
               <div className="space-y-2">
-                <Label>Additional UX Features</Label>
+                <Label>
+                  <TooltipWrapper content="Additional user experience features that enhance how users interact with your app.">
+                    Additional UX Features
+                  </TooltipWrapper>
+                </Label>
                 <div className="flex items-center gap-2">
                   <input type="checkbox" id="multiLanguageSupport" checked={multiLanguageSupport} onChange={(e) => setMultiLanguageSupport(e.target.checked)} />
-                  <Label htmlFor="multiLanguageSupport" className="font-normal">Multi-language Support</Label>
+                  <Label htmlFor="multiLanguageSupport" className="font-normal">
+                    <TooltipWrapper content="Your app can display in multiple languages, allowing users to choose their preferred language.">
+                      Multi-language Support
+                    </TooltipWrapper>
+                  </Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <input type="checkbox" id="themeCustomization" checked={themeCustomization} onChange={(e) => setThemeCustomization(e.target.checked)} />
-                  <Label htmlFor="themeCustomization" className="font-normal">Theme Customization (Dark/Light mode)</Label>
+                  <Label htmlFor="themeCustomization" className="font-normal">
+                    <TooltipWrapper content="Users can switch between light and dark themes, or customize colors to their preference.">
+                      Theme Customization (Dark/Light mode)
+                    </TooltipWrapper>
+                  </Label>
                 </div>
               </div>
               <div>
-                <Label>Accessibility Features</Label>
+                <Label>
+                  <TooltipWrapper content="Features that make your app usable by people with disabilities, ensuring everyone can use your app effectively.">
+                    Accessibility Features
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["Screen reader support", "Keyboard navigation", "High contrast", "ARIA labels", "Focus indicators"].map((feature) => {
                     const active = accessibilityFeatures.includes(feature);
@@ -1678,6 +2778,9 @@ export default function CursorBuilderPage() {
                     );
                   })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: These make your app accessible to everyone. Screen reader = for visually impaired. Keyboard navigation = use without mouse. High contrast = easier to see. ARIA labels = help screen readers. Focus indicators = show where you are.
+                </p>
               </div>
             </div>
           )}
@@ -1690,7 +2793,11 @@ export default function CursorBuilderPage() {
                 onChange={handleTechDetailsChange}
               />
               <div>
-                <Label>Frontend Frameworks</Label>
+                <Label>
+                  <TooltipWrapper content="The technology framework that powers your app's user interface. These are popular tools developers use to build interactive web applications.">
+                    What technology should power your app's interface?
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["React", "Vue", "Angular", "Next.js", "Svelte", "Remix"].map((fw) => {
                     const active = frontendFrameworks.includes(fw);
@@ -1709,25 +2816,60 @@ export default function CursorBuilderPage() {
                     );
                   })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: If you're not sure, React or Next.js are popular choices. You can select multiple if needed.
+                </p>
               </div>
               <div>
-                <Label>Build Tools</Label>
-                <Input className="mt-2" value={buildTools} onChange={(e) => setBuildTools(e.target.value)} placeholder="Vite, Webpack, Turbopack, etc." required />
+                <Label>
+                  <TooltipWrapper content="Tools that package and optimize your app code so it runs efficiently in users' browsers. Think of it as preparing your app for delivery.">
+                    How should your app be prepared for users?
+                  </TooltipWrapper>
+                </Label>
+                <Input className="mt-2" value={buildTools} onChange={(e) => setBuildTools(e.target.value)} placeholder="e.g., Vite, Webpack, Turbopack, or describe your build process needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: If you don't know, you can write "automated build process" or leave it to be determined.
+                </p>
               </div>
               <div>
-                <Label>Browser Compatibility</Label>
-                <Input className="mt-2" value={browserCompatibility} onChange={(e) => setBrowserCompatibility(e.target.value)} placeholder="e.g., Chrome 90+, Safari 14+, Firefox 88+" required />
+                <Label>
+                  <TooltipWrapper content="Which web browsers should your app work in? Different browsers may need different support.">
+                    Which browsers should your app work on?
+                  </TooltipWrapper>
+                </Label>
+                <Input className="mt-2" value={browserCompatibility} onChange={(e) => setBrowserCompatibility(e.target.value)} placeholder="e.g., Chrome 90+, Safari 14+, Firefox 88+, or 'all modern browsers'" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Most apps support "all modern browsers" (Chrome, Firefox, Safari, Edge from recent years).
+                </p>
               </div>
               <div>
-                <Label>State Management</Label>
-                <Input className="mt-2" value={stateManagement} onChange={(e) => setStateManagement(e.target.value)} placeholder="Redux, Zustand, Jotai, Context API, etc." required />
+                <Label>
+                  <TooltipWrapper content="How your app remembers and updates information as users interact with it. Think of it like the app's memory system that tracks what users do.">
+                    How should your app remember information?
+                  </TooltipWrapper>
+                </Label>
+                <Input className="mt-2" value={stateManagement} onChange={(e) => setStateManagement(e.target.value)} placeholder="e.g., Redux, Zustand, Jotai, Context API, or describe what needs to be remembered" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: If you're not sure, just describe what your app needs to remember (like user preferences, shopping cart items, login status, etc.).
+                </p>
               </div>
               <div>
-                <Label>UI Libraries</Label>
-                <Input className="mt-2" value={uiLibraries} onChange={(e) => setUiLibraries(e.target.value)} placeholder="Tailwind CSS, Material-UI, Chakra UI, etc." required />
+                <Label>
+                  <TooltipWrapper content="Design systems and styling tools that help create consistent, beautiful user interfaces. These provide pre-built components and styling.">
+                    What design system should your app use?
+                  </TooltipWrapper>
+                </Label>
+                <Input className="mt-2" value={uiLibraries} onChange={(e) => setUiLibraries(e.target.value)} placeholder="e.g., Tailwind CSS, Material-UI, Chakra UI, or describe your design needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: These help make your app look professional and consistent. Tailwind CSS is a popular choice.
+                </p>
               </div>
               <div>
-                <Label>Frontend Optimizations</Label>
+                <Label>
+                  <TooltipWrapper content="Techniques to make your app load faster and run more smoothly. These help improve user experience by reducing wait times.">
+                    How should your app load quickly?
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["Code splitting", "Lazy loading", "Image optimization", "Bundle size optimization", "CDN usage"].map((opt) => {
                     const active = frontendOptimization.includes(opt);
@@ -1746,14 +2888,31 @@ export default function CursorBuilderPage() {
                     );
                   })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: These are all good practices for making apps fast. You can select multiple options.
+                </p>
               </div>
               <div>
-                <Label>API Structure & Integration</Label>
-                <Textarea className="mt-2" rows={3} value={apiStructure} onChange={(e) => setApiStructure(e.target.value)} placeholder="How will frontend interact with backend? (REST, GraphQL, tRPC, etc.)" required />
+                <Label>
+                  <TooltipWrapper content="The way your app sends and receives data from backend servers. This is how the user interface communicates with the server to get or save information.">
+                    How should your app communicate with servers?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={apiStructure} onChange={(e) => setApiStructure(e.target.value)} placeholder="e.g., REST, GraphQL, tRPC, or describe how your app needs to exchange data with the server" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: REST is the most common approach. If you're not sure, describe what your app needs to send or receive (like user data, files, messages, etc.).
+                </p>
               </div>
               <div>
-                <Label>Frontend Testing Strategy</Label>
-                <Textarea className="mt-2" rows={3} value={frontendTesting} onChange={(e) => setFrontendTesting(e.target.value)} placeholder="Testing frameworks and approach (Jest, Vitest, Playwright, Cypress, etc.)" required />
+                <Label>
+                  <TooltipWrapper content="How your app will be tested to ensure it works correctly. Testing helps catch bugs and ensures features work as expected before users see them.">
+                    How should your app be tested?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={frontendTesting} onChange={(e) => setFrontendTesting(e.target.value)} placeholder="e.g., Jest, Vitest, Playwright, Cypress, or describe your testing needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Testing ensures quality. If you're not sure, describe what you want to test (like user interactions, forms, navigation, etc.).
+                </p>
               </div>
             </div>
           )}
@@ -1762,11 +2921,22 @@ export default function CursorBuilderPage() {
             <div className="space-y-4">
               <h2 className="text-base font-semibold tracking-tight">Tech Stack - Backend</h2>
               <div>
-                <Label>Backend Framework</Label>
-                <Input className="mt-2" value={backend} onChange={(e) => setBackend(e.target.value)} placeholder="Node.js, Python, etc." required />
+                <Label>
+                  <TooltipWrapper content="The programming language and runtime environment that powers your app's server. This handles the business logic and data processing.">
+                    What technology should power your app's server?
+                  </TooltipWrapper>
+                </Label>
+                <Input className="mt-2" value={backend} onChange={(e) => setBackend(e.target.value)} placeholder="e.g., Node.js, Python, or describe your server technology needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Node.js and Python are popular choices. If you're not sure, describe what your server needs to do.
+                </p>
               </div>
               <div>
-                <Label>Backend Frameworks</Label>
+                <Label>
+                  <TooltipWrapper content="Tools and libraries that help build and organize your server code. These provide structure and common functionality.">
+                    What tools should handle server logic?
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["Express", "FastAPI", "NestJS", "Django", "Flask", "Spring Boot", "Laravel"].map((fw) => {
                     const active = backendFrameworks.includes(fw);
@@ -1785,34 +2955,95 @@ export default function CursorBuilderPage() {
                     );
                   })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: These are popular server frameworks. Express (Node.js) and FastAPI (Python) are common choices.
+                </p>
               </div>
               <div>
-                <Label>Database</Label>
-                <Input className="mt-2" value={database} onChange={(e) => setDatabase(e.target.value)} placeholder="PostgreSQL, MongoDB, etc." required />
+                <Label>
+                  <TooltipWrapper content="Where your app stores its data permanently. Think of it as the app's filing cabinet where all information is kept.">
+                    How should your app store data?
+                  </TooltipWrapper>
+                </Label>
+                <Input className="mt-2" value={database} onChange={(e) => setDatabase(e.target.value)} placeholder="e.g., PostgreSQL, MongoDB, or describe your data storage needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: PostgreSQL is great for structured data, MongoDB for flexible data. If unsure, describe what kind of data you'll store.
+                </p>
               </div>
               <div>
-                <Label>Hosting Preferences</Label>
-                <Input className="mt-2" value={hostingPreferences} onChange={(e) => setHostingPreferences(e.target.value)} placeholder="AWS, Vercel, Railway, Heroku, self-hosted, etc." required />
+                <Label>
+                  <TooltipWrapper content="Where your app will be hosted and run on the internet. This is like choosing where your app's home will be.">
+                    Where should your app be hosted?
+                  </TooltipWrapper>
+                </Label>
+                <Input className="mt-2" value={hostingPreferences} onChange={(e) => setHostingPreferences(e.target.value)} placeholder="e.g., AWS, Vercel, Railway, Heroku, self-hosted, or describe your hosting needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Vercel and Railway are beginner-friendly. AWS offers more control. If unsure, describe your hosting requirements.
+                </p>
               </div>
               <div>
-                <Label>Caching Needs</Label>
-                <Textarea className="mt-2" rows={2} value={cachingNeeds} onChange={(e) => setCachingNeeds(e.target.value)} placeholder="Redis, Memcached, in-memory caching, etc." required />
+                <Label>
+                  <TooltipWrapper content="Temporary storage for frequently accessed data to make your app faster. Like keeping commonly used items on your desk instead of in a filing cabinet.">
+                    How should your app store frequently used data?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={cachingNeeds} onChange={(e) => setCachingNeeds(e.target.value)} placeholder="e.g., Redis, Memcached, in-memory caching, or describe what data should be cached" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Caching speeds up your app. If you're not sure, describe what data is accessed frequently (like user sessions, product listings, etc.).
+                </p>
               </div>
               <div>
-                <Label>API Versioning Strategy</Label>
-                <Input className="mt-2" value={apiVersioning} onChange={(e) => setApiVersioning(e.target.value)} placeholder="e.g., /v1/, /v2/, header-based, etc." required />
+                <Label>
+                  <TooltipWrapper content="A way to update your API without breaking existing functionality. Like versioning documents so old versions still work while new ones are added.">
+                    How should your app handle API changes over time?
+                  </TooltipWrapper>
+                </Label>
+                <Input className="mt-2" value={apiVersioning} onChange={(e) => setApiVersioning(e.target.value)} placeholder="e.g., /v1/, /v2/, header-based, or describe your versioning needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Versioning lets you update your app without breaking existing integrations. URL-based versioning (/v1/, /v2/) is common.
+                </p>
               </div>
               <div>
-                <Label>Expected Traffic Volume</Label>
-                <Input className="mt-2" value={expectedTraffic} onChange={(e) => setExpectedTraffic(e.target.value)} placeholder="e.g., 1000 requests/day, 10K requests/hour" required />
+                <Label>
+                  <TooltipWrapper content="The number of users or requests you expect your app to handle. This helps determine the infrastructure needed.">
+                    How many users do you expect?
+                  </TooltipWrapper>
+                </Label>
+                <Input className="mt-2" value={expectedTraffic} onChange={(e) => setExpectedTraffic(e.target.value)} placeholder="e.g., 1000 requests/day, 10K requests/hour, or describe your expected usage" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Be realistic about your expected usage. This helps plan for the right infrastructure size.
+                </p>
               </div>
               <div>
-                <Label>Data Fetching Patterns</Label>
-                <Textarea className="mt-2" rows={2} value={dataFetching} onChange={(e) => setDataFetching(e.target.value)} placeholder="REST, GraphQL, WebSockets, Server-Sent Events, etc." required />
+                <Label>
+                  <TooltipWrapper content="The method your app uses to request and receive data from servers. This is how your app gets information it needs.">
+                    How should your app get data from servers?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={dataFetching} onChange={(e) => setDataFetching(e.target.value)} placeholder="e.g., REST, GraphQL, WebSockets, Server-Sent Events, or describe your data needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: REST is most common. WebSockets are for real-time updates. If unsure, describe how your app needs to get data (one-time requests, real-time updates, etc.).
+                </p>
               </div>
               <div>
-                <Label>Logging & Monitoring</Label>
-                <Textarea className="mt-2" rows={2} value={loggingMonitoring} onChange={(e) => setLoggingMonitoring(e.target.value)} placeholder="Tools and approach (e.g., Winston, Pino, Datadog, Sentry)" required />
+                <Label>
+                  <TooltipWrapper content="Tools to record events and monitor app performance and errors. Like a dashboard that shows what's happening in your app.">
+                    How should your app track what's happening?
+                  </TooltipWrapper>
+                </Label>
+                <Label htmlFor="loggingMonitoring" className="sr-only">Logging & Monitoring</Label>
+                <Textarea 
+                  id="loggingMonitoring"
+                  className="mt-2" 
+                  rows={2} 
+                  value={loggingMonitoring} 
+                  onChange={(e) => setLoggingMonitoring(e.target.value)} 
+                  placeholder="e.g., Winston, Pino, Datadog, Sentry, or describe what you want to track" 
+                  required 
+                />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Monitoring helps you understand app performance and catch errors. If unsure, describe what you want to track (errors, user activity, performance, etc.).
+                </p>
               </div>
             </div>
           )}
@@ -1821,7 +3052,11 @@ export default function CursorBuilderPage() {
             <div className="space-y-4">
               <h2 className="text-base font-semibold tracking-tight">Security & Compliance</h2>
               <div>
-                <Label>Security requirements</Label>
+                <Label>
+                  <TooltipWrapper content="Security features that protect your app and user data. These help prevent unauthorized access and keep information safe.">
+                    What security features does your app need?
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["Auth required","RBAC","Encrypt at rest","Encrypt in transit","2FA"]
                     .map((t) => {
@@ -1833,13 +3068,27 @@ export default function CursorBuilderPage() {
                       );
                     })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Auth required = users must log in. RBAC = different permission levels. Encrypt at rest/transit = data protection. 2FA = extra login security.
+                </p>
               </div>
               <div>
-                <Label>Sensitive Data Handling</Label>
-                <Textarea className="mt-2" rows={3} value={sensitiveData} onChange={(e) => setSensitiveData(e.target.value)} placeholder="What sensitive data will be handled? (PII, payment info, health data, etc.)" required />
+                <Label>
+                  <TooltipWrapper content="Personal or confidential information that requires special protection. This includes things like passwords, credit card numbers, health records, or personal identification.">
+                    What sensitive information will your app handle?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={sensitiveData} onChange={(e) => setSensitiveData(e.target.value)} placeholder="e.g., passwords, payment info, health data, personal identification, or describe sensitive data" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Be specific about what sensitive data you'll handle. This helps determine the security measures needed.
+                </p>
               </div>
               <div>
-                <Label>Authentication Methods</Label>
+                <Label>
+                  <TooltipWrapper content="How users will log in to your app. Different methods offer different levels of security and user convenience.">
+                    How should users log in?
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["Email/Password", "OAuth (Google, GitHub)", "Magic Links", "Biometric", "SSO", "JWT", "Session-based"].map((method) => {
                     const active = authenticationMethods.includes(method);
@@ -1858,17 +3107,47 @@ export default function CursorBuilderPage() {
                     );
                   })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Email/Password is standard. OAuth lets users sign in with Google/GitHub. Magic Links = passwordless login. Biometric = fingerprint/face ID. SSO = single sign-on for organizations.
+                </p>
               </div>
               <div>
-                <Label>Authorization Levels</Label>
-                <Textarea className="mt-2" rows={2} value={authorizationLevels} onChange={(e) => setAuthorizationLevels(e.target.value)} placeholder="User roles and permissions (e.g., Admin, User, Guest, Moderator)" required />
+                <Label>
+                  <TooltipWrapper content="Defining who can access what in your app. Different users may have different permission levels (like admin vs regular user).">
+                    Who can access what in your app?
+                  </TooltipWrapper>
+                </Label>
+                <Label htmlFor="authorizationLevels" className="sr-only">Authorization Levels</Label>
+                <Textarea 
+                  id="authorizationLevels"
+                  className="mt-2" 
+                  rows={2} 
+                  value={authorizationLevels} 
+                  onChange={(e) => setAuthorizationLevels(e.target.value)} 
+                  placeholder="e.g., Admin (full access), User (limited access), Guest (read-only), or describe user roles and permissions" 
+                  required 
+                />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Think about who needs access to what features. Common roles: Admin, User, Guest, Moderator, Manager, etc.
+                </p>
               </div>
               <div>
-                <Label>Encryption & Hashing</Label>
-                <Textarea className="mt-2" rows={2} value={encryptionHashing} onChange={(e) => setEncryptionHashing(e.target.value)} placeholder="Encryption algorithms, hashing methods (e.g., bcrypt, Argon2, AES-256)" required />
+                <Label>
+                  <TooltipWrapper content="Methods to protect sensitive data like passwords and personal information. Encryption scrambles data, hashing secures passwords.">
+                    How should sensitive data be protected?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={encryptionHashing} onChange={(e) => setEncryptionHashing(e.target.value)} placeholder="e.g., bcrypt, Argon2, AES-256, or describe your data protection needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: These protect passwords and sensitive data. If you're not sure, describe what needs protection (passwords, payment info, personal data, etc.).
+                </p>
               </div>
               <div>
-                <Label>Vulnerability Prevention</Label>
+                <Label>
+                  <TooltipWrapper content="Security threats that should be prevented. These are common ways attackers try to compromise apps, and your app should be protected against them.">
+                    What security threats should be prevented?
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["SQL Injection", "XSS", "CSRF", "Rate Limiting", "Input Validation", "Dependency Scanning"].map((vuln) => {
                     const active = vulnerabilityPrevention.includes(vuln);
@@ -1887,17 +3166,35 @@ export default function CursorBuilderPage() {
                     );
                   })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: These are all important security protections. SQL Injection/XSS/CSRF = attack prevention. Rate Limiting = prevent abuse. Input Validation = check user input. Dependency Scanning = check for vulnerabilities.
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="securityAuditing" checked={securityAuditing} onChange={(e) => setSecurityAuditing(e.target.checked)} />
-                <Label htmlFor="securityAuditing" className="font-normal">Regular Security Auditing Required</Label>
+                <Label htmlFor="securityAuditing" className="font-normal">
+                  <TooltipWrapper content="Regular security reviews to check for vulnerabilities and ensure your app stays secure over time.">
+                    Regular Security Auditing Required
+                  </TooltipWrapper>
+                </Label>
               </div>
               <div>
-                <Label>Rate Limiting Strategy</Label>
-                <Textarea className="mt-2" rows={2} value={rateLimiting} onChange={(e) => setRateLimiting(e.target.value)} placeholder="Rate limiting approach (e.g., 100 requests/minute per IP, token bucket)" required />
+                <Label>
+                  <TooltipWrapper content="Limiting how many requests users can make to prevent abuse and protect your app from being overwhelmed.">
+                    How should your app prevent abuse?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={rateLimiting} onChange={(e) => setRateLimiting(e.target.value)} placeholder="e.g., 100 requests/minute per IP, token bucket, or describe your abuse prevention needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: This prevents users from making too many requests too quickly, which could slow down or crash your app.
+                </p>
               </div>
               <div>
-                <Label>Compliance</Label>
+                <Label>
+                  <TooltipWrapper content="Regulations and standards your app must follow based on your industry or location. These ensure legal compliance and data protection.">
+                    What regulations must your app follow?
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["GDPR","HIPAA","SOC 2","PCI DSS","CCPA"]
                     .map((t) => {
@@ -1909,9 +3206,16 @@ export default function CursorBuilderPage() {
                       );
                     })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: GDPR = EU data protection. HIPAA = US health data. SOC 2 = security standards. PCI DSS = payment card data. CCPA = California privacy. Select based on your industry/location.
+                </p>
               </div>
               <div>
-                <Label>Data Privacy Requirements</Label>
+                <Label>
+                  <TooltipWrapper content="Privacy features that protect user data and give users control over their information. These are often required by law.">
+                    What privacy features are needed?
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["Right to deletion", "Data portability", "Consent management", "Privacy by design", "Data minimization"].map((req) => {
                     const active = dataPrivacy.includes(req);
@@ -1930,17 +3234,42 @@ export default function CursorBuilderPage() {
                     );
                   })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Right to deletion = users can delete their data. Data portability = users can export their data. Consent management = ask permission before collecting data. Privacy by design = build privacy in from the start. Data minimization = only collect what's needed.
+                </p>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="dataRetention">Data retention</Label>
-                  <select id="dataRetention" title="Select Data Retention" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" value={dataRetention} onChange={(e) => setDataRetention(e.target.value)} required>
+                  <Label htmlFor="dataRetention">
+                    <TooltipWrapper content="How long user data should be kept before being automatically deleted. This helps with privacy and compliance.">
+                      How long should data be kept?
+                    </TooltipWrapper>
+                  </Label>
+                  <select 
+                    id="dataRetention" 
+                    aria-label="Select Data Retention"
+                    className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" 
+                    value={dataRetention} 
+                    onChange={(e) => setDataRetention(e.target.value)} 
+                    required
+                  >
                     {["30 days","90 days","1 year","7 years","Indefinite"].map((t) => <option key={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
-                  <Label htmlFor="backupFrequency">Backup frequency</Label>
-                  <select id="backupFrequency" title="Select Backup Frequency" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" value={backupFrequency} onChange={(e) => setBackupFrequency(e.target.value)} required>
+                  <Label htmlFor="backupFrequency">
+                    <TooltipWrapper content="How often your app's data should be backed up to prevent data loss. Regular backups protect against accidents or failures.">
+                      How often should data be backed up?
+                    </TooltipWrapper>
+                  </Label>
+                  <select 
+                    id="backupFrequency" 
+                    aria-label="Select Backup Frequency"
+                    className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" 
+                    value={backupFrequency} 
+                    onChange={(e) => setBackupFrequency(e.target.value)} 
+                    required
+                  >
                     {["Hourly","Daily","Weekly"].map((t) => <option key={t}>{t}</option>)}
                   </select>
                 </div>
@@ -1952,40 +3281,118 @@ export default function CursorBuilderPage() {
             <div className="space-y-4">
               <h2 className="text-base font-semibold tracking-tight">Functionality & Logic</h2>
               <div>
-                <Label>Core Business Logic</Label>
-                <Textarea className="mt-2" rows={4} value={coreBusinessLogic} onChange={(e) => setCoreBusinessLogic(e.target.value)} placeholder="Describe the core business logic and algorithms..." required />
+                <Label>
+                  <TooltipWrapper content="The main rules and processes your app follows to accomplish its purpose. These are the core operations that make your app work.">
+                    What are the main rules and processes your app follows?
+                  </TooltipWrapper>
+                </Label>
+                <Label htmlFor="coreBusinessLogic" className="sr-only">Core Business Logic</Label>
+                <Textarea 
+                  id="coreBusinessLogic"
+                  className="mt-2" 
+                  rows={4} 
+                  value={coreBusinessLogic} 
+                  onChange={(e) => setCoreBusinessLogic(e.target.value)} 
+                  placeholder="Describe the main processes, rules, and workflows your app needs to handle..." 
+                  required 
+                />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Think about what your app does step-by-step. For example: "Users can create accounts, upload files, share with others, and receive notifications."
+                </p>
               </div>
               <div>
-                <Label>AI/ML Integrations</Label>
-                <Textarea className="mt-2" rows={3} value={aiMlIntegrations} onChange={(e) => setAiMlIntegrations(e.target.value)} placeholder="Any AI/ML features? (e.g., recommendations, predictions, NLP, computer vision)" required />
+                <Label>
+                  <TooltipWrapper content="Artificial intelligence or machine learning features that make your app smarter, like recommendations, predictions, or automated responses.">
+                    Does your app use artificial intelligence?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={aiMlIntegrations} onChange={(e) => setAiMlIntegrations(e.target.value)} placeholder="e.g., recommendations, predictions, automated responses, image recognition, or describe AI features" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: AI features include things like product recommendations, smart search, chatbots, image recognition, or automated content generation.
+                </p>
               </div>
               <div>
-                <Label>Payment/Monetization</Label>
-                <Textarea className="mt-2" rows={3} value={paymentsMonetization} onChange={(e) => setPaymentsMonetization(e.target.value)} placeholder="Describe payment processing, subscriptions, pricing models, etc." required />
+                <Label>
+                  <TooltipWrapper content="How your app will handle payments, subscriptions, or other ways to make money. This includes processing transactions and managing billing.">
+                    How will your app handle payments?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={paymentsMonetization} onChange={(e) => setPaymentsMonetization(e.target.value)} placeholder="e.g., one-time payments, subscriptions, pricing models, or describe your payment needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Describe how users will pay (credit cards, subscriptions, one-time purchases, etc.) and what pricing model you'll use.
+                </p>
               </div>
               <div>
-                <Label>Custom Functionalities</Label>
-                <Textarea className="mt-2" rows={3} value={customFunctionalities} onChange={(e) => setCustomFunctionalities(e.target.value)} placeholder="Any unique or custom features specific to your app?" required />
+                <Label>
+                  <TooltipWrapper content="Special features that make your app unique or different from competitors. These are custom capabilities specific to your app.">
+                    What unique features does your app have?
+                  </TooltipWrapper>
+                </Label>
+                <Label htmlFor="customFunctionalities" className="sr-only">Custom Functionalities</Label>
+                <Textarea 
+                  id="customFunctionalities"
+                  className="mt-2" 
+                  rows={3} 
+                  value={customFunctionalities} 
+                  onChange={(e) => setCustomFunctionalities(e.target.value)} 
+                  placeholder="Describe any unique or custom features specific to your app" 
+                  required 
+                />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Think about what makes your app special. What features set it apart from similar apps?
+                </p>
               </div>
               <div>
-                <Label>External Systems Integration</Label>
-                <Textarea className="mt-2" rows={3} value={externalSystems} onChange={(e) => setExternalSystems(e.target.value)} placeholder="Integrations with external systems (CRM, ERP, email services, etc.)" required />
+                <Label>
+                  <TooltipWrapper content="Other services or systems your app needs to connect with, like customer management tools, email services, or business software.">
+                    What other services should your app connect to?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={externalSystems} onChange={(e) => setExternalSystems(e.target.value)} placeholder="e.g., CRM, ERP, email services, payment processors, or describe external integrations" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: List any third-party services you need (like Stripe for payments, SendGrid for emails, Salesforce for CRM, etc.).
+                </p>
               </div>
               <div>
-                <Label>Validation Rules</Label>
-                <Textarea className="mt-2" rows={3} value={validationRules} onChange={(e) => setValidationRules(e.target.value)} placeholder="Input validation, business rule validation, data integrity checks" required />
+                <Label>
+                  <TooltipWrapper content="Rules that check if user input is correct and valid. These ensure data quality and prevent errors.">
+                    What rules should your app enforce?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={validationRules} onChange={(e) => setValidationRules(e.target.value)} placeholder="e.g., email format checks, required fields, data format validation, or describe validation needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Think about what needs to be checked (email formats, password strength, required fields, number ranges, etc.).
+                </p>
               </div>
               <div>
-                <Label>Background Jobs & Scheduled Tasks</Label>
-                <Textarea className="mt-2" rows={2} value={backgroundJobs} onChange={(e) => setBackgroundJobs(e.target.value)} placeholder="Cron jobs, queue workers, scheduled tasks (e.g., email sending, data processing)" required />
+                <Label>
+                  <TooltipWrapper content="Tasks your app should do automatically in the background, like sending emails, processing data, or generating reports.">
+                    What tasks should your app do automatically?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={backgroundJobs} onChange={(e) => setBackgroundJobs(e.target.value)} placeholder="e.g., email sending, data processing, report generation, or describe automated tasks" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: These are tasks that happen without user interaction, like sending welcome emails, processing uploads, or generating daily reports.
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="multiTenancy" checked={multiTenancy} onChange={(e) => setMultiTenancy(e.target.checked)} />
-                <Label htmlFor="multiTenancy" className="font-normal">Multi-tenancy Support Required</Label>
+                <Label htmlFor="multiTenancy" className="font-normal">
+                  <TooltipWrapper content="Support for multiple organizations or companies using the same app instance, where each organization's data is kept separate.">
+                    Multi-tenancy Support Required
+                  </TooltipWrapper>
+                </Label>
               </div>
               <div>
-                <Label>Updates & Migrations</Label>
-                <Textarea className="mt-2" rows={2} value={updateMigrations} onChange={(e) => setUpdateMigrations(e.target.value)} placeholder="How should database migrations and updates be handled?" required />
+                <Label>
+                  <TooltipWrapper content="How your app will handle updates and changes to the database structure over time without losing data.">
+                    How should your app handle updates?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={updateMigrations} onChange={(e) => setUpdateMigrations(e.target.value)} placeholder="e.g., database migrations, version updates, or describe your update process needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: This is about safely updating your app and database structure without breaking existing functionality or losing data.
+                </p>
               </div>
             </div>
           )}
@@ -1994,27 +3401,63 @@ export default function CursorBuilderPage() {
             <div className="space-y-4">
               <h2 className="text-base font-semibold tracking-tight">Error-Fixing & Maintenance</h2>
               <div>
-                <Label>Anticipated Common Errors</Label>
-                <Textarea className="mt-2" rows={4} value={commonErrors} onChange={(e) => setCommonErrors(e.target.value)} placeholder="List common errors you expect to encounter (e.g., network failures, validation errors, API timeouts)" required />
+                <Label>
+                  <TooltipWrapper content="Problems or errors your app might encounter during normal operation. Thinking about these helps plan how to handle them gracefully.">
+                    What errors might your app encounter?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={4} value={commonErrors} onChange={(e) => setCommonErrors(e.target.value)} placeholder="e.g., network failures, validation errors, API timeouts, or describe potential issues" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Common issues include network problems, invalid user input, server errors, or timeouts. Describe what could go wrong.
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="errorLogTemplates" checked={errorLogTemplates} onChange={(e) => setErrorLogTemplates(e.target.checked)} />
-                <Label htmlFor="errorLogTemplates" className="font-normal">Generate Error Log Templates</Label>
+                <Label htmlFor="errorLogTemplates" className="font-normal">
+                  <TooltipWrapper content="Generate templates for logging errors in a consistent format, making it easier to track and fix problems.">
+                    Generate Error Log Templates
+                  </TooltipWrapper>
+                </Label>
               </div>
               <div>
-                <Label>Debugging Strategy</Label>
-                <Textarea className="mt-2" rows={3} value={debuggingStrategies} onChange={(e) => setDebuggingStrategies(e.target.value)} placeholder="Describe your debugging approach (logging levels, error tracking tools, debugging workflows)" required />
+                <Label>
+                  <TooltipWrapper content="How problems will be identified and fixed. This includes tools and processes for finding and resolving issues.">
+                    How should problems be identified and fixed?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={debuggingStrategies} onChange={(e) => setDebuggingStrategies(e.target.value)} placeholder="e.g., error tracking tools, logging systems, or describe your debugging approach" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Describe how you'll track errors (tools like Sentry), log important events, and investigate problems when they occur.
+                </p>
               </div>
               <div>
-                <Label>Versioning & Updates</Label>
-                <Textarea className="mt-2" rows={2} value={versioningUpdates} onChange={(e) => setVersioningUpdates(e.target.value)} placeholder="How should versioning be handled? (Semantic versioning, feature flags, etc.)" required />
+                <Label>
+                  <TooltipWrapper content="How your app will handle version changes over time. This ensures updates don't break existing functionality.">
+                    How should your app handle version changes?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={versioningUpdates} onChange={(e) => setVersioningUpdates(e.target.value)} placeholder="e.g., semantic versioning, feature flags, or describe your versioning approach" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Versioning helps track changes and roll out updates safely. Semantic versioning (1.0.0, 1.1.0, 2.0.0) is common.
+                </p>
               </div>
               <div>
-                <Label>Maintenance Tasks</Label>
-                <Textarea className="mt-2" rows={3} value={maintenanceTasks} onChange={(e) => setMaintenanceTasks(e.target.value)} placeholder="Regular maintenance needs (database cleanup, cache invalidation, dependency updates)" required />
+                <Label>
+                  <TooltipWrapper content="Regular tasks needed to keep your app running smoothly, like cleaning up old data, updating dependencies, or clearing caches.">
+                    What regular maintenance is needed?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={maintenanceTasks} onChange={(e) => setMaintenanceTasks(e.target.value)} placeholder="e.g., database cleanup, cache clearing, dependency updates, or describe maintenance needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Think about ongoing tasks like removing old data, updating libraries, clearing temporary files, or optimizing performance.
+                </p>
               </div>
               <div>
-                <Label>Testing Types</Label>
+                <Label>
+                  <TooltipWrapper content="Different ways to test your app to ensure it works correctly. Each type tests different aspects of functionality.">
+                    What types of testing should be done?
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["Unit tests", "Integration tests", "E2E tests", "Performance tests", "Security tests", "Load tests"].map((type) => {
                     const active = testingTypes.includes(type);
@@ -2033,18 +3476,51 @@ export default function CursorBuilderPage() {
                     );
                   })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Unit = test individual pieces. Integration = test how pieces work together. E2E = test full user flows. Performance = test speed. Security = test safety. Load = test under heavy usage.
+                </p>
               </div>
               <div>
-                <Label>CI/CD Tools</Label>
-                <Input className="mt-2" value={cicdTools} onChange={(e) => setCicdTools(e.target.value)} placeholder="GitHub Actions, GitLab CI, Jenkins, CircleCI, etc." required />
+                <Label>
+                  <TooltipWrapper content="Tools that automatically test and deploy your app when you make changes. This automates the process of releasing updates.">
+                    How should updates be automatically deployed?
+                  </TooltipWrapper>
+                </Label>
+                <Input className="mt-2" value={cicdTools} onChange={(e) => setCicdTools(e.target.value)} placeholder="e.g., GitHub Actions, GitLab CI, Jenkins, CircleCI, or describe your deployment automation needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: CI/CD automates testing and deployment. GitHub Actions is popular and beginner-friendly. If unsure, describe your deployment needs.
+                </p>
               </div>
               <div>
-                <Label>Rollback Plans</Label>
-                <Textarea className="mt-2" rows={2} value={rollbackPlans} onChange={(e) => setRollbackPlans(e.target.value)} placeholder="How should rollbacks be handled in case of deployment failures?" required />
+                <Label>
+                  <TooltipWrapper content="How to undo a deployment if something goes wrong. This is like having an emergency backup plan.">
+                    How should failed updates be handled?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={rollbackPlans} onChange={(e) => setRollbackPlans(e.target.value)} placeholder="e.g., automatic rollback, manual revert process, or describe your rollback strategy" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: This is your safety net if a new version breaks something. Describe how you'll quickly revert to the previous working version.
+                </p>
               </div>
               <div>
-                <Label>User Feedback Loops</Label>
-                <Textarea className="mt-2" rows={2} value={userFeedbackLoops} onChange={(e) => setUserFeedbackLoops(e.target.value)} placeholder="How will you collect and act on user feedback for bug reports and improvements?" required />
+                <Label>
+                  <TooltipWrapper content="How you'll collect feedback from users about bugs and improvements, and how you'll act on that feedback.">
+                    How will you collect and act on user feedback?
+                  </TooltipWrapper>
+                </Label>
+                <Label htmlFor="userFeedbackLoops" className="sr-only">User Feedback Loops</Label>
+                <Textarea 
+                  id="userFeedbackLoops"
+                  className="mt-2" 
+                  rows={2} 
+                  value={userFeedbackLoops} 
+                  onChange={(e) => setUserFeedbackLoops(e.target.value)} 
+                  placeholder="e.g., in-app feedback forms, email support, bug reporting, or describe your feedback process" 
+                  required 
+                />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Think about how users will report bugs or suggest improvements, and how you'll prioritize and implement those changes.
+                </p>
               </div>
             </div>
           )}
@@ -2053,13 +3529,24 @@ export default function CursorBuilderPage() {
             <div className="space-y-4">
               <h2 className="text-base font-semibold tracking-tight">Performance & Scale</h2>
               <div>
-                <Label htmlFor="expectedUsers">Expected users</Label>
+                <Label htmlFor="expectedUsers">
+                  <TooltipWrapper content="The approximate number of users you expect to use your app. This helps plan for the right infrastructure size.">
+                    How many users do you expect?
+                  </TooltipWrapper>
+                </Label>
                 <select id="expectedUsers" title="Select Expected Users" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" value={expectedUsers} onChange={(e) => setExpectedUsers(e.target.value)} required>
                   {["< 100","100-1K","1K-10K","10K-100K","100K-1M","1M+"].map((t) => <option key={t}>{t}</option>)}
                 </select>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Be realistic about your expected user count. This helps determine server capacity and infrastructure needs.
+                </p>
               </div>
               <div>
-                <Label>Performance requirements</Label>
+                <Label>
+                  <TooltipWrapper content="Performance features that are important for your app, like speed, reliability, or real-time capabilities.">
+                    What performance features are important?
+                  </TooltipWrapper>
+                </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {["Real-time updates","Offline support","Low latency (<200ms)","High availability (99.9%+)"]
                     .map((t) => {
@@ -2071,42 +3558,105 @@ export default function CursorBuilderPage() {
                       );
                     })}
                 </div>
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Real-time = instant updates. Offline = works without internet. Low latency = fast responses. High availability = rarely goes down.
+                </p>
               </div>
               <div>
-                <Label>Performance Benchmarks</Label>
-                <Textarea className="mt-2" rows={2} value={performanceBenchmarks} onChange={(e) => setPerformanceBenchmarks(e.target.value)} placeholder="Specific performance targets (e.g., page load < 2s, API response < 500ms)" required />
+                <Label>
+                  <TooltipWrapper content="Specific speed and performance goals for your app, like how fast pages should load or how quickly the app should respond.">
+                    What are your speed and performance goals?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={performanceBenchmarks} onChange={(e) => setPerformanceBenchmarks(e.target.value)} placeholder="e.g., page load < 2s, API response < 500ms, or describe your performance targets" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Set realistic targets. For example: "Pages should load in under 2 seconds" or "Search results should appear instantly."
+                </p>
               </div>
               <div>
-                <Label>Device & Network Optimization</Label>
-                <Textarea className="mt-2" rows={2} value={deviceNetworkOptimization} onChange={(e) => setDeviceNetworkOptimization(e.target.value)} placeholder="Optimizations for slow networks, low-end devices, mobile data constraints" required />
+                <Label>
+                  <TooltipWrapper content="Optimizations to make your app work well on slow internet connections, older devices, or limited mobile data plans.">
+                    How should your app work on slow connections?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={deviceNetworkOptimization} onChange={(e) => setDeviceNetworkOptimization(e.target.value)} placeholder="e.g., optimize for slow networks, low-end devices, mobile data constraints, or describe optimization needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Think about users on slow WiFi or limited mobile data. Describe how your app should handle these situations.
+                </p>
               </div>
               <div>
-                <Label>Scalability Plans</Label>
-                <Textarea className="mt-2" rows={3} value={scalabilityPlans} onChange={(e) => setScalabilityPlans(e.target.value)} placeholder="How should the system scale? (horizontal scaling, vertical scaling, auto-scaling)" required />
+                <Label>
+                  <TooltipWrapper content="How your app will handle growth and increased usage over time. This ensures your app can grow without problems.">
+                    How should your app handle growth?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={scalabilityPlans} onChange={(e) => setScalabilityPlans(e.target.value)} placeholder="e.g., horizontal scaling, vertical scaling, auto-scaling, or describe your scaling needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Scaling means handling more users. Horizontal = add more servers. Vertical = make servers more powerful. Auto-scaling = automatic adjustment.
+                </p>
               </div>
               <div>
-                <Label>Caching Strategies</Label>
-                <Textarea className="mt-2" rows={2} value={cachingStrategies} onChange={(e) => setCachingStrategies(e.target.value)} placeholder="Caching approach (browser cache, CDN, server-side cache, database query cache)" required />
+                <Label>
+                  <TooltipWrapper content="How your app will store frequently accessed data temporarily to improve speed and reduce server load.">
+                    How should your app store data for speed?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={cachingStrategies} onChange={(e) => setCachingStrategies(e.target.value)} placeholder="e.g., browser cache, CDN, server-side cache, or describe your caching needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Caching stores data temporarily to make your app faster. Browser cache = user's device. CDN = global network. Server cache = server memory.
+                </p>
               </div>
               <div>
-                <Label>SEO Considerations</Label>
-                <Textarea className="mt-2" rows={2} value={seoConsiderations} onChange={(e) => setSeoConsiderations(e.target.value)} placeholder="SEO requirements (meta tags, structured data, sitemap, etc.)" required />
+                <Label>
+                  <TooltipWrapper content="How your app will be found in search engines like Google. This helps users discover your app through search.">
+                    How should your app be found in search engines?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={seoConsiderations} onChange={(e) => setSeoConsiderations(e.target.value)} placeholder="e.g., meta tags, structured data, sitemap, or describe your SEO needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: SEO helps your app appear in search results. If you want users to find your app via Google, describe your SEO needs.
+                </p>
               </div>
               <div>
-                <Label>Mobile Optimizations</Label>
-                <Textarea className="mt-2" rows={2} value={mobileOptimizations} onChange={(e) => setMobileOptimizations(e.target.value)} placeholder="Mobile-specific optimizations (responsive design, touch interactions, mobile performance)" required />
+                <Label>
+                  <TooltipWrapper content="Mobile-specific features and optimizations to ensure your app works well on phones and tablets.">
+                    What mobile-specific features are needed?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={mobileOptimizations} onChange={(e) => setMobileOptimizations(e.target.value)} placeholder="e.g., responsive design, touch interactions, mobile performance, or describe mobile needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Mobile optimization includes touch-friendly buttons, fast loading on mobile networks, and working well on small screens.
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="loadTesting" checked={loadTesting} onChange={(e) => setLoadTesting(e.target.checked)} />
-                <Label htmlFor="loadTesting" className="font-normal">Load Testing Required</Label>
+                <Label htmlFor="loadTesting" className="font-normal">
+                  <TooltipWrapper content="Testing your app under heavy load to ensure it can handle many users at once without crashing or slowing down.">
+                    Load Testing Required
+                  </TooltipWrapper>
+                </Label>
               </div>
               <div>
-                <Label>Environmental Considerations</Label>
-                <Textarea className="mt-2" rows={2} value={environmentalConsiderations} onChange={(e) => setEnvironmentalConsiderations(e.target.value)} placeholder="Energy efficiency, carbon footprint, green hosting considerations" required />
+                <Label>
+                  <TooltipWrapper content="Environmental impact considerations, like energy efficiency or carbon footprint. This is about making your app more sustainable.">
+                    What environmental impact considerations are important?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={environmentalConsiderations} onChange={(e) => setEnvironmentalConsiderations(e.target.value)} placeholder="e.g., energy efficiency, carbon footprint, green hosting, or describe environmental goals" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: This is about making your app more environmentally friendly, like using green hosting or optimizing for energy efficiency.
+                </p>
               </div>
               <div>
-                <Label>Success Metrics</Label>
-                <Textarea className="mt-2" rows={2} value={successMetrics} onChange={(e) => setSuccessMetrics(e.target.value)} placeholder="How will you measure success? (KPIs, metrics, analytics)" required />
+                <Label>
+                  <TooltipWrapper content="How you'll measure if your app is successful. These are the metrics and indicators that show your app is working well.">
+                    How will you measure success?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={successMetrics} onChange={(e) => setSuccessMetrics(e.target.value)} placeholder="e.g., user engagement, conversion rates, performance metrics, or describe your success indicators" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Think about what success looks like (user signups, daily active users, sales, engagement, etc.). These are your key performance indicators.
+                </p>
               </div>
             </div>
           )}
@@ -2116,25 +3666,51 @@ export default function CursorBuilderPage() {
               <h2 className="text-base font-semibold tracking-tight">Development Preferences</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
-                  <Label htmlFor="codeStyle">Code Style</Label>
-                  <textarea id="codeStyle" title="Enter Code Style Preferences" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" rows={3} value={codeStyle} onChange={(e) => setCodeStyle(e.target.value)} required />
+                  <Label htmlFor="codeStyle">
+                    <TooltipWrapper content="How code should be written and organized. This includes coding standards, formatting, and structure preferences.">
+                      How should code be written and organized?
+                    </TooltipWrapper>
+                  </Label>
+                  <textarea id="codeStyle" title="Enter Code Style Preferences" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" rows={3} value={codeStyle} onChange={(e) => setCodeStyle(e.target.value)} placeholder="e.g., clean code, consistent formatting, or describe code style preferences" required />
                 </div>
                 <div>
-                  <Label htmlFor="testingApproach">Testing Approach</Label>
-                  <textarea id="testingApproach" title="Enter Testing Approach" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" rows={3} value={testingApproach} onChange={(e) => setTestingApproach(e.target.value)} required />
+                  <Label htmlFor="testingApproach">
+                    <TooltipWrapper content="How code should be tested to ensure it works correctly. This includes testing methods and strategies.">
+                      How should code be tested?
+                    </TooltipWrapper>
+                  </Label>
+                  <textarea id="testingApproach" title="Enter Testing Approach" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" rows={3} value={testingApproach} onChange={(e) => setTestingApproach(e.target.value)} placeholder="e.g., comprehensive testing, test-driven development, or describe testing approach" required />
                 </div>
                 <div>
-                  <Label htmlFor="docsLevel">Documentation Level</Label>
-                  <textarea id="docsLevel" title="Enter Documentation Level" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" rows={3} value={docsLevel} onChange={(e) => setDocsLevel(e.target.value)} required />
+                  <Label htmlFor="docsLevel">
+                    <TooltipWrapper content="How much documentation is needed to explain how the code works. This helps future developers understand the codebase.">
+                      How much documentation is needed?
+                    </TooltipWrapper>
+                  </Label>
+                  <textarea id="docsLevel" title="Enter Documentation Level" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" rows={3} value={docsLevel} onChange={(e) => setDocsLevel(e.target.value)} placeholder="e.g., minimal, comprehensive, or describe documentation needs" required />
                 </div>
               </div>
               <div>
-                <Label>Version Control</Label>
-                <Input className="mt-2" value={versionControl} onChange={(e) => setVersionControl(e.target.value)} placeholder="Git workflow, branching strategy, commit conventions" required />
+                <Label>
+                  <TooltipWrapper content="How code changes will be managed and tracked over time. This includes workflows for making and reviewing changes.">
+                    How should code changes be managed?
+                  </TooltipWrapper>
+                </Label>
+                <Input className="mt-2" value={versionControl} onChange={(e) => setVersionControl(e.target.value)} placeholder="e.g., Git workflow, branching strategy, commit conventions, or describe version control needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Version control tracks code changes. Git is standard. If unsure, describe how you want to manage code updates.
+                </p>
               </div>
               <div>
-                <Label>Deployment Details</Label>
-                <Textarea className="mt-2" rows={2} value={deploymentDetails} onChange={(e) => setDeploymentDetails(e.target.value)} placeholder="Deployment process, environments (dev, staging, prod), deployment frequency" required />
+                <Label>
+                  <TooltipWrapper content="How your app will be released and updated. This includes the process of deploying changes to users.">
+                    How should your app be released?
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={deploymentDetails} onChange={(e) => setDeploymentDetails(e.target.value)} placeholder="e.g., deployment process, environments (dev, staging, prod), deployment frequency, or describe deployment needs" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Deployment is how updates reach users. Common approach: test in dev, then staging, then production. Describe your release process.
+                </p>
               </div>
               <div className="flex items-center justify-between">
                 <div className="text-xs text-foreground/60">These preferences inform tone and completeness.</div>
@@ -2153,36 +3729,92 @@ export default function CursorBuilderPage() {
             <div className="space-y-4">
               <h2 className="text-base font-semibold tracking-tight">Additional Context</h2>
               <div>
-                <Label>Similar projects</Label>
-                <Textarea className="mt-2" rows={3} value={similarProjects} onChange={(e) => setSimilarProjects(e.target.value)} placeholder="Name apps similar to what you're building" required />
+                <Label>
+                  <TooltipWrapper content="Apps or projects similar to what you're building. This helps understand your vision and what already exists in the market.">
+                    Similar projects
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={similarProjects} onChange={(e) => setSimilarProjects(e.target.value)} placeholder="Name apps similar to what you're building (e.g., 'Like Instagram but for pets')" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Listing similar apps helps us understand your vision and what features users might expect.
+                </p>
               </div>
               <div>
-                <Label>Design inspiration (URLs)</Label>
-                <Textarea className="mt-2" rows={3} value={designInspiration} onChange={(e) => setDesignInspiration(e.target.value)} placeholder="Links to inspiration" required />
+                <Label>
+                  <TooltipWrapper content="Links to design inspiration, like websites, apps, or designs you like. These help guide the visual style of your app.">
+                    Design inspiration (URLs)
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={designInspiration} onChange={(e) => setDesignInspiration(e.target.value)} placeholder="Links to design inspiration (e.g., https://example.com, Figma links, Dribbble, etc.)" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Share URLs of designs, websites, or apps you like. This helps create a visual style that matches your vision.
+                </p>
               </div>
               <div>
-                <Label>Special requirements</Label>
-                <Textarea className="mt-2" rows={3} value={specialRequirements} onChange={(e) => setSpecialRequirements(e.target.value)} placeholder="Anything not covered above" required />
+                <Label>
+                  <TooltipWrapper content="Any special requirements or considerations not covered in the previous steps. This is your chance to add anything important.">
+                    Special requirements
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={3} value={specialRequirements} onChange={(e) => setSpecialRequirements(e.target.value)} placeholder="Anything not covered above (special constraints, unique needs, etc.)" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Use this space for anything important that wasn't covered in previous steps.
+                </p>
               </div>
               <div>
-                <Label>Ethical Guidelines</Label>
-                <Textarea className="mt-2" rows={2} value={ethicalGuidelines} onChange={(e) => setEthicalGuidelines(e.target.value)} placeholder="Ethical considerations (fairness, bias prevention, user privacy, transparency)" required />
+                <Label>
+                  <TooltipWrapper content="Ethical principles your app should follow, like fairness, preventing bias, protecting user privacy, and being transparent.">
+                    Ethical Guidelines
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={ethicalGuidelines} onChange={(e) => setEthicalGuidelines(e.target.value)} placeholder="e.g., fairness, bias prevention, user privacy, transparency, or describe ethical considerations" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Think about how your app should treat users fairly, avoid discrimination, protect privacy, and be transparent about how it works.
+                </p>
               </div>
               <div>
-                <Label>Legal Requirements</Label>
-                <Textarea className="mt-2" rows={2} value={legalRequirements} onChange={(e) => setLegalRequirements(e.target.value)} placeholder="Legal obligations (terms of service, privacy policy, data protection, licensing)" required />
+                <Label>
+                  <TooltipWrapper content="Legal obligations your app must meet, like terms of service, privacy policies, data protection laws, and licensing requirements.">
+                    Legal Requirements
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={legalRequirements} onChange={(e) => setLegalRequirements(e.target.value)} placeholder="e.g., terms of service, privacy policy, data protection, licensing, or describe legal obligations" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Consider what legal documents and compliance requirements your app needs (terms, privacy policy, data protection, etc.).
+                </p>
               </div>
               <div>
-                <Label>Sustainability Goals</Label>
-                <Textarea className="mt-2" rows={2} value={sustainabilityGoals} onChange={(e) => setSustainabilityGoals(e.target.value)} placeholder="Sustainability and environmental goals for the project" required />
+                <Label>
+                  <TooltipWrapper content="Environmental and sustainability goals for your project, like reducing energy consumption or carbon footprint.">
+                    Sustainability Goals
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={sustainabilityGoals} onChange={(e) => setSustainabilityGoals(e.target.value)} placeholder="e.g., energy efficiency, carbon footprint reduction, green hosting, or describe sustainability goals" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: If environmental impact is important, describe your sustainability goals (green hosting, energy efficiency, etc.).
+                </p>
               </div>
               <div>
-                <Label>Future Expansions</Label>
-                <Textarea className="mt-2" rows={2} value={futureExpansions} onChange={(e) => setFutureExpansions(e.target.value)} placeholder="Planned future features or expansions" required />
+                <Label>
+                  <TooltipWrapper content="Features or capabilities you plan to add in the future. This helps plan for future growth and expansion.">
+                    Future Expansions
+                  </TooltipWrapper>
+                </Label>
+                <Textarea className="mt-2" rows={2} value={futureExpansions} onChange={(e) => setFutureExpansions(e.target.value)} placeholder="Planned future features or expansions (e.g., mobile app, new integrations, additional features)" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: Think about where you want your app to be in the future. What features might you add later?
+                </p>
               </div>
               <div>
-                <Label>Unique Aspects</Label>
+                <Label>
+                  <TooltipWrapper content="What makes your app unique or different from competitors. This helps highlight your app's unique value proposition.">
+                    Unique Aspects
+                  </TooltipWrapper>
+                </Label>
                 <Textarea className="mt-2" rows={2} value={uniqueAspects} onChange={(e) => setUniqueAspects(e.target.value)} placeholder="What makes this project unique or different from competitors?" required />
+                <p className="text-xs text-foreground/60 mt-1">
+                  💡 Tip: What sets your app apart? What unique value does it provide that competitors don't?
+                </p>
               </div>
             </div>
           )}

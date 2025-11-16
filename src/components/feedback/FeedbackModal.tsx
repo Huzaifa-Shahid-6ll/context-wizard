@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { initPostHog, trackEvent } from '@/lib/analytics';
-import { Check, X, Star } from 'lucide-react';
+import { Check, X, Star } from '@/lib/icons';
 import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useUser } from '@clerk/nextjs';

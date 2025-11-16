@@ -50,7 +50,8 @@ export const updateGenerationStatus = mutation({
       v.literal("tasks_pending"),
       v.literal("tasks_approved"),
       v.literal("generating_prompts"),
-      v.literal("completed")
+      v.literal("completed"),
+      v.literal("cancelled")
     ),
     prd: v.optional(v.string()),
     userFlows: v.optional(v.string()),
@@ -339,13 +340,101 @@ Return ONLY a JSON array of security features, like: ["JWT Authentication", "Pas
 PRD:
 ${prd}
 
-Return ONLY a JSON array of functionality features.`;
+Return ONLY a JSON array of functionality feature names as strings, like: ["Contact Management", "User Authentication", "Payment Processing"]`;
 
       const functionalityText = await generateWithOpenRouter(functionalityPrompt, tier);
       try {
-        lists.functionalityFeatureList = JSON.parse(functionalityText.replace(/```json\n?|\n?```/g, ""));
+        const parsed = JSON.parse(functionalityText.replace(/```json\n?|\n?```/g, ""));
+        // Transform objects with 'feature' property to strings, or use strings as-is
+        if (Array.isArray(parsed)) {
+          lists.functionalityFeatureList = parsed.map((item: unknown) => {
+            // If it's already a string, use it
+            if (typeof item === "string") {
+              return item;
+            }
+            // If it's an object, check for 'feature' property (case-insensitive check)
+            if (typeof item === "object" && item !== null) {
+              const obj = item as Record<string, unknown>;
+              // Check for 'feature' property (case-sensitive first, then try different cases)
+              if ("feature" in obj && typeof obj.feature === "string") {
+                return obj.feature;
+              }
+              if ("Feature" in obj && typeof obj.Feature === "string") {
+                return obj.Feature;
+              }
+              // Try lowercase keys
+              const lowerKeys = Object.keys(obj).map(k => k.toLowerCase());
+              const featureKey = lowerKeys.find(k => k === "feature" || k === "name" || k === "title");
+              if (featureKey) {
+                const actualKey = Object.keys(obj).find(k => k.toLowerCase() === featureKey);
+                if (actualKey && typeof obj[actualKey] === "string") {
+                  return obj[actualKey] as string;
+                }
+              }
+              // If no feature property, try to stringify the object (fallback)
+              return JSON.stringify(item);
+            }
+            // Fallback: convert to string
+            return String(item);
+          }).filter((item): item is string => typeof item === "string" && item.length > 0);
+        } else {
+          // If not an array, wrap it
+          lists.functionalityFeatureList = [String(parsed)];
+        }
       } catch {
-        lists.functionalityFeatureList = functionalityText.split("\n").filter(line => line.trim()).map(line => line.replace(/^[-*]\s*/, "").trim());
+        lists.functionalityFeatureList = functionalityText.split("\n").filter(line => line.trim()).map(line => line.replace(/^[-*]\s*/, "").trim()).filter(line => line.length > 0);
+      }
+      
+      // Final safety check: ensure all items are strings and remove any that are still objects
+      if (lists.functionalityFeatureList) {
+        lists.functionalityFeatureList = lists.functionalityFeatureList.map(item => {
+          if (typeof item === "string") return item;
+          if (typeof item === "object" && item !== null) {
+            const obj = item as Record<string, unknown>;
+            // Try multiple property names
+            if ("feature" in obj && typeof obj.feature === "string") return obj.feature;
+            if ("Feature" in obj && typeof obj.Feature === "string") return obj.Feature;
+            if ("name" in obj && typeof obj.name === "string") return obj.name;
+            if ("Name" in obj && typeof obj.Name === "string") return obj.Name;
+            if ("title" in obj && typeof obj.title === "string") return obj.title;
+            if ("Title" in obj && typeof obj.Title === "string") return obj.Title;
+            // Last resort: stringify
+            return JSON.stringify(item);
+          }
+          return String(item);
+        }).filter((item): item is string => typeof item === "string" && item.length > 0);
+        
+        // Double-check: if any item is still an object, remove it
+        lists.functionalityFeatureList = lists.functionalityFeatureList.filter(item => {
+          try {
+            // If it's a JSON string that parses to an object, extract the feature name
+            const parsed = JSON.parse(item);
+            if (typeof parsed === "object" && parsed !== null) {
+              const obj = parsed as Record<string, unknown>;
+              if ("feature" in obj && typeof obj.feature === "string") {
+                return true; // We'll replace it below
+              }
+              return false; // Remove objects we can't extract a string from
+            }
+            return true;
+          } catch {
+            return true; // Not JSON, keep it
+          }
+        }).map(item => {
+          // One more pass to extract from JSON strings
+          try {
+            const parsed = JSON.parse(item);
+            if (typeof parsed === "object" && parsed !== null) {
+              const obj = parsed as Record<string, unknown>;
+              if ("feature" in obj && typeof obj.feature === "string") return obj.feature;
+              if ("name" in obj && typeof obj.name === "string") return obj.name;
+              if ("title" in obj && typeof obj.title === "string") return obj.title;
+            }
+            return item;
+          } catch {
+            return item;
+          }
+        });
       }
     }
 
@@ -368,14 +457,55 @@ Return ONLY a JSON array of error scenarios, like: ["Network timeout", "Invalid 
       }
     }
 
-    // Update generation
+    // Final transformation: ensure all list items are strings before saving
+    const sanitizedLists: typeof lists = {};
+    if (lists.screenList) {
+      sanitizedLists.screenList = lists.screenList.map(item => 
+        typeof item === "string" ? item : String(item)
+      ).filter((item): item is string => typeof item === "string" && item.length > 0);
+    }
+    if (lists.endpointList) {
+      sanitizedLists.endpointList = lists.endpointList.map(item => 
+        typeof item === "string" ? item : String(item)
+      ).filter((item): item is string => typeof item === "string" && item.length > 0);
+    }
+    if (lists.securityFeatureList) {
+      sanitizedLists.securityFeatureList = lists.securityFeatureList.map(item => 
+        typeof item === "string" ? item : String(item)
+      ).filter((item): item is string => typeof item === "string" && item.length > 0);
+    }
+    if (lists.functionalityFeatureList) {
+      sanitizedLists.functionalityFeatureList = lists.functionalityFeatureList.map(item => {
+        // If it's already a string, return it
+        if (typeof item === "string") return item;
+        // If it's an object, try to extract the feature name
+        if (typeof item === "object" && item !== null) {
+          const obj = item as Record<string, unknown>;
+          if ("feature" in obj && typeof obj.feature === "string") return obj.feature;
+          if ("Feature" in obj && typeof obj.Feature === "string") return obj.Feature;
+          if ("name" in obj && typeof obj.name === "string") return obj.name;
+          if ("Name" in obj && typeof obj.Name === "string") return obj.Name;
+          if ("title" in obj && typeof obj.title === "string") return obj.title;
+          if ("Title" in obj && typeof obj.Title === "string") return obj.Title;
+        }
+        // Last resort: stringify
+        return String(item);
+      }).filter((item): item is string => typeof item === "string" && item.length > 0);
+    }
+    if (lists.errorScenarioList) {
+      sanitizedLists.errorScenarioList = lists.errorScenarioList.map(item => 
+        typeof item === "string" ? item : String(item)
+      ).filter((item): item is string => typeof item === "string" && item.length > 0);
+    }
+
+    // Update generation with sanitized lists
     await ctx.runMutation(api.appBuilderGenerations.updateGenerationStatus, {
       generationId,
       status: "generating_prompts",
-      ...lists,
+      ...sanitizedLists,
     });
 
-    return lists;
+    return sanitizedLists;
   },
 });
 
@@ -402,7 +532,9 @@ export const generateItemPrompt = action({
     // Check prompt limit
     const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
     if (!limitCheck.canCreate) {
-      throw new Error(`Daily prompt limit reached.`);
+      const error = `Daily prompt limit reached.`;
+      console.error(`[generateItemPrompt] ${error}`, { generationId, userId, itemType, itemName });
+      throw new Error(error);
     }
 
     // Get user tier
@@ -507,34 +639,91 @@ Generate a prompt that helps identify and fix this error scenario, including ana
 Include a 5-line explanation in simple language.`;
     }
 
-    const prompt = await generateWithOpenRouter(itemPrompt, tier);
+    try {
+      const prompt = await generateWithOpenRouter(itemPrompt, tier);
 
-    // Get current generation to update generatedPrompts
-    const generation = await ctx.runQuery(api.appBuilderGenerations.getGeneration, { generationId });
-    const currentPrompts = generation?.generatedPrompts || {};
-    const typePrompts = currentPrompts[itemType] || [];
-    
-    currentPrompts[itemType] = [
-      ...typePrompts,
-      {
-        title: itemName,
-        prompt,
+      // Get current generation to update generatedPrompts
+      const generation = await ctx.runQuery(api.appBuilderGenerations.getGeneration, { generationId });
+      const currentPrompts = generation?.generatedPrompts || {};
+      const typePrompts = currentPrompts[itemType] || [];
+      
+      currentPrompts[itemType] = [
+        ...typePrompts,
+        {
+          title: itemName,
+          prompt,
+          itemType,
+          createdAt: Date.now(),
+        },
+      ];
+
+      // Update generation
+      await ctx.runMutation(api.appBuilderGenerations.updateGenerationStatus, {
+        generationId,
+        status: "generating_prompts",
+        generatedPrompts: currentPrompts,
+      });
+
+      // Increment prompt count
+      await ctx.runMutation(api.users.incrementPromptCount, { userId });
+
+      console.log(`[generateItemPrompt] Success: ${itemType}/${itemName}`, { generationId, userId });
+      return { prompt };
+    } catch (error: any) {
+      const errorMessage = error.message || String(error);
+      const errorContext = {
+        generationId,
+        userId,
         itemType,
-        createdAt: Date.now(),
-      },
-    ];
+        itemName,
+        error: errorMessage,
+        timestamp: Date.now(),
+      };
+      
+      console.error(`[generateItemPrompt] Error generating prompt for ${itemType}/${itemName}:`, errorContext);
+      
+      // Store error in generation record (could extend schema to include errorLog)
+      // For now, log it and rethrow
+      throw new Error(`Failed to generate prompt for ${itemName} (${itemType}): ${errorMessage}`);
+    }
+  },
+});
 
-    // Update generation
-    await ctx.runMutation(api.appBuilderGenerations.updateGenerationStatus, {
+// Get generation progress for state sync
+export const getGenerationProgress = query({
+  args: {
+    generationId: v.id("appBuilderGenerations"),
+  },
+  handler: async (ctx, { generationId }) => {
+    const generation = await ctx.db.get(generationId);
+    if (!generation) {
+      return null;
+    }
+
+    const generatedPrompts = generation.generatedPrompts || {};
+    const totalPrompts = 
+      (generation.screenList?.length || 0) +
+      (generation.endpointList?.length || 0) +
+      (generation.securityFeatureList?.length || 0) +
+      (generation.functionalityFeatureList?.length || 0) +
+      (generation.errorScenarioList?.length || 0);
+    
+    const completedPrompts = Object.values(generatedPrompts).flat().length;
+
+    return {
       generationId,
-      status: "generating_prompts",
-      generatedPrompts: currentPrompts,
-    });
-
-    // Increment prompt count
-    await ctx.runMutation(api.users.incrementPromptCount, { userId });
-
-    return { prompt };
+      status: generation.status,
+      completedPrompts,
+      totalPrompts,
+      progress: totalPrompts > 0 ? (completedPrompts / totalPrompts) * 100 : 0,
+      generatedPrompts,
+      screenList: generation.screenList || [],
+      endpointList: generation.endpointList || [],
+      securityFeatureList: generation.securityFeatureList || [],
+      functionalityFeatureList: generation.functionalityFeatureList || [],
+      errorScenarioList: generation.errorScenarioList || [],
+      lastError: null, // Could be extended to store last error
+    };
   },
 });
 

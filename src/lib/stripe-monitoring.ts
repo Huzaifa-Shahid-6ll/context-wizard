@@ -6,6 +6,7 @@
 
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../convex/_generated/api';
+import { logger } from './logger';
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -42,7 +43,8 @@ export async function getWebhookMetrics(
       averageProcessingTime: 0,
     };
   } catch (error) {
-    console.error('Failed to get webhook metrics:', error);
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error('Failed to get webhook metrics', { error: err.message });
     throw error;
   }
 }
@@ -63,7 +65,12 @@ export function alertWebhookFailure(
   - Retry Count: ${retryCount}
   - Timestamp: ${new Date().toISOString()}`;
 
-  console.error(alertMessage);
+  logger.error('Stripe webhook failure alert', {
+    eventId,
+    eventType,
+    error,
+    retryCount,
+  });
 
   // In production, you would:
   // - Send to monitoring service (e.g., Sentry, Datadog)
@@ -84,7 +91,11 @@ export function trackSubscriptionLifecycle(
   - Timestamp: ${new Date().toISOString()}
   ${metadata ? `- Metadata: ${JSON.stringify(metadata)}` : ''}`;
 
-  console.log(logMessage);
+  logger.info('Subscription lifecycle event', {
+    userId,
+    event,
+    metadata,
+  });
 
   // In production, you would:
   // - Send to analytics service (PostHog, Mixpanel, etc.)
@@ -134,7 +145,8 @@ export async function checkStripeHealth(): Promise<{
     // recentWebhookFailures = logs.filter(log => log.status === 'failed').length;
     // averageProcessingTime = logs.reduce((sum, log) => sum + (log.processingTimeMs || 0), 0) / logs.length;
   } catch (error) {
-    console.error('Failed to check webhook metrics:', error);
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error('Failed to check webhook metrics', { error: err.message });
     issues.push('Unable to retrieve webhook metrics');
   }
 
