@@ -4,14 +4,19 @@
  */
 
 // Lazy load tiktoken to avoid WASM loading during SSR/build
-function getTiktokenSync() {
+type TiktokenModule = {
+  encoding_for_model: (model: string) => { encode: (text: string) => number[]; free: () => void };
+  get_encoding: (encoding: string) => { encode: (text: string) => number[]; free: () => void };
+};
+
+function getTiktokenSync(): TiktokenModule | null {
   if (typeof window === 'undefined') {
     return null;
   }
   try {
     // Use require to avoid static analysis during build
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('@dqbd/tiktoken');
+    return require('@dqbd/tiktoken') as TiktokenModule;
   } catch {
     return null;
   }
@@ -188,7 +193,11 @@ export function countMessagesTokens(
         openAIModel = 'gpt-4o';
       }
 
-      const encoding = encoding_for_model(openAIModel as any);
+      const tiktoken = getTiktokenSync();
+      if (!tiktoken) {
+        throw new Error('Tiktoken not available');
+      }
+      const encoding = tiktoken.encoding_for_model(openAIModel as any);
       
       // OpenAI adds ~4 tokens per message for formatting
       let totalTokens = 0;

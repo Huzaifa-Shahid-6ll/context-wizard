@@ -3,7 +3,7 @@
  * Provides consistent user tier checking across the application
  */
 
-import type { Doc } from '../../convex/_generated/dataModel';
+import type { Doc } from '@/../convex/_generated/dataModel';
 
 export type UserTier = 'free' | 'pro';
 export type UserDoc = Doc<'users'> | null | undefined;
