@@ -1,6 +1,12 @@
 // Prevent XSS and injection attacks
 
+import { Errors } from './errors';
+
 export function sanitizeInput(input: string): string {
+  if (typeof input !== 'string') {
+    throw Errors.invalidInput('Input must be a string');
+  }
+  
   return input
     .trim()
     .replace(/[<>]/g, '') // Remove HTML tags

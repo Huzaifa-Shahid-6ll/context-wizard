@@ -3,8 +3,19 @@
  * This ensures exact matches with OpenAI's and Anthropic's token predictors
  */
 
-import { encoding_for_model, get_encoding, type Tiktoken } from '@dqbd/tiktoken';
-import { countTokens as anthropicCountTokens } from '@anthropic-ai/sdk';
+// Lazy load tiktoken to avoid WASM loading during SSR/build
+function getTiktokenSync() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    // Use require to avoid static analysis during build
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('@dqbd/tiktoken');
+  } catch {
+    return null;
+  }
+}
 
 export type TokenCountResult = {
   count: number;
@@ -23,6 +34,16 @@ export function countTokensAccurate(
   if (!text || text.trim().length === 0) {
     return { count: 0, method: 'empty' };
   }
+  
+  // Skip WASM during SSR/build
+  if (typeof window === 'undefined') {
+    // Fallback approximation during build/SSR
+    return {
+      count: Math.ceil(text.length / 4),
+      method: 'approximation-ssr',
+      model: modelOrProvider,
+    };
+  }
 
   // Normalize model name
   const model = modelOrProvider.toLowerCase();
@@ -37,49 +58,41 @@ export function countTokensAccurate(
     model.includes('openai/gpt') ||
     model.includes('gpt')
   ) {
-    try {
-      // Map OpenRouter model names to OpenAI model names
-      let openAIModel: string = 'gpt-4';
-      if (model.includes('gpt-3.5') || model.includes('gpt-35')) {
-        openAIModel = 'gpt-3.5-turbo';
-      } else if (model.includes('gpt-4o')) {
-        openAIModel = 'gpt-4o';
-      } else if (model.includes('gpt-4-turbo')) {
-        openAIModel = 'gpt-4-turbo';
-      } else if (model.includes('gpt-4')) {
-        openAIModel = 'gpt-4';
-      }
+    // Map OpenRouter model names to OpenAI model names
+    let openAIModel: string = 'gpt-4';
+    if (model.includes('gpt-3.5') || model.includes('gpt-35')) {
+      openAIModel = 'gpt-3.5-turbo';
+    } else if (model.includes('gpt-4o')) {
+      openAIModel = 'gpt-4o';
+    } else if (model.includes('gpt-4-turbo')) {
+      openAIModel = 'gpt-4-turbo';
+    } else if (model.includes('gpt-4')) {
+      openAIModel = 'gpt-4';
+    }
 
-      const encoding = encoding_for_model(openAIModel as any);
-      const tokens = encoding.encode(text);
-      const count = tokens.length;
-      encoding.free(); // Free memory
-      return {
-        count,
-        method: 'tiktoken',
-        model: openAIModel,
-      };
-    } catch (error) {
-      console.warn('Failed to use tiktoken, falling back to cl100k_base', error);
-      // Fallback to cl100k_base encoding (used by GPT-4 and GPT-3.5)
-      try {
-        const encoding = get_encoding('cl100k_base');
+    try {
+      // Try to use tiktoken dynamically
+      const tiktoken = getTiktokenSync();
+      if (tiktoken) {
+        const encoding = tiktoken.encoding_for_model(openAIModel as any);
         const tokens = encoding.encode(text);
         const count = tokens.length;
-        encoding.free();
+        encoding.free(); // Free memory
         return {
           count,
-          method: 'tiktoken-cl100k_base-fallback',
-          model: 'gpt-4',
-        };
-      } catch (fallbackError) {
-        console.warn('Failed to use tiktoken fallback', fallbackError);
-        // Last resort: approximation
-        return {
-          count: Math.ceil(text.length / 4),
-          method: 'approximation-fallback',
+          method: 'tiktoken',
+          model: openAIModel,
         };
       }
+      throw new Error('Tiktoken not available');
+    } catch (error) {
+      console.warn('Failed to use tiktoken, falling back to approximation', error);
+      // Fallback: approximation
+      return {
+        count: Math.ceil(text.length / 4),
+        method: 'approximation-fallback',
+        model: openAIModel,
+      };
     }
   }
 
@@ -89,35 +102,30 @@ export function countTokensAccurate(
     model.includes('anthropic/claude') ||
     model.includes('anthropic')
   ) {
-    try {
-      // Anthropic's countTokens function
-      const count = anthropicCountTokens(text);
-      return {
-        count,
-        method: 'anthropic-sdk',
-        model: 'claude',
-      };
-    } catch (error) {
-      console.warn('Failed to use Anthropic SDK, falling back', error);
-      // Fallback approximation for Claude (~3.5 chars per token)
-      return {
-        count: Math.ceil(text.length / 3.5),
-        method: 'approximation-fallback',
-      };
-    }
+    // Fallback approximation for Claude (~3.5 chars per token)
+    // Note: Anthropic SDK doesn't export countTokens, using approximation
+    return {
+      count: Math.ceil(text.length / 3.5),
+      method: 'approximation',
+      model: 'claude',
+    };
   }
 
   // Default: Try tiktoken with cl100k_base (used by GPT-4 and GPT-3.5)
   try {
-    const encoding = get_encoding('cl100k_base');
-    const tokens = encoding.encode(text);
-    const count = tokens.length;
-    encoding.free();
-    return {
-      count,
-      method: 'tiktoken-cl100k_base',
-      model: 'default',
-    };
+    const tiktoken = getTiktokenSync();
+    if (tiktoken) {
+      const encoding = tiktoken.get_encoding('cl100k_base');
+      const tokens = encoding.encode(text);
+      const count = tokens.length;
+      encoding.free();
+      return {
+        count,
+        method: 'tiktoken-cl100k_base',
+        model: 'default',
+      };
+    }
+    throw new Error('Tiktoken not available');
   } catch (error) {
     // Last resort: approximation
     return {

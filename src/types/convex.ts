@@ -1,4 +1,4 @@
-import type { Id } from "../convex/_generated/dataModel";
+import type { Id } from "../../convex/_generated/dataModel";
 
 export type UserStats = {
   remainingPrompts: number;
@@ -13,5 +13,4 @@ export type GenerationProgress = {
 };
 
 export type ChatSessionId = Id<"chatSessions">;
-export type ChatMessageId = Id<"chatMessages">;
 

@@ -23,9 +23,10 @@ import { ScrollReveal } from "@/components/landing/ScrollReveal";
 import { ReadingProgress } from "@/components/landing/ReadingProgress";
 import { AnimatedHeading } from "@/components/landing/AnimatedHeading";
 import { LogoLoop } from "@/components/LogoLoop";
-import { motion } from "framer-motion";
 import LightRays from "@/components/LightRays";
 import ShinyText from "@/components/ui/ShinyText";
+import { ScrollLockedCards } from "@/components/landing/ScrollLockedCards";
+import ScrollStack, { ScrollStackItem } from "@/components/ScrollStack";
 
 
 export default function Home() {
@@ -79,41 +80,38 @@ export default function Home() {
       content:
         "The wizard itself takes just a few minutes to complete. Building the actual app depends on complexity, but with our guided prompts, most apps can be built in hours rather than days or weeks. The prompts are designed to be efficient and comprehensive.",
     },
+  ];
+
+  const featureCards = [
     {
-      icon: HelpCircle,
-      title: "Do I need Cursor to use this?",
-      content:
-        "Yes, Cursor Builder generates prompts specifically designed for Cursor. However, the prompts are written in plain language and could be adapted for other AI coding assistants, though they're optimized for Cursor's workflow.",
+      icon: Workflow,
+      title: "10-Step Guided Wizard",
+      desc: "Complete step-by-step process from app type selection to deployment. Our comprehensive wizard walks you through every stage of development—from choosing your app architecture to setting up authentication, database connections, API endpoints, and deployment configurations. No guesswork, no missing steps—just follow the prompts and build with confidence.",
     },
     {
-      icon: DollarSign,
-      title: "Can I use this for commercial projects?",
-      content:
-        "Yes! Both Free and Pro plans allow commercial use. The prompts you generate become part of your project and you have full rights to use, modify, and build with them. We only ask that you don't resell the prompt generation service itself.",
+      icon: Sparkles,
+      title: "AI-Generated Cursor Prompts",
+      desc: "Get production-ready prompts for every feature you need—authentication systems, database setup and migrations, API routes with proper error handling, frontend components with state management, testing configurations, and deployment strategies. Each prompt is carefully crafted to work seamlessly with Cursor's AI, ensuring you get code that matches your project structure and follows industry best practices.",
     },
     {
-      icon: Headphones,
-      title: "What if I get stuck building my app?",
-      content:
-        "Each prompt includes context and explanations to help you understand what's being built. If you need additional help, contact us at support@contextwizard.com or join our Discord community for support from other builders.",
+      icon: Code2,
+      title: "Multiple App Templates",
+      desc: "Choose from a wide variety of app templates including portfolio sites, e-commerce platforms, SaaS applications, blog systems, dashboards, or build completely custom apps with our guided prompts. Each template comes with pre-configured prompts for common features, saving you hours of setup time and ensuring consistency across your project.",
     },
     {
-      icon: Boxes,
-      title: "Can I build multiple apps?",
-      content:
-        "Absolutely! You can use Cursor Builder to generate prompts for as many apps as you want. Free users get 5 builds per day, while Pro users get unlimited builds. Each app gets its own set of customized prompts.",
+      icon: Shield,
+      title: "Best Practices Built-In",
+      desc: "Every prompt includes comprehensive error handling, security considerations, input validation, proper authentication flows, and architecture patterns from day one. We've learned from thousands of projects to ensure your code is secure, maintainable, and scalable from the very first line. No technical debt, no shortcuts—just production-ready code.",
     },
     {
-      icon: RefreshCw,
-      title: "How do I cancel my Pro subscription?",
-      content:
-        "You can cancel anytime from your dashboard → Billing. Your Pro access continues until the end of your billing period, and you can re-subscribe anytime without losing your build history.",
+      icon: Zap,
+      title: "Works for Non-Developers",
+      desc: "Even if you're new to coding, our guided prompts make building complex apps accessible to everyone. Each step is explained in plain language, with clear instructions on what to do and why. The AI handles the complex parts while you learn and understand the process. Perfect for entrepreneurs, designers, or anyone who wants to build without years of coding experience.",
     },
     {
-      icon: RefreshCw,
-      title: "Do you offer refunds?",
-      content:
-        "Yes, we offer a 30-day money-back guarantee for Pro subscriptions. If you're not satisfied, email support@contextwizard.com within 30 days of your purchase for a full refund.",
+      icon: Rocket,
+      title: "From Idea to Production",
+      desc: "Complete workflow from project setup to deployment. All prompts are production-ready and tested, covering everything from initial project scaffolding to database migrations, API development, frontend implementation, testing, and final deployment. Follow the guided process and go from concept to live application faster than ever before, with confidence that your code is ready for real users.",
     },
   ];
 
@@ -189,7 +187,7 @@ export default function Home() {
 
           {/* Subheadline */}
           <p className="mx-auto mt-4 max-w-3xl text-lg sm:text-xl font-normal text-foreground/60 text-shadow-sm">
-            The only tool that generates step-by-step Cursor prompts for building full applications. From portfolio sites to SaaS platforms—build anything with guided AI assistance.
+            The only tool that generates step-by-step prompts for building full applications. From portfolio sites to SaaS platforms—build anything with guided AI assistance.
           </p>
 
           {/* Two-column feature comparison */}
@@ -230,7 +228,7 @@ export default function Home() {
             <Button 
               asChild 
               size="lg" 
-              className="h-14 sm:h-16 px-8 sm:px-12 text-base sm:text-lg font-semibold shadow-depth-lg hover:shadow-elevated hover:scale-105 transition-all duration-200"
+              className="light-shine h-14 sm:h-16 px-8 sm:px-12 text-base sm:text-lg font-semibold shadow-depth-lg hover:shadow-elevated hover:scale-105 transition-all duration-200"
               onClick={() => trackEvent('hero_cta_clicked', { button_text: 'Start Building Apps' })}
             >
               <Link href="/dashboard/cursor-builder">
@@ -263,63 +261,23 @@ export default function Home() {
       />
 
       {/* SECTION 3: THE PROBLEM (Emotional Connection) */}
-      <ScrollReveal>
-      <section id="problem" className="max-w-7xl mx-auto px-4 py-20">
-        <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-primary text-shadow-md">
-          <ShinyText text="Why AI Coding Tools Keep Failing You" speed={3} className="text-3xl sm:text-4xl font-bold" />
-        </h2>
-        <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-          Every developer knows the frustration. Here{'\''}s what{'\''}s really going wrong.
-        </p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-          {/* Column 1: Broken Code */}
-          <Card className="depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="depth-layer-3 shadow-depth-sm w-12 h-12 rounded-lg flex items-center justify-center">
-                <AlertCircle className="h-6 w-6 text-destructive" />
-              </div>
-              <h3 className="text-xl font-semibold text-shadow-sm">
-                <ShinyText text="Cursor Generates Broken Code" speed={3} className="text-xl font-semibold" />
-              </h3>
-            </div>
-            <p className="text-muted-foreground text-base leading-relaxed">
-              You paste a prompt and get code that doesn{'\''}t match your project structure, uses wrong dependencies, or completely misses your architecture.
-            </p>
-          </Card>
-
-          {/* Column 2: Hours Wasted */}
-          <Card className="depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="depth-layer-3 shadow-depth-sm w-12 h-12 rounded-lg flex items-center justify-center">
-                <Clock className="h-6 w-6 text-amber-500" />
-              </div>
-              <h3 className="text-xl font-semibold text-shadow-sm">
-                <ShinyText text="Hours Wasted on Setup" speed={3} className="text-xl font-semibold" />
-              </h3>
-            </div>
-            <p className="text-muted-foreground text-base leading-relaxed">
-              Every new project means manually writing .cursorrules, creating documentation, and explaining your codebase to AI—over and over again.
-            </p>
-          </Card>
-
-          {/* Column 3: Burning Credits */}
-          <Card className="depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="depth-layer-3 shadow-depth-sm w-12 h-12 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-red-500" />
-              </div>
-              <h3 className="text-xl font-semibold text-shadow-sm">
-                <ShinyText text="Burning API Credits" speed={3} className="text-xl font-semibold" />
-              </h3>
-            </div>
-            <p className="text-muted-foreground text-base leading-relaxed">
-              Bad context means more back-and-forth, more regenerations, and hundreds of wasted tokens trying to get AI to understand your project.
-            </p>
-          </Card>
+      <section id="problem" className="relative">
+        <div className="max-w-7xl mx-auto px-4 py-20">
+          <h2 className="text-4xl sm:text-5xl font-extrabold text-center mb-4 text-primary text-shadow-md">
+            <ShinyText
+              text="Why AI Coding Tools Keep Failing You"
+              speed={3}
+              className="text-4xl sm:text-5xl font-extrabold"
+              highlightWord="Failing"
+              highlightClassName="text-red-500 font-extrabold"
+            />
+          </h2>
+          <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto text-lg sm:text-xl font-semibold">
+            Every developer knows the frustration. Here{'\''}s what{'\''}s really going wrong.
+          </p>
         </div>
+        <ScrollLockedCards />
       </section>
-      </ScrollReveal>
 
       {/* SECTION 4: THE SOLUTION (How It Works - Visual) */}
       <ScrollReveal>
@@ -338,38 +296,33 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
           {/* Step 1 */}
           <Card 
-            className="relative
-              depth-layer-2
-              shadow-depth-sm
+            className="light-shine
               border-0
               hover-lift
               transition-all duration-300
-              overflow-hidden"
+              overflow-hidden
+              p-0"
           >
-            <div 
-              className="absolute top-4 left-4
-                bg-primary/10
-                w-8 h-8 rounded-full
-                flex items-center justify-center
-                text-sm font-semibold
-                text-primary"
-            >
-              1
-            </div>
             <div
-              className="bg-muted/30
-                rounded-lg h-40
+              className="bg-white
+                h-48
                 flex items-center justify-center
-                mb-4"
+                overflow-hidden relative"
             >
-              <Target className="h-14 w-14 text-muted-foreground" />
+              <Image 
+                src="/Consult-Experts--Streamline-Milano.png" 
+                alt="Choose Your App Type" 
+                width={160} 
+                height={160} 
+                className="w-full h-full object-contain"
+              />
             </div>
-            <CardHeader className="pt-2">
+            <CardHeader className="pt-4 px-6">
               <CardTitle className="text-lg font-semibold">
                 <ShinyText text="Choose Your App Type" speed={3} className="text-lg font-semibold" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="pb-6">
+            <CardContent className="pb-6 px-6">
               <p className="text-muted-foreground text-sm leading-relaxed">
                 Select from portfolio sites, e-commerce, SaaS platforms, or custom apps. Our wizard guides you through every step.
               </p>
@@ -378,38 +331,33 @@ export default function Home() {
 
           {/* Step 2 */}
           <Card 
-            className="relative
-              depth-layer-2
-              shadow-depth-sm
+            className="light-shine
               border-0
               hover-lift
               transition-all duration-300
-              overflow-hidden"
+              overflow-hidden
+              p-0"
           >
-            <div 
-              className="absolute top-4 left-4
-                bg-primary/10
-                w-8 h-8 rounded-full
-                flex items-center justify-center
-                text-sm font-semibold
-                text-primary"
-            >
-              2
-            </div>
             <div
-              className="bg-muted/30
-                rounded-lg h-40
+              className="bg-white
+                h-48
                 flex items-center justify-center
-                mb-4"
+                overflow-hidden relative"
             >
-              <Sparkles className="h-14 w-14 text-muted-foreground animate-pulse" />
+              <Image 
+                src="/Being-Creative-2--Streamline-Milano.png" 
+                alt="Get Step-by-Step Prompts" 
+                width={160} 
+                height={160} 
+                className="w-full h-full object-contain"
+              />
             </div>
-            <CardHeader className="pt-2">
+            <CardHeader className="pt-4 px-6">
               <CardTitle className="text-lg font-semibold">
                 <ShinyText text="Get Step-by-Step Prompts" speed={3} className="text-lg font-semibold" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="pb-6">
+            <CardContent className="pb-6 px-6">
               <p className="text-muted-foreground text-sm leading-relaxed">
                 Our AI generates complete Cursor prompts for every feature—from setup to deployment. Copy, paste, and build.
               </p>
@@ -418,38 +366,33 @@ export default function Home() {
 
           {/* Step 3 */}
           <Card 
-            className="relative
-              depth-layer-2
-              shadow-depth-sm
+            className="light-shine
               border-0
               hover-lift
               transition-all duration-300
-              overflow-hidden"
+              overflow-hidden
+              p-0"
           >
-            <div 
-              className="absolute top-4 left-4
-                bg-primary/10
-                w-8 h-8 rounded-full
-                flex items-center justify-center
-                text-sm font-semibold
-                text-primary"
-            >
-              3
-            </div>
             <div
-              className="bg-muted/30
-                rounded-lg h-40
+              className="bg-white
+                h-48
                 flex items-center justify-center
-                mb-4"
+                overflow-hidden relative"
             >
-              <Code2 className="h-14 w-14 text-muted-foreground" />
+              <Image 
+                src="/Analyze-Data-5--Streamline-Milano.png" 
+                alt="Build Your Complete App" 
+                width={160} 
+                height={160} 
+                className="w-full h-full object-contain"
+              />
             </div>
-            <CardHeader className="pt-2">
+            <CardHeader className="pt-4 px-6">
               <CardTitle className="text-lg font-semibold">
                 <ShinyText text="Build Your Complete App" speed={3} className="text-lg font-semibold" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="pb-6">
+            <CardContent className="pb-6 px-6">
               <p className="text-muted-foreground text-sm leading-relaxed">
                 Follow the guided prompts in Cursor to build your entire application. Includes error handling, best practices, and architecture.
               </p>
@@ -465,13 +408,20 @@ export default function Home() {
         {/* Video Demo Embed */}
         <div className="mt-12 max-w-4xl mx-auto">
           <div className="relative aspect-video rounded-xl border-2 border-border bg-gradient-to-br from-muted to-muted/50 shadow-2xl overflow-hidden">
-            {/* Placeholder for video - replace with actual embed */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
-              <Video className="h-24 w-24 text-muted-foreground mb-4" />
-              <div className="text-xl font-semibold">
+            <div className="absolute inset-0">
+              <Image 
+                src="/Digital-Nomad-Working-In-Coffee-Shop-3--Streamline-Milano.png" 
+                alt="See Cursor Builder in Action" 
+                fill
+                className="object-cover"
+              />
+            </div>
+            {/* Overlay with text and play button */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-black/40">
+              <div className="text-xl font-semibold text-white">
                 <ShinyText text="See Cursor Builder in Action" speed={3} className="text-xl font-semibold" />
               </div>
-              <div className="text-sm text-muted-foreground mt-2">Watch how easy it is to build complete apps with guided prompts</div>
+              <div className="text-sm text-white/90 mt-2">Watch how easy it is to build complete apps with guided prompts</div>
               
               {/* Play button overlay */}
               <button
@@ -492,41 +442,39 @@ export default function Home() {
       {/* SECTION 5: BEFORE/AFTER (Proof It Works) */}
       <ScrollReveal>
       <section id="before-after" className="mx-auto max-w-7xl px-4 sm:px-6 py-20">
-        <h2 className="text-center text-3xl sm:text-4xl font-bold text-primary mb-4 text-shadow-md">
-          <ShinyText text="See The Difference Context Makes" speed={3} className="text-3xl sm:text-4xl font-bold" />
+        <h2 className="text-center mb-4 text-shadow-md">
+          <div className="text-[#b5b5b5a4] bg-clip-text inline-block animate-shine text-3xl sm:text-4xl md:text-5xl font-black" style={{ backgroundImage: 'linear-gradient(120deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0) 60%)', backgroundSize: '200% 100%', WebkitBackgroundClip: 'text', animationDuration: '3s' }}>
+            See the Difference <span className="text-[#fafafa]">Great Prompts</span> Make
+          </div>
         </h2>
         <p className="text-center text-muted-foreground mb-12 text-base max-w-2xl mx-auto">
-          Same prompt, completely different results. See why context files matter.
+          Same AI, completely different results. See why GREAT PROMPTS matter.
         </p>
         
         {/* Desktop: Side-by-side, Mobile: Tabs */}
         <div className="hidden md:grid grid-cols-2 gap-6 lg:gap-8 mb-8">
           {/* Before */}
-          <Card className="depth-layer-2 shadow-depth-md border-0 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <X className="h-6 w-6 text-destructive" />
-              <CardTitle className="text-xl font-semibold text-destructive">
-                <ShinyText text="Without Context Files" speed={3} className="text-xl font-semibold" />
+          <Card className="light-shine border-0 p-6">
+            <div className="mb-4">
+              <CardTitle className="text-2xl sm:text-3xl font-bold text-destructive">
+                <ShinyText text="Without Great Prompts" speed={3} className="text-2xl sm:text-3xl font-bold" />
               </CardTitle>
             </div>
-            <div className="rounded-lg depth-layer-1 shadow-inset p-4 mb-4">
+            <div className="rounded-lg p-4 mb-4">
               <Image src="/badCODE_example.png" alt="Messy AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
             </div>
-            <p className="text-sm text-muted-foreground text-center">32 lines of bugs, wrong dependencies, doesn{'\''}t run</p>
           </Card>
 
           {/* After */}
-          <Card className="depth-layer-3 shadow-depth-lg border-0 p-6 hover-lift">
-            <div className="flex items-center gap-2 mb-4">
-              <Check className="h-6 w-6 text-primary" />
-              <CardTitle className="text-xl font-semibold text-primary">
-                <ShinyText text="With Context Files" speed={3} className="text-xl font-semibold" />
+          <Card className="light-shine border-0 p-6 hover-lift">
+            <div className="mb-4">
+              <CardTitle className="text-2xl sm:text-3xl font-bold text-primary">
+                <ShinyText text="With Great Prompts" speed={3} className="text-2xl sm:text-3xl font-bold" />
               </CardTitle>
             </div>
-            <div className="rounded-lg depth-layer-3 shadow-depth-sm p-4 mb-4">
+            <div className="rounded-lg p-4 mb-4">
               <Image src="/Good Code_example.png" alt="Clean AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
             </div>
-            <p className="text-sm font-medium text-primary text-center">Production-ready code, correct patterns, works first try</p>
           </Card>
         </div>
 
@@ -544,31 +492,27 @@ export default function Home() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="before" className="mt-0">
-              <Card className="depth-layer-2 shadow-depth-md border-0 p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <X className="h-6 w-6 text-destructive" />
-                  <CardTitle className="text-xl font-semibold text-destructive">
-                <ShinyText text="Without Context Files" speed={3} className="text-xl font-semibold" />
+              <Card className="light-shine border-0 p-6">
+                <div className="mb-4">
+                  <CardTitle className="text-2xl sm:text-3xl font-bold text-destructive">
+                <ShinyText text="Without Great Prompts" speed={3} className="text-2xl sm:text-3xl font-bold" />
               </CardTitle>
                 </div>
-            <div className="rounded-lg depth-layer-1 shadow-inset p-4 mb-4">
+            <div className="rounded-lg p-4 mb-4">
               <Image src="/badCODE_example.png" alt="Messy AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
             </div>
-                <p className="text-sm text-muted-foreground text-center">32 lines of bugs, wrong dependencies, doesn{'\''}t run</p>
               </Card>
             </TabsContent>
             <TabsContent value="after" className="mt-0">
-              <Card className="depth-layer-3 shadow-depth-lg border-0 p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Check className="h-6 w-6 text-primary" />
-                  <CardTitle className="text-xl font-semibold text-primary">
-                <ShinyText text="With Context Files" speed={3} className="text-xl font-semibold" />
+              <Card className="light-shine border-0 p-6">
+                <div className="mb-4">
+                  <CardTitle className="text-2xl sm:text-3xl font-bold text-primary">
+                <ShinyText text="With Great Prompts" speed={3} className="text-2xl sm:text-3xl font-bold" />
               </CardTitle>
                 </div>
-                <div className="rounded-lg depth-layer-3 shadow-depth-sm p-4 mb-4">
+                <div className="rounded-lg p-4 mb-4">
                   <Image src="/Good Code_example.png" alt="Clean AI-generated code" width={600} height={360} className="h-auto w-full rounded" />
                 </div>
-                <p className="text-sm font-medium text-primary text-center">Production-ready code, correct patterns, works first try</p>
               </Card>
             </TabsContent>
           </Tabs>
@@ -579,7 +523,7 @@ export default function Home() {
           <SignUpButton mode="modal">
             <Button 
               size="lg" 
-              className="h-12 px-8 text-base font-semibold shadow-depth-lg hover:shadow-elevated"
+              className="light-shine h-12 px-8 text-base font-semibold shadow-depth-lg hover:shadow-elevated"
               onClick={() => {
                 trackEvent("before_after_cta_clicked", { button_text: "Start Building Apps" });
                 router.push("/dashboard/cursor-builder");
@@ -593,116 +537,204 @@ export default function Home() {
       </section>
       </ScrollReveal>
 
-      {/* SECTION 6: TESTIMONIALS (Trust - High Up!) */}
+      {/* SECTION 6: TESTIMONIALS (Langbase Style Replica) */}
       <ScrollReveal>
       <section id="testimonials" className="bg-background">
-        <div className="max-w-6xl mx-auto px-4 py-16">
-          {/* Section Header with Highlight */}
-          <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-3">
-              <span className="bg-primary/20 px-3 py-1 rounded">WORLD-CLASS</span> <ShinyText text="CUSTOMER SUPPORT" speed={3} className="text-3xl sm:text-4xl font-bold" />
-            </h2>
-            <p className="text-muted-foreground text-sm">
-              Don{'\''}t just take our word for it. Our A-team gets tons of praise.
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+          {/* Section Header - Langbase Style */}
+          <div className="text-center mb-16">
+            <p className="text-emerald-500 text-sm sm:text-base font-medium mb-4">
+              Trusted by the world's top innovative organizations
             </p>
+            <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground">
+              What developers and founders are saying about Context Wizard
+            </h2>
           </div>
 
-          {/* Testimonials Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          {/* Testimonials Grid - Langbase Style with Varied Card Sizes */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
             {[
               { 
-                initials: "JD", 
+                initials: "ZB", 
                 bg: "bg-blue-500", 
-                quote: "I've been using BluE for 7 months now. Trust my notice all I get paid and support is <mark>excellent</mark>. I contacted human support 3 times, and their support was very <mark>quick to respond</mark> (that drives you crazy with the website itself has made the minimum needed a virtual tool drives you crazy).", 
-                name: "Lindy", 
-                source: "Trustpilot", 
-                date: "2 weeks ago" 
+                quote: "Context Wizard is transforming how AI coding tools are managed. From easy integrations, and seamless control of context files. What else could we ask for?",
+                name: "Zane Burke", 
+                title: "CTO & Co-founder",
+                company: "Context Wizard"
               },
               { 
-                initials: "MS", 
+                initials: "SD", 
                 bg: "bg-green-500", 
-                quote: "I start out using BluE as a freelancer, it was <mark>easy to use</mark>. Recently I started my own company and I now use BluE as a business to work with my contractors, freelancers and employees. I love how easy it is to <mark>transfer or withdraw</mark> service when I had any questions about the transfers or withdrawals.", 
-                name: "Anne", 
-                source: "Trustpilot", 
-                date: "1 month ago" 
+                quote: "The real breakthrough here is how easily we can test context files via Context Wizard – actually seeing which patterns get recognized for specific codebases. That kind of visibility just isn't available with other providers. Typically, you'd need specialized knowledge, framework-centric coding, or custom configurations to get the same result. But with Context Wizard, there's next-to-no-overhead or prior expertise needed. The straightforward setup, developer experience, out-of-the-box features, and built-in version control instantly give it a huge plus for anyone building AI-driven apps. Context Wizard basically saved me from an AI engineer overnight. The learning curve is practically zero thanks to the clear explanations and clean UI. And being able to talk directly with real engineers on their support team makes the entire experience even smoother.",
+                name: "Stephen Degnan", 
+                title: "AI & Internal Tooling Lead",
+                company: "Liquid Web",
+                span: 2,
+                customerStory: "Customer story: Liquid Web's 300% productivity boost with Context Wizard",
+                logo: "Liquid Web"
               },
               { 
-                initials: "AL", 
+                initials: "LK", 
                 bg: "bg-purple-500", 
-                quote: "I have been using Cursor for 5+ years now. I find the pleasure of using BluE for their <mark>excellent communication capabilities</mark> facilitated by the staff.", 
-                name: "Rosalie", 
-                source: "Trustpilot", 
-                date: "3 weeks ago" 
+                quote: "Context Wizard uniquely positioned to dramatically improve the AI developer experience. We have done exactly that with Context Wizard, building an OpenAI-agnostic context routing product for developers.",
+                name: "Logan Kilpatrick", 
+                title: "Google - OpenAI - Harvard"
               },
               { 
-                initials: "SK", 
+                initials: "AC", 
                 bg: "bg-amber-500", 
-                quote: "The .cursorrules files are <mark>game-changing</mark>. Cursor now generates code that matches our style guide perfectly. <mark>No more manual corrections!</mark>", 
-                name: "Sarah Kim", 
-                source: "Product Hunt", 
-                date: "2 weeks ago" 
+                quote: "Context Wizard lets us manage all our context-related infrastructure in one place. Quick iteration, real-time analytics, version controlled prompts, and real-time testing of different LLM models. Need more in context engineering? Context Wizard has it!",
+                name: "Anand Chaudhary", 
+                title: "CTO - Product & AI",
+                company: "Census.com - Former AWS/DO"
+              },
+              { 
+                initials: "ST", 
+                bg: "bg-indigo-500", 
+                quote: "We wrote ChatGPT v3 with our own context engine using Context Wizard. Why? Control and accuracy. Each step from prompt to answer is a Context Wizard pipe. This means prompt testing, prompt and model refinement. Want to add an OpenAI-agnostic routing layer? Context Wizard. It's not just about better answers – it's about building a system we can trust.",
+                name: "Sharo Tojo", 
+                title: "Founder",
+                company: "DevGPT"
+              },
+              { 
+                initials: "RH", 
+                bg: "bg-teal-500", 
+                quote: "Trusted to use Context Wizard. World Context Wizard is transforming AI development with its context infrastructure, making it easy for any developer to build, collaborate, and deploy AI apps. Think flexible workflows, but for AI context! Proud to have supported them from the beginning!",
+                name: "Ramon Hernandez", 
+                title: "CEO & Co-founder",
+                company: "Context Wizard"
+              },
+              { 
+                initials: "RR", 
+                bg: "bg-pink-500", 
+                quote: "Context Wizard uniquely solves for the hard parts of AI. It does the context models. Unlike an LLM, Context Wizard is the easiest way to build AI features. You can actually use build, ship, and iterate with zero config, nothing to happen.",
+                name: "Raf Radish", 
+                title: "Founding Designer",
+                company: "Vercel",
+                logo: "Vercel"
+              },
+              { 
+                initials: "JG", 
+                bg: "bg-cyan-500", 
+                quote: "LLMs are redefining the meaning of an application. Context Wizard is the easiest way to build AI features. It empowers every developer to build AI features in building this new world.",
+                name: "Jan Ghinger", 
+                title: "CTO",
+                company: "Monorepo"
+              },
+              { 
+                initials: "RP", 
+                bg: "bg-orange-500", 
+                quote: "Get an early beta. Context Wizard is shipping groundbreaking AI features for optimal control. We've worked for months. This means we're building AI powered projects and we're there!",
+                name: "Rahul Parekh", 
+                title: "Head of Product",
+                company: "Census.com - Former AWS/DO"
+              },
+              { 
+                initials: "KS", 
+                bg: "bg-emerald-500", 
+                quote: "Really impressed with Context Wizard over OpenAI's GPT-3.5. One of the most 'no-brainer' tools I've seen in the past decade. It's creating a new way to use custom composable context files to easily build/deploy new models as they are trained. It's the fastest way for anyone to stay on the bleeding edge without without under-resourcing. Context Wizard is simplifying the complexity of AI.",
+                name: "Kin Singh", 
+                title: "Founder",
+                company: "Ideas - Gitcoin"
+              },
+              { 
+                initials: "RS", 
+                bg: "bg-blue-600", 
+                quote: "Excellent product. Just added to the AI Development Tools list!",
+                name: "Robert Smith", 
+                title: "AI Engineer",
+                company: "Microsoft"
+              },
+              { 
+                initials: "CG", 
+                bg: "bg-violet-500", 
+                quote: "I had an opportunity to take an early look at Context Wizard is doing is groundbreaking to help manage context files for AI agents and resources for myself. The team allows me to build AI powered projects and we're there!",
+                name: "Corbin Godfrey", 
+                title: "Founding Designer",
+                company: "Vercel"
+              },
+              { 
+                initials: "BG", 
+                bg: "bg-rose-500", 
+                quote: "Good developers tools... Context Wizard is shipping the OpenAI-agnostic routing and pipelines that developers love to use. It ensures repetition, high-fidelity, inference routing, and allows leveraging the best models to build one more that scales. With AI pipes, developers can build and iterate AI features at high velocity.",
+                name: "Benjamin Godfrey", 
+                title: "CEO",
+                company: "Flowman - Persistent"
+              },
+              { 
+                initials: "AA", 
+                bg: "bg-sky-500", 
+                quote: "Composability - building complex systems from simple, interchangeable parts - can transform development processes. At npm, we made package management composable. Context Wizard brings this same spirit of modularity and flexibility into the AI domain.",
+                name: "Ahmad Awais", 
+                title: "CTO",
+                company: "npm - Google - Texas"
+              },
+              { 
+                initials: "GG", 
+                bg: "bg-lime-500", 
+                quote: "Context Wizard AI serves an easy day experience is powerful and unique. Truly designed to meet the needs of developers building and operating LLM apps.",
+                name: "Guy Godfrey", 
+                title: "Founder",
+                company: "Envy"
+              },
+              { 
+                initials: "JA", 
+                bg: "bg-fuchsia-500", 
+                quote: "If you're a developer and you're looking to do, you should be using Context Wizard. It's easy to use, extensible, and configurable. You can focus on your product and business rather than all the plumbing. Great work Ahmad and team!",
+                name: "James Andrade", 
+                title: "Staff Engineer",
+                company: "Vercel"
+              },
+              { 
+                initials: "MG", 
+                bg: "bg-yellow-500", 
+                quote: "We use OpenAI's GPT-3.5. I've been playing with Context Wizard since early 2023. I've got working with AI, this has 10/10 platform, 10/10 landing page.",
+                name: "Mike Giles", 
+                title: "Founder",
+                company: "RapidAPI"
+              },
+              { 
+                initials: "WM", 
+                bg: "bg-red-500", 
+                quote: "Really impressive launch of Context Wizard! It makes it easy for developers to build complex AI agents in a more modular and scalable manner. Context Wizard is an early supporter of Ahmad on his founder journey.",
+                name: "Walter Marshall", 
+                title: "Founder",
+                company: "Flowman"
               },
             ].map((t, idx) => (
-              <Card 
+              <div 
                 key={idx}
-                className="p-4 rounded-lg bg-card border border-border/40 hover:border-border transition-colors"
+                className={`p-6 rounded-lg bg-card border border-border/40 hover:border-border transition-colors ${t.span === 2 ? 'md:col-span-2 lg:col-span-2' : ''} flex flex-col w-full`}
+                style={{ height: 'fit-content' }}
               >
-                <div className="flex items-start gap-3 mb-3">
-                  <div className={`h-10 w-10 rounded-full ${t.bg} text-white flex items-center justify-center font-bold text-sm shrink-0`}>
-                    {t.initials}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm">{t.name}</div>
-                    <div className="flex items-center gap-1 mt-1">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star key={i} className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                      ))}
+                <p className="text-sm sm:text-base leading-relaxed text-foreground">
+                  {t.quote}
+                </p>
+                <div className="border-t border-border/40 mt-4 pt-4">
+                  <div className="flex items-start gap-3">
+                    <div className={`h-12 w-12 rounded-full ${t.bg} text-white flex items-center justify-center font-bold text-sm shrink-0`}>
+                      {t.initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm text-foreground">{t.name}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {t.title}{t.company && `, ${t.company}`}
+                      </div>
+                      {t.customerStory && (
+                        <p className="text-emerald-500 text-xs font-medium mt-3">
+                          {t.customerStory}
+                        </p>
+                      )}
+                      {t.logo && (
+                        <div className="mt-3 text-xs text-muted-foreground font-medium">
+                          {t.logo}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
-                <p 
-                  className="text-sm leading-relaxed mb-2"
-                  dangerouslySetInnerHTML={{ 
-                    __html: t.quote.replace(
-                      /<mark>/g, 
-                      '<mark class="bg-primary/20 px-1 rounded">'
-                    )
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t.source} • {t.date}
-                </p>
-              </Card>
+              </div>
             ))}
-          </div>
-
-          {/* Stats Bar */}
-          <div className="flex flex-wrap items-center justify-center gap-6 py-6 border-t border-border/40">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <Star className="h-5 w-5 fill-yellow-500 text-yellow-500" />
-                <span className="text-2xl font-bold">4.9</span>
-              </div>
-              <span className="text-sm text-muted-foreground">stars out of 5</span>
-            </div>
-            <span className="text-muted-foreground/40">|</span>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <div className="text-2xl font-bold">3 minutes</div>
-                <div className="text-xs text-muted-foreground">avg. response time</div>
-              </div>
-            </div>
-            <span className="text-muted-foreground/40">|</span>
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="gap-2"
-              onClick={() => trackEvent('trustpilot_clicked')}
-            >
-              See 275+ reviews on Trustpilot
-              <ArrowRight className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </section>
@@ -713,7 +745,7 @@ export default function Home() {
       <section 
         id="features" 
         className="mx-auto max-w-6xl px-6 py-20 scroll-mt-24
-          depth-layer-1
+          bg-black
           border-y border-border/20"
       >
         <h2 
@@ -721,62 +753,68 @@ export default function Home() {
             text-shadow-md
             tracking-tight"
         >
-          <ShinyText text="Everything You Need to Build Complete Apps" speed={3} className="text-3xl sm:text-4xl font-bold" />
+          <div
+            className="text-[#b5b5b5a4] bg-clip-text inline-block animate-shine text-3xl sm:text-4xl font-bold"
+            style={{
+              backgroundImage:
+                "linear-gradient(120deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0) 60%)",
+              backgroundSize: "200% 100%",
+              WebkitBackgroundClip: "text",
+              animationDuration: "3s"
+            }}
+          >
+            Everything You Need to Build Complete <span className="text-[#fafafa]">Apps</span>
+          </div>
         </h2>
-        <p className="mx-auto mt-3 max-w-2xl text-center text-foreground/70 text-base">Six powerful features that help you build production-ready applications with Cursor.</p>
-        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { icon: Workflow, title: "10-Step Guided Wizard", desc: "Complete step-by-step process from app type selection to deployment. No guesswork, just follow the prompts." },
-            { icon: Sparkles, title: "AI-Generated Cursor Prompts", desc: "Get production-ready prompts for every feature—authentication, database setup, API routes, and more." },
-            { icon: Code2, title: "Multiple App Templates", desc: "Choose from portfolio sites, e-commerce, SaaS platforms, or build custom apps with guided prompts." },
-            { icon: Shield, title: "Best Practices Built-In", desc: "Every prompt includes error handling, security considerations, and architecture patterns from day one." },
-            { icon: Zap, title: "Works for Non-Developers", desc: "Even if you're new to coding, our guided prompts make building complex apps accessible to everyone." },
-            { icon: Rocket, title: "From Idea to Production", desc: "Complete workflow from project setup to deployment. All prompts are production-ready and tested." },
-          ].map(({ icon: Icon, title, desc }, i) => (
-            <motion.div
-              key={i}
-              whileHover={{ y: -4 }}
-              className="group"
-              onClick={() => trackEvent("feature_card_clicked", { feature_name: title })}
-            >
-              <Card 
-                className="depth-layer-2
-                  shadow-depth-md
-                  border-0
-                  hover:depth-layer-3
-                  hover:shadow-elevated
-                  transition-all duration-300
-                  overflow-hidden
-                  h-full"
+        <p className="mx-auto mt-3 max-w-2xl text-center text-foreground/70 text-base">Six powerful features that help you build production-ready applications with AI.</p>
+        <div className="mt-10">
+          <ScrollStack
+            className="max-h-[80vh]"
+            itemDistance={200}
+            itemStackDistance={30}
+            stackPosition="20%"
+            baseScale={0.85}
+            rotationAmount={0}
+            blurAmount={0}
+          >
+            {featureCards.map(({ title, desc }) => (
+              <ScrollStackItem
+                key={title}
+                itemClassName="bg-transparent !p-0 !shadow-none !rounded-none !h-auto"
               >
-                <CardHeader>
-                  <div
-                    className="depth-layer-3
-                      w-12 h-12 rounded-lg
-                      shadow-depth-sm
-                      flex items-center justify-center
-                      group-hover:shadow-depth-md
-                      transition-all duration-300"
-                  >
-                    <Icon className="h-6 w-6 text-primary" />
-                  </div>
-                  <CardTitle
-                    className="text-xl font-semibold mt-4
-                      text-shadow-sm
-                      group-hover:text-primary
-                      transition-colors"
-                  >
-                    {title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground text-base leading-relaxed">
-                    {desc}
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+                <Card
+                  className="light-shine depth-layer-2
+                    shadow-depth-md
+                    border-0
+                    hover:depth-layer-3
+                    hover:shadow-elevated
+                    transition-all duration-300
+                    overflow-hidden
+                    h-full gap-4
+                    min-h-[280px]
+                    group"
+                  onClick={() => trackEvent("feature_card_clicked", { feature_name: title })}
+                >
+                  <CardHeader className="gap-1 pb-0">
+                    <CardTitle
+                      className="text-xl font-semibold
+                        text-shadow-sm
+                        group-hover:text-primary
+                        transition-colors"
+                    >
+                      {title}
+                    </CardTitle>
+                    <div className="h-[2px] w-full bg-foreground/30 rounded-full"></div>
+                  </CardHeader>
+                  <CardContent className="pt-3">
+                    <p className="text-foreground/80 text-base leading-relaxed">
+                      {desc}
+                    </p>
+                  </CardContent>
+                </Card>
+              </ScrollStackItem>
+            ))}
+          </ScrollStack>
         </div>
       </section>
       </ScrollReveal>
@@ -785,20 +823,31 @@ export default function Home() {
       <ScrollReveal>
       <section 
         id="use-cases"
-        className="depth-layer-1"
+        className="bg-black"
       >
         <div className="max-w-7xl mx-auto px-4 py-20">
           <h2 
             className="text-3xl sm:text-4xl font-bold text-center mb-4 text-primary
               text-shadow-md"
           >
-            <ShinyText text="Perfect For Every Builder" speed={3} className="text-3xl sm:text-4xl font-bold" />
+            <div
+              className="text-[#b5b5b5a4] bg-clip-text inline-block animate-shine text-3xl sm:text-4xl font-bold"
+              style={{
+                backgroundImage:
+                  "linear-gradient(120deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0) 60%)",
+                backgroundSize: "200% 100%",
+                WebkitBackgroundClip: "text",
+                animationDuration: "3s"
+              }}
+            >
+              Perfect For Every <span className="text-[#fafafa]">Builder</span>
+            </div>
           </h2>
-          <p className="text-muted-foreground text-center mb-12 text-base">From solo developers to teams—build apps faster with guided Cursor prompts</p>
+          <p className="text-muted-foreground text-center mb-12 text-base">From solo developers to teams—build apps faster with guided Great prompts</p>
 
           {/* Primary: Vibe Coders (40% size) */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-            <Card className="lg:col-span-2 depth-layer-2 shadow-depth-lg border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
+            <Card className="light-shine lg:col-span-2 depth-layer-2 shadow-depth-lg border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="depth-layer-3 shadow-depth-sm w-12 h-12 rounded-lg flex items-center justify-center">
                   <Bot className="h-6 w-6 text-primary" />
@@ -825,7 +874,7 @@ export default function Home() {
             </Card>
 
             {/* Secondary cards (20% each) */}
-            <Card className="lg:col-span-1 depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
+            <Card className="light-shine lg:col-span-1 depth-layer-2 shadow-depth-md border-0 hover:depth-layer-3 hover:shadow-elevated transition-all duration-300 p-6">
               <div className="flex items-center gap-2 mb-3">
                 <Code2 className="h-5 w-5 text-primary" />
                 <h3 className="text-lg font-semibold">
@@ -906,23 +955,36 @@ export default function Home() {
       <section id="innovation" className="max-w-7xl mx-auto px-4 py-20 bg-muted/20">
         <div className="text-center mb-12">
           <h2 className="text-3xl sm:text-4xl font-bold text-primary mb-4 text-shadow-md">
-            <ShinyText text="Go Beyond Context Files—Build Entire Apps" speed={3} className="text-3xl sm:text-4xl font-bold" />
+            <div
+              className="text-[#b5b5b5a4] bg-clip-text inline-block animate-shine text-3xl sm:text-4xl font-bold"
+              style={{
+                backgroundImage:
+                  "linear-gradient(120deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0) 60%)",
+                backgroundSize: "200% 100%",
+                WebkitBackgroundClip: "text",
+                animationDuration: "3s"
+              }}
+            >
+              Go Beyond Context Files—<span className="text-[#fafafa]">Build Entire Apps</span>
+            </div>
           </h2>
           <p className="text-muted-foreground text-base max-w-2xl mx-auto">
-            The only tool that generates complete Cursor prompts for building full applications
+            The only tool that generates complete prompts for building full applications
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
           {/* Left: Visual/Screenshot */}
           <div className="order-2 lg:order-1">
-            <Card className="depth-layer-2 shadow-depth-lg border-0 p-6">
-              <div className="rounded-lg depth-layer-1 shadow-inset h-96 flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
-                <div className="text-center">
-                  <Workflow className="h-24 w-24 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-sm text-muted-foreground">Cursor Builder Screenshot</p>
-                  <p className="text-xs text-muted-foreground mt-2">10-step wizard interface</p>
-                </div>
+            <Card className="light-shine depth-layer-2 shadow-depth-lg border-0 p-6">
+              <div className="rounded-lg depth-layer-1 shadow-inset h-96 flex items-center justify-center bg-white overflow-hidden relative force-bg-white">
+                <Image 
+                  src="/Evaluate-Performance-Employee-3--Streamline-Milano.png" 
+                  alt="Cursor Builder Screenshot" 
+                  width={400} 
+                  height={400} 
+                  className="w-full h-full object-contain"
+                />
               </div>
             </Card>
           </div>
@@ -930,7 +992,7 @@ export default function Home() {
           {/* Right: Benefits */}
           <div className="order-1 lg:order-2">
             <h3 className="text-2xl font-bold mb-6 text-primary">
-              <ShinyText text="The Only Tool That Generates Complete Cursor Prompts" speed={3} className="text-2xl font-bold" />
+              <ShinyText text="The Only Tool That Generates Complete Prompts" speed={3} className="text-2xl font-bold" />
             </h3>
             <ul className="space-y-4">
               <li className="flex items-start gap-3">
@@ -963,7 +1025,7 @@ export default function Home() {
               </li>
             </ul>
             <div className="mt-8">
-              <Button asChild size="lg" className="h-12 px-8 text-base font-semibold">
+              <Button asChild size="lg" className="light-shine h-12 px-8 text-base font-semibold">
                 <Link href="/dashboard/cursor-builder" onClick={() => trackEvent("cursor_builder_cta_clicked", { location: "innovation_section" })}>
                   Try Cursor Builder
                   <ArrowRight className="ml-2 h-5 w-5" />
@@ -997,10 +1059,10 @@ export default function Home() {
           <div className="text-center mt-12">
             <p className="mb-4">Still have questions?</p>
             <div className="flex justify-center gap-4">
-              <Button asChild>
+              <Button asChild className="light-shine">
                 <a href="mailto:support@contextwizard.com">Contact Support</a>
               </Button>
-              <Button asChild variant="outline">
+              <Button asChild variant="outline" className="light-shine">
                 <a href="https://discord.gg/your-discord-link">Join Discord Community</a>
               </Button>
             </div>
@@ -1023,7 +1085,7 @@ export default function Home() {
             <ShinyText text="Ready to Build Your First App?" speed={3} className="text-3xl sm:text-4xl md:text-5xl font-bold" />
           </h2>
           <p className="text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join 500+ developers building complete apps with guided Cursor prompts.
+            Join 500+ developers building complete apps with guided prompts.
           </p>
 
           {/* Large CTA */}
@@ -1031,7 +1093,7 @@ export default function Home() {
             <SignUpButton mode="modal">
               <Button 
                 size="lg" 
-                className="h-14 sm:h-16 px-8 sm:px-12 text-base sm:text-lg font-semibold shadow-depth-lg hover:shadow-elevated hover:scale-105 transition-all duration-200"
+                className="light-shine h-14 sm:h-16 px-8 sm:px-12 text-base sm:text-lg font-semibold shadow-depth-lg hover:shadow-elevated hover:scale-105 transition-all duration-200"
                 onClick={() => trackEvent('final_cta_clicked', { location: 'final_cta_section' })}
               >
                 Start Free—No Credit Card Required
@@ -1067,8 +1129,10 @@ export default function Home() {
       {/* Structured Data for SEO */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+        suppressHydrationWarning
+      >
+        {JSON.stringify(jsonLd)}
+      </script>
     </div>
   );
 }

@@ -8,7 +8,7 @@ export const generateEmbedding = action({
   handler: async (_ctx, { text }): Promise<number[]> => {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      throw new Error("OPENROUTER_API_KEY not configured");
+      throw new Error("EXTERNAL_SERVICE_ERROR: OPENROUTER_API_KEY not configured");
     }
 
     try {

@@ -3,14 +3,35 @@ import { auth } from '@clerk/nextjs/server';
 import { api } from '@/../convex/_generated/api';
 import { ConvexHttpClient } from 'convex/browser';
 import { sanitizeInput } from '@/lib/sanitize';
+import { createSafeErrorResponse } from '@/lib/errorMessages';
+
+// Request size limit: 5KB for affiliate click requests
+const MAX_REQUEST_SIZE = 5 * 1024; // 5KB
 
 export async function POST(request: NextRequest) {
   try {
+    // Check content length
+    const contentLength = request.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > MAX_REQUEST_SIZE) {
+      return Response.json(
+        { error: 'Request payload too large' },
+        { status: 413 }
+      );
+    }
+    
     // Use Clerk to get the authenticated user
     const authObject = await auth();
     const { userId } = authObject;
     
     const body = await request.json();
+    
+    // Additional validation after parsing
+    if (JSON.stringify(body).length > MAX_REQUEST_SIZE) {
+      return Response.json(
+        { error: 'Request payload too large' },
+        { status: 413 }
+      );
+    }
     const { toolName, category } = body;
 
     if (!toolName || !category) {
@@ -34,6 +55,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ message: 'Affiliate click logged' });
   } catch (error) {
     console.error('Error logging affiliate click:', error);
-    return Response.json({ message: 'Internal server error' }, { status: 500 });
+    const errorResponse = createSafeErrorResponse(error);
+    return Response.json(errorResponse.error, { status: 500 });
   }
 }

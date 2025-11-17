@@ -8,9 +8,7 @@ import { TooltipWrapper } from "@/components/forms/TooltipWrapper";
 import type { CursorBuilderFormState } from "@/types/cursor-builder";
 import type { StepProps } from "./StepProps";
 
-interface OverviewStepProps extends StepProps {
-  // Additional props specific to overview step if needed
-}
+type OverviewStepProps = StepProps;
 
 export function OverviewStep({ formState, updateField }: OverviewStepProps) {
   return (

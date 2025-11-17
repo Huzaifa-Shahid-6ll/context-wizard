@@ -368,6 +368,17 @@ const appBuilderGenerations = defineTable({
 .index("by_userId", ["userId"])
 .index("by_createdAt", ["createdAt"]);
 
+// Rate Limits table schema for persistent rate limiting
+const rateLimits = defineTable({
+  key: v.string(), // e.g., "prompt_gen:userId:2024-01-01" or "api:ip:window"
+  count: v.number(),
+  resetAt: v.number(), // Unix timestamp in milliseconds
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+  .index("by_key", ["key"])
+  .index("by_resetAt", ["resetAt"]); // For cleanup of expired entries
+
 // Export the schema
 export default defineSchema({
   users,
@@ -389,6 +400,7 @@ export default defineSchema({
   vectorEmbeddings,
   promptVersions,
   appBuilderGenerations,
+  rateLimits,
 });
 
 // Type helpers generated via convex codegen (imported by consumers):

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import TextType from "@/components/TextType";
+import ShinyText from "@/components/ui/ShinyText";
 
 interface AnimatedHeadingProps {
   className?: string;
@@ -72,39 +73,39 @@ export function AnimatedHeading({ className = "" }: AnimatedHeadingProps) {
       <span className="relative inline-block overflow-hidden align-top" style={{ minWidth: "140px", height: "1.2em" }}>
         <AnimatePresence mode="wait">
           {currentWord === "App" && (
-            <motion.span
+            <motion.div
               key="App"
               initial={{ y: 0, opacity: 1 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "-100%", opacity: 0 }}
               transition={{ duration: 0.8, ease: "easeInOut" }}
-              className="inline-block whitespace-nowrap bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent"
+              className="inline-block whitespace-nowrap"
             >
-              App
-            </motion.span>
+              <ShinyText text="App" speed={3} className="inline-block whitespace-nowrap" />
+            </motion.div>
           )}
           {currentWord === "Empires" && (
-            <motion.span
+            <motion.div
               key="Empires"
               initial={{ y: "100%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "-100%", opacity: 0 }}
               transition={{ duration: 0.8, ease: "easeInOut" }}
-              className="inline-block whitespace-nowrap bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent"
+              className="inline-block whitespace-nowrap"
             >
-              Empires
-            </motion.span>
+              <ShinyText text="Empires" speed={3} className="inline-block whitespace-nowrap" />
+            </motion.div>
           )}
           {currentWord === "Prompts" && (
-            <motion.span
+            <motion.div
               key="Prompts"
               initial={{ y: "100%", opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, ease: "easeInOut" }}
-              className="inline-block whitespace-nowrap bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent"
+              className="inline-block whitespace-nowrap"
             >
-              Prompts
-            </motion.span>
+              <ShinyText text="Prompts" speed={3} className="inline-block whitespace-nowrap" />
+            </motion.div>
           )}
         </AnimatePresence>
       </span>

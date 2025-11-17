@@ -2,6 +2,8 @@ import React, { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { FeedbackModal } from './FeedbackModal';
 import { logger } from '@/lib/logger';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from '@/lib/icons';
 
 interface Props {
   children: ReactNode;
@@ -39,11 +41,16 @@ class ErrorBoundary extends React.Component<Props, State> {
 
       return (
         <div className="p-4 max-w-2xl mx-auto">
-          <div className="bg-destructive/10 border border-destructive rounded-lg p-4 mb-4">
-            <h2 className="text-lg font-semibold text-destructive">Something went wrong</h2>
-            <p className="text-destructive/80 mt-2">{this.state.error?.message}</p>
-          </div>
-          <p className="mb-4">We{'\''}ve been notified of this issue. If you{'\''}d like to provide more details, please share your feedback below.</p>
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Something went wrong</AlertTitle>
+            <AlertDescription>
+              {this.state.error?.message || 'An unexpected error occurred'}
+            </AlertDescription>
+          </Alert>
+          <p className="mb-4 text-sm text-muted-foreground">
+            We{'\''}ve been notified of this issue. If you{'\''}d like to provide more details, please share your feedback below.
+          </p>
           <FeedbackTrigger error={this.state.error} />
         </div>
       );

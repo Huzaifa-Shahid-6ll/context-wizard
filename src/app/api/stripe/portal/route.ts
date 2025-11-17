@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { stripe } from '@/lib/stripe';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../../../../convex/_generated/api';
+import { createSafeErrorResponse } from '@/lib/errorMessages';
 
 export const runtime = 'nodejs';
 
@@ -37,8 +38,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (error: unknown) {
     console.error('Portal session error:', error);
+    const errorResponse = createSafeErrorResponse(error);
     return NextResponse.json(
-      { error: 'Failed to create portal session' },
+      errorResponse.error,
       { status: 500 }
     );
   }

@@ -640,41 +640,41 @@ Be concise, deterministic (temperature ~0.2), and ensure numeric fields are numb
           {results.type === "analysis" && (
             <div className="space-y-4">
               {/* Token Estimate Card */}
-              {results.data.tokenEstimate && (
+              {(results.data as any).tokenEstimate && (
                 <Card className="p-4 shadow-sm ring-1 ring-border bg-muted/50">
                   <h3 className="text-sm font-semibold mb-3">Token Estimate</h3>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-foreground/70">Original Prompt:</span>
                       <span className="ml-2 font-semibold">
-                        {results.data.tokenEstimate.originalPrompt} tokens
+                        {(results.data.tokenEstimate as any).originalPrompt} tokens
                       </span>
                     </div>
                     <div>
                       <span className="text-foreground/70">Improved Prompt:</span>
                       <span className="ml-2 font-semibold">
-                        {results.data.tokenEstimate.improvedPrompt} tokens
+                        {(results.data.tokenEstimate as any).improvedPrompt} tokens
                       </span>
                     </div>
-                    {results.data.tokenEstimate.systemContext && (
+                    {(results.data.tokenEstimate as any).systemContext && (
                       <div>
                         <span className="text-foreground/70">System Context:</span>
                         <span className="ml-2 font-semibold">
-                          {results.data.tokenEstimate.systemContext} tokens
+                          {(results.data.tokenEstimate as any).systemContext} tokens
                         </span>
                       </div>
                     )}
                     <div>
                       <span className="text-foreground/70">Total Estimate:</span>
                       <span className="ml-2 font-semibold text-primary">
-                        {results.data.tokenEstimate.totalEstimate} tokens
+                        {(results.data.tokenEstimate as any).totalEstimate} tokens
                       </span>
                     </div>
                   </div>
                   <p className="mt-3 text-xs text-foreground/60 border-t border-border pt-3">
-                    Estimated using <span className="font-medium">{results.data.tokenEstimate.method}</span> method
-                    {results.data.tokenEstimate.model && (
-                      <> for <span className="font-medium">{results.data.tokenEstimate.model}</span> model</>
+                    Estimated using <span className="font-medium">{(results.data.tokenEstimate as any).method}</span> method
+                    {(results.data.tokenEstimate as any).model && (
+                      <> for <span className="font-medium">{(results.data.tokenEstimate as any).model}</span> model</>
                     )}
                     . These counts match official token predictors for accurate cost estimation.
                   </p>

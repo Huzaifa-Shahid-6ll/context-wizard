@@ -4,8 +4,8 @@ import React from "react";
 import { initPostHog, trackEvent } from "@/lib/analytics";
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
-import { api } from "@/../convex/_generated/api";
-import { Id } from "@/../convex/_generated/dataModel";
+import { api } from "../../../../convex/_generated/api";
+import { Id } from "../../../../convex/_generated/dataModel";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,7 +69,7 @@ export default function PromptHistoryPage() {
   function onDelete(id: string) {
     if (!userId) return;
     trackEvent('prompt_deleted');
-    deletePrompt({ id: id as Id<"prompts">, userId }).catch(() => {});
+    deletePrompt({ id: id as Id<"prompts">, clerkId: userId }).catch(() => {});
   }
 
   function downloadText(filename: string, content: string, mime: string) {

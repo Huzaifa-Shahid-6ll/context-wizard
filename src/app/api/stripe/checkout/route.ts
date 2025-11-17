@@ -3,10 +3,14 @@ import { auth } from '@clerk/nextjs/server';
 import { stripe, STRIPE_PRICES } from '@/lib/stripe';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../../../../convex/_generated/api';
+import { createSafeErrorResponse } from '@/lib/errorMessages';
 
 export const runtime = 'nodejs';
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+
+// Request size limit: 10KB for checkout requests
+const MAX_REQUEST_SIZE = 10 * 1024; // 10KB
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,8 +24,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check content length
+    const contentLength = req.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > MAX_REQUEST_SIZE) {
+      return NextResponse.json(
+        { error: 'Request payload too large' },
+        { status: 413 }
+      );
+    }
+
     // Parse request body
     const body = await req.json();
+    
+    // Additional validation after parsing
+    if (JSON.stringify(body).length > MAX_REQUEST_SIZE) {
+      return NextResponse.json(
+        { error: 'Request payload too large' },
+        { status: 413 }
+      );
+    }
     const { priceId, billingPeriod = 'monthly' } = body ?? {};
 
     // Determine price ID
@@ -103,20 +124,15 @@ export async function POST(req: NextRequest) {
       sessionId: session.id,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Stripe checkout error:', error);
     
-    // Provide more specific error messages
-    let errorMessage = message || 'Failed to create checkout session';
-    if (message.includes('No such price')) {
-      errorMessage = 'Invalid pricing option. Please try again.';
-    } else if (message.includes('Invalid API Key')) {
-      errorMessage = 'Payment system configuration error. Please contact support.';
-    }
+    // Use production-safe error messages
+    const errorResponse = createSafeErrorResponse(error);
+    const statusCode = error instanceof Error && error.message.includes('Unauthorized') ? 401 : 500;
     
     return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
+      errorResponse.error,
+      { status: statusCode }
     );
   }
 }

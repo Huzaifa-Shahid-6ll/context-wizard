@@ -3,12 +3,16 @@ import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { generateWithOpenRouter } from "../src/lib/openrouter";
 
+// Structured formData validator (basic structure validation)
+// Note: formData is complex, so we validate structure but allow flexible content
+// Using v.any() for formData validation in the mutation args instead
+
 // Create a new generation record
 export const createGeneration = mutation({
   args: {
     userId: v.string(),
     projectName: v.string(),
-    formData: v.any(),
+    formData: v.any(), // Keep as any for now due to complexity, but validate in handler
     selectedPromptTypes: v.array(v.union(
       v.literal("frontend"),
       v.literal("backend"),
@@ -18,6 +22,27 @@ export const createGeneration = mutation({
     )),
   },
   handler: async (ctx, args) => {
+    // Validate project name
+    if (!args.projectName || typeof args.projectName !== 'string') {
+      throw new Error("INVALID_INPUT: Project name is required");
+    }
+    if (args.projectName.trim().length === 0) {
+      throw new Error("INVALID_INPUT: Project name cannot be empty");
+    }
+    if (args.projectName.length > 100) {
+      throw new Error("INVALID_INPUT: Project name cannot exceed 100 characters");
+    }
+    
+    // Validate formData is an object
+    if (!args.formData || typeof args.formData !== 'object' || Array.isArray(args.formData)) {
+      throw new Error("INVALID_INPUT: formData must be an object");
+    }
+    
+    // Validate selectedPromptTypes
+    if (!Array.isArray(args.selectedPromptTypes) || args.selectedPromptTypes.length === 0) {
+      throw new Error("INVALID_INPUT: At least one prompt type must be selected");
+    }
+    
     const now = Date.now();
     const generationId = await ctx.db.insert("appBuilderGenerations", {
       ...args,
@@ -32,9 +57,20 @@ export const createGeneration = mutation({
 
 // Get generation by ID
 export const getGeneration = query({
-  args: { generationId: v.id("appBuilderGenerations") },
-  handler: async (ctx, { generationId }) => {
-    return await ctx.db.get(generationId);
+  args: { 
+    generationId: v.id("appBuilderGenerations"),
+    clerkId: v.string(), // Add authorization check
+  },
+  handler: async (ctx, { generationId, clerkId }) => {
+    const generation = await ctx.db.get(generationId);
+    if (!generation) {
+      throw new Error("RESOURCE_NOT_FOUND: Generation not found");
+    }
+    // Verify user owns this generation
+    if (generation.userId !== clerkId) {
+      throw new Error("UNAUTHORIZED: Not authorized to access this generation");
+    }
+    return generation;
   },
 });
 
@@ -643,7 +679,7 @@ Include a 5-line explanation in simple language.`;
       const prompt = await generateWithOpenRouter(itemPrompt, tier);
 
       // Get current generation to update generatedPrompts
-      const generation = await ctx.runQuery(api.appBuilderGenerations.getGeneration, { generationId });
+      const generation = await ctx.runQuery(api.appBuilderGenerations.getGeneration, { generationId, clerkId: userId });
       const currentPrompts = generation?.generatedPrompts || {};
       const typePrompts = currentPrompts[itemType] || [];
       

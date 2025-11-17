@@ -13,11 +13,11 @@ export const fetchLatestSubscription = query({
       .unique();
     
     if (!user) {
-      throw new Error("User not found");
+      throw new Error("USER_NOT_FOUND: User not found");
     }
 
     if (!user.stripeCustomerId) {
-      throw new Error("No Stripe customer ID found for this user");
+      throw new Error("RESOURCE_NOT_FOUND: No Stripe customer ID found for this user");
     }
 
     try {
@@ -73,11 +73,11 @@ export const syncUserSubscriptionFromStripe = mutation({
       .unique();
     
     if (!user) {
-      throw new Error("User not found");
+      throw new Error("USER_NOT_FOUND: User not found");
     }
 
     if (!user.stripeCustomerId) {
-      throw new Error("No Stripe customer ID found for this user");
+      throw new Error("RESOURCE_NOT_FOUND: No Stripe customer ID found for this user");
     }
 
     try {

@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -293,11 +294,11 @@ export default function CursorBuilderPage() {
   function calculateTotalPrompts(): number {
     if (!generatedLists) return 0;
     let total = 0;
-    if (generatedLists.screenList) total += generatedLists.screenList.length;
-    if (generatedLists.endpointList) total += generatedLists.endpointList.length;
-    if (generatedLists.securityFeatureList) total += generatedLists.securityFeatureList.length;
-    if (generatedLists.functionalityFeatureList) total += generatedLists.functionalityFeatureList.length;
-    if (generatedLists.errorScenarioList) total += generatedLists.errorScenarioList.length;
+    if (generatedLists.frontend) total += generatedLists.frontend.length;
+    if (generatedLists.backend) total += generatedLists.backend.length;
+    if (generatedLists.security) total += generatedLists.security.length;
+    if (generatedLists.functionality) total += generatedLists.functionality.length;
+    if (generatedLists.errorFixing) total += generatedLists.errorFixing.length;
     return total;
   }
 
@@ -792,8 +793,17 @@ export default function CursorBuilderPage() {
         selectedPromptTypes: selectedTypes,
       });
       
-      setGeneratedLists(lists);
-      generatedListsRef.current = lists; // Also update ref
+      // Transform the result to match GeneratedLists type
+      const transformedLists: GeneratedLists = {
+        frontend: (lists as any).screenList?.map((name: string) => ({ name, type: "frontend" })) || [],
+        backend: (lists as any).endpointList?.map((name: string) => ({ name, type: "backend" })) || [],
+        security: (lists as any).securityFeatureList?.map((name: string) => ({ name, type: "security" })) || [],
+        functionality: (lists as any).functionalityFeatureList?.map((name: string) => ({ name, type: "functionality" })) || [],
+        errorFixing: (lists as any).errorScenarioList?.map((name: string) => ({ name, type: "errorFixing" })) || [],
+      };
+      
+      setGeneratedLists(transformedLists);
+      generatedListsRef.current = transformedLists; // Also update ref
       setProgress(80);
       setGenerationStartTime(Date.now());
       
@@ -803,8 +813,8 @@ export default function CursorBuilderPage() {
       setIsSubmitting(true); // Set to true before starting generation
       
       // Start generating prompts for first item
-      // Pass lists directly to avoid race condition with state update
-      await generateNextPrompt(lists);
+      // Pass transformedLists directly to avoid race condition with state update
+      await generateNextPrompt(transformedLists);
     } catch (e: unknown) {
       const error = e instanceof Error ? e : new Error(String(e));
       logger.error("Failed to generate lists", { error: error.message });
@@ -917,8 +927,8 @@ export default function CursorBuilderPage() {
 
       // Helper function to check if item already generated - use synced prompts and ref
       function itemAlreadyGenerated(type: string, name: string): boolean {
-        const syncedPromptsList = syncedPrompts[type] || [];
-        const refPromptsList = generatedPromptsRef.current[type] || [];
+        const syncedPromptsList = (syncedPrompts as any)[type] || [];
+        const refPromptsList = (generatedPromptsRef.current as any)[type] || [];
         // Check both synced and ref to catch all cases
         return syncedPromptsList.some((p: GeneratedItem) => p.title === name) ||
                refPromptsList.some((p: GeneratedItem) => p.title === name);
@@ -927,91 +937,93 @@ export default function CursorBuilderPage() {
       // Determine which item to generate next
       let nextItem: { type: string; name: string; index: number } | null = null;
       
+      if (!listsToUse) return;
+      
       // Check frontend screens - with duplicate detection
-      if (selectedTypes.includes("frontend") && listsToUse.screenList) {
+      if (selectedTypes.includes("frontend") && listsToUse.frontend) {
         const frontendPrompts = syncedPrompts.frontend || [];
-        const remainingScreens = listsToUse.screenList.filter(
-          (screen: string) => !itemAlreadyGenerated("frontend", screen)
+        const remainingScreens = listsToUse.frontend.filter(
+          (item) => !itemAlreadyGenerated("frontend", item.name)
         );
         
         if (remainingScreens.length > 0) {
           const nextScreen = remainingScreens[0];
-          const originalIndex = listsToUse.screenList.indexOf(nextScreen);
+          const originalIndex = listsToUse.frontend.findIndex(item => item.name === nextScreen.name);
           nextItem = {
             type: "frontend",
-            name: nextScreen,
+            name: nextScreen.name,
             index: originalIndex,
           };
         }
       }
       
       // Check backend endpoints - with duplicate detection
-      if (!nextItem && selectedTypes.includes("backend") && listsToUse.endpointList) {
+      if (!nextItem && selectedTypes.includes("backend") && listsToUse.backend) {
         const backendPrompts = syncedPrompts.backend || [];
-        const remainingEndpoints = listsToUse.endpointList.filter(
-          (endpoint: string) => !itemAlreadyGenerated("backend", endpoint)
+        const remainingEndpoints = listsToUse.backend.filter(
+          (item) => !itemAlreadyGenerated("backend", item.name)
         );
         
         if (remainingEndpoints.length > 0) {
           const nextEndpoint = remainingEndpoints[0];
-          const originalIndex = listsToUse.endpointList.indexOf(nextEndpoint);
+          const originalIndex = listsToUse.backend.findIndex(item => item.name === nextEndpoint.name);
           nextItem = {
             type: "backend",
-            name: nextEndpoint,
+            name: nextEndpoint.name,
             index: originalIndex,
           };
         }
       }
       
       // Check security features - with duplicate detection
-      if (!nextItem && selectedTypes.includes("security") && listsToUse.securityFeatureList) {
+      if (!nextItem && selectedTypes.includes("security") && listsToUse.security) {
         const securityPrompts = syncedPrompts.security || [];
-        const remainingFeatures = listsToUse.securityFeatureList.filter(
-          (feature: string) => !itemAlreadyGenerated("security", feature)
+        const remainingFeatures = listsToUse.security.filter(
+          (item) => !itemAlreadyGenerated("security", item.name)
         );
         
         if (remainingFeatures.length > 0) {
           const nextFeature = remainingFeatures[0];
-          const originalIndex = listsToUse.securityFeatureList.indexOf(nextFeature);
+          const originalIndex = listsToUse.security.findIndex(item => item.name === nextFeature.name);
           nextItem = {
             type: "security",
-            name: nextFeature,
+            name: nextFeature.name,
             index: originalIndex,
           };
         }
       }
       
       // Check functionality features - with duplicate detection
-      if (!nextItem && selectedTypes.includes("functionality") && listsToUse.functionalityFeatureList) {
+      if (!nextItem && selectedTypes.includes("functionality") && listsToUse.functionality) {
         const functionalityPrompts = syncedPrompts.functionality || [];
-        const remainingFeatures = listsToUse.functionalityFeatureList.filter(
-          (feature: string) => !itemAlreadyGenerated("functionality", feature)
+        const remainingFeatures = listsToUse.functionality.filter(
+          (item) => !itemAlreadyGenerated("functionality", item.name)
         );
         
         if (remainingFeatures.length > 0) {
           const nextFeature = remainingFeatures[0];
-          const originalIndex = listsToUse.functionalityFeatureList.indexOf(nextFeature);
+          const originalIndex = listsToUse.functionality.findIndex(item => item.name === nextFeature.name);
           nextItem = {
             type: "functionality",
-            name: nextFeature,
+            name: nextFeature.name,
             index: originalIndex,
           };
         }
       }
       
       // Check error scenarios - with duplicate detection
-      if (!nextItem && selectedTypes.includes("error_fixing") && listsToUse.errorScenarioList) {
+      if (!nextItem && selectedTypes.includes("error_fixing") && listsToUse.errorFixing) {
         const errorPrompts = syncedPrompts.error_fixing || [];
-        const remainingScenarios = listsToUse.errorScenarioList.filter(
-          (scenario: string) => !itemAlreadyGenerated("error_fixing", scenario)
+        const remainingScenarios = listsToUse.errorFixing.filter(
+          (item) => !itemAlreadyGenerated("error_fixing", item.name)
         );
         
         if (remainingScenarios.length > 0) {
           const nextScenario = remainingScenarios[0];
-          const originalIndex = listsToUse.errorScenarioList.indexOf(nextScenario);
+          const originalIndex = listsToUse.errorFixing.findIndex(item => item.name === nextScenario.name);
           nextItem = {
             type: "error_fixing",
-            name: nextScenario,
+            name: nextScenario.name,
             index: originalIndex,
           };
         }
@@ -1162,18 +1174,19 @@ export default function CursorBuilderPage() {
       Object.entries(generatedPrompts).forEach(([type, prompts]: [string, GeneratedItem[] | undefined]) => {
         if (Array.isArray(prompts)) {
           prompts.forEach((p: GeneratedItem, idx: number) => {
-            const promptType = type === "frontend" ? "frontend_prompt" :
-                             type === "backend" ? "backend_prompt" :
-                             type === "security" ? "security_prompt" :
-                             type === "functionality" ? "functionality_prompt" :
-                             type === "error_fixing" ? "error_fixing_prompt" : "chat_message";
+            const promptType: "frontend_prompt" | "backend_prompt" | "security_prompt" | "functionality_prompt" | "error_fixing_prompt" | "chat_message" = 
+              type === "frontend" ? "frontend_prompt" :
+              type === "backend" ? "backend_prompt" :
+              type === "security" ? "security_prompt" :
+              type === "functionality" ? "functionality_prompt" :
+              type === "error_fixing" ? "error_fixing_prompt" : "chat_message";
             embeddingItems.push({
               content: p.prompt,
               metadata: {
-                type: promptType,
+                type: promptType as any,
                 section: p.title,
                 promptId: `${type}_${idx}`,
-              },
+              } as any,
             });
           });
         }
@@ -1714,12 +1727,7 @@ export default function CursorBuilderPage() {
                 Analyzing your project details and creating a comprehensive PRD...
               </p>
               <div className="w-full max-w-md">
-                <div className="h-2 w-full rounded-full bg-secondary/20 overflow-hidden mb-2">
-                  <div 
-                    className="h-full bg-gradient-to-r from-primary via-primary/90 to-primary rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
+                <Progress value={progress} className="h-2 mb-2" />
                 <p className="text-xs text-foreground/50">{progress}% complete</p>
               </div>
               <div className="mt-8 p-4 bg-secondary/10 rounded-lg border border-border max-w-md">
@@ -1750,8 +1758,8 @@ export default function CursorBuilderPage() {
               </Button>
             </div>
             {isSubmitting && (
-              <div className="mt-4 h-2 w-full rounded bg-secondary/20">
-                <div className="h-2 rounded bg-primary transition-[width] duration-300" style={{ width: `${progress}%` }} />
+              <div className="mt-4">
+                <Progress value={progress} className="h-2" />
               </div>
             )}
           </Card>
@@ -1781,12 +1789,7 @@ export default function CursorBuilderPage() {
                 Creating detailed user journey maps based on your PRD...
               </p>
               <div className="w-full max-w-md">
-                <div className="h-2 w-full rounded-full bg-secondary/20 overflow-hidden mb-2">
-                  <div 
-                    className="h-full bg-gradient-to-r from-primary via-primary/90 to-primary rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
+                <Progress value={progress} className="h-2 mb-2" />
                 <p className="text-xs text-foreground/50">{progress}% complete</p>
               </div>
               <div className="mt-8 p-4 bg-secondary/10 rounded-lg border border-border max-w-md">
@@ -1817,8 +1820,8 @@ export default function CursorBuilderPage() {
               </Button>
             </div>
             {isSubmitting && (
-              <div className="mt-4 h-2 w-full rounded bg-secondary/20">
-                <div className="h-2 rounded bg-primary transition-[width] duration-300" style={{ width: `${progress}%` }} />
+              <div className="mt-4">
+                <Progress value={progress} className="h-2" />
               </div>
             )}
           </Card>
@@ -1848,12 +1851,7 @@ export default function CursorBuilderPage() {
                 Breaking down your project into actionable development tasks...
               </p>
               <div className="w-full max-w-md">
-                <div className="h-2 w-full rounded-full bg-secondary/20 overflow-hidden mb-2">
-                  <div 
-                    className="h-full bg-gradient-to-r from-primary via-primary/90 to-primary rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
+                <Progress value={progress} className="h-2 mb-2" />
                 <p className="text-xs text-foreground/50">{progress}% complete</p>
               </div>
               <div className="mt-8 p-4 bg-secondary/10 rounded-lg border border-border max-w-md">
@@ -1884,8 +1882,8 @@ export default function CursorBuilderPage() {
               </Button>
             </div>
             {isSubmitting && (
-              <div className="mt-4 h-2 w-full rounded bg-secondary/20">
-                <div className="h-2 rounded bg-primary transition-[width] duration-300" style={{ width: `${progress}%` }} />
+              <div className="mt-4">
+                <Progress value={progress} className="h-2" />
               </div>
             )}
           </Card>
@@ -1915,12 +1913,7 @@ export default function CursorBuilderPage() {
                 Creating lists of screens, endpoints, and features for prompt generation...
               </p>
               <div className="w-full max-w-md">
-                <div className="h-2 w-full rounded-full bg-secondary/20 overflow-hidden mb-2">
-                  <div 
-                    className="h-full bg-gradient-to-r from-primary via-primary/90 to-primary rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
+                <Progress value={progress} className="h-2 mb-2" />
                 <p className="text-xs text-foreground/50">{progress}% complete</p>
               </div>
               <div className="mt-8 p-4 bg-secondary/10 rounded-lg border border-border max-w-md">
@@ -1950,10 +1943,14 @@ export default function CursorBuilderPage() {
                         setGeneratedPrompts(getGenerationProgress.generatedPrompts);
                         generatedPromptsRef.current = getGenerationProgress.generatedPrompts; // Update ref
                       }
-                      if (getGenerationProgress.screenList && !generatedLists.screenList) {
-                        const updatedLists = {
-                          ...generatedLists,
-                          screenList: getGenerationProgress.screenList,
+                      if ((getGenerationProgress as any).screenList && !generatedLists?.frontend) {
+                        const progressLists = getGenerationProgress as any;
+                        const updatedLists: GeneratedLists = {
+                          frontend: progressLists.screenList?.map((name: string) => ({ name, type: "frontend" })) || [],
+                          backend: progressLists.endpointList?.map((name: string) => ({ name, type: "backend" })) || [],
+                          security: progressLists.securityFeatureList?.map((name: string) => ({ name, type: "security" })) || [],
+                          functionality: progressLists.functionalityFeatureList?.map((name: string) => ({ name, type: "functionality" })) || [],
+                          errorFixing: progressLists.errorScenarioList?.map((name: string) => ({ name, type: "errorFixing" })) || [],
                         };
                         setGeneratedLists(updatedLists);
                         generatedListsRef.current = updatedLists; // Update ref
@@ -2061,16 +2058,12 @@ export default function CursorBuilderPage() {
                       </span>
                     )}
                   </div>
-                  <div className="h-3 w-full rounded-full bg-secondary/20 overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-full transition-all duration-500 ease-out"
-                      style={{ 
-                        width: `${calculateTotalPrompts() > 0 
-                          ? (Object.values(generatedPrompts).flat().length / calculateTotalPrompts()) * 100 
-                          : 0}%` 
-                      }}
-                    />
-                  </div>
+                  <Progress 
+                    value={calculateTotalPrompts() > 0 
+                      ? (Object.values(generatedPrompts).flat().length / calculateTotalPrompts()) * 100 
+                      : 0} 
+                    className="h-3"
+                  />
                 </div>
               )}
               

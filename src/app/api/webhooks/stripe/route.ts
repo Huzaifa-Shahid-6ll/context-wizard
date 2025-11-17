@@ -5,6 +5,7 @@ import { stripe, STRIPE_WEBHOOK_SECRET_EXPORT } from '@/lib/stripe';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../../../../convex/_generated/api';
 import { logger } from '@/lib/logger';
+import { RATE_LIMITS } from '../../../../../convex/lib/rateLimit';
 
 // CRITICAL: Disable body parsing for webhooks
 export const runtime = 'nodejs';
@@ -21,36 +22,7 @@ const MAX_WEBHOOK_AGE_SECONDS = 5 * 60; // 5 minutes
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 100; // Max requests per window
 
-// Simple in-memory rate limiter (for production, use Redis or similar)
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-// Rate limiting helper
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const record = rateLimitMap.get(ip);
-
-  if (!record || now > record.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-
-  if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return false;
-  }
-
-  record.count++;
-  return true;
-}
-
-// Clean up old rate limit entries periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, record] of rateLimitMap.entries()) {
-    if (now > record.resetAt) {
-      rateLimitMap.delete(ip);
-    }
-  }
-}, RATE_LIMIT_WINDOW_MS);
+// Rate limiting is now handled by Convex - see checkRateLimit call below
 
 // Helper function to retry Convex operations with exponential backoff
 async function retryConvexOperation<T>(
@@ -77,12 +49,14 @@ async function retryConvexOperation<T>(
         });
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
         logger.error(`${operationName} failed after all retries`, {
           eventId: context.eventId,
           attempts: MAX_RETRIES + 1,
-          error: error instanceof Error ? error.message : String(error),
-          error instanceof Error ? error.stack : undefined
-        );
+          error: errorMessage,
+          stack: errorStack,
+        });
       }
     }
   }
@@ -103,8 +77,6 @@ function logWebhookError(
   logger.error(`Error processing webhook event`, {
     eventId,
     eventType,
-    eventId,
-    eventType,
     error: errorMessage,
     stack: errorStack,
     context,
@@ -118,13 +90,41 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
   
   try {
-    // Rate limiting
+    // Rate limiting using Convex
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 
                req.headers.get('x-real-ip') || 
                'unknown';
     
-    if (!checkRateLimit(ip)) {
-      logger.error("Rate limit exceeded", { requestId, ip });
+    // Check rate limit using Convex
+    const rateLimitCheck = await convex.mutation(api.mutations.incrementRateLimit, {
+      identifier: ip,
+      action: 'webhook_request',
+      limit: RATE_LIMITS.WEBHOOK_REQUESTS.count,
+      windowMs: RATE_LIMITS.WEBHOOK_REQUESTS.windowMs,
+    });
+    
+    if (!rateLimitCheck.allowed) {
+      logger.error("Rate limit exceeded", { 
+        requestId, 
+        ip,
+        count: rateLimitCheck.count,
+        limit: RATE_LIMITS.WEBHOOK_REQUESTS.count,
+      });
+      
+      // Log security event (using security.ts mutation)
+      await convex.mutation(api.security.logSecurityEvent, {
+        type: 'rate_limit_hit',
+        userId: undefined,
+        ip,
+        fingerprint: req.headers.get('user-agent') || 'unknown',
+        details: {
+          action: 'webhook_request',
+          count: rateLimitCheck.count,
+          limit: RATE_LIMITS.WEBHOOK_REQUESTS.count,
+        },
+        severity: 'medium',
+      });
+      
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
         { status: 429 }
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
         signatureLength: signature.length,
       };
       
-      logger.error("Webhook signature verification failed", { requestId, ...errorDetails });
+      logger.error("Webhook signature verification failed", errorDetails);
       
       // Provide more specific error messages
       let errorMessage = 'Webhook signature verification failed';
@@ -273,10 +273,10 @@ export async function POST(req: NextRequest) {
           // Stripe docs: https://docs.stripe.com/api/subscriptions/object#subscription_object-current_period_end
           // Prefer current_period_end, then trial_end, otherwise fallback to +30 days
           const currentPeriodEndSec =
-            typeof subscription.current_period_end === 'number'
-              ? Number(subscription.current_period_end)
-              : typeof subscription.trial_end === 'number' && subscription.trial_end !== null
-                ? Number(subscription.trial_end)
+            typeof (subscription as any).current_period_end === 'number'
+              ? Number((subscription as any).current_period_end)
+              : typeof (subscription as any).trial_end === 'number' && (subscription as any).trial_end !== null
+                ? Number((subscription as any).trial_end)
                 : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
 
           // Update user in Convex with retry logic
@@ -393,10 +393,10 @@ export async function POST(req: NextRequest) {
           // Ensure currentPeriodEnd is always a number to satisfy Convex validator
           // Stripe docs: https://docs.stripe.com/api/subscriptions/object#subscription_object-current_period_end
           const currentPeriodEndSec =
-            typeof subscription.current_period_end === 'number'
-              ? Number(subscription.current_period_end)
-              : typeof subscription.trial_end === 'number' && subscription.trial_end !== null
-                ? Number(subscription.trial_end)
+            typeof (subscription as any).current_period_end === 'number'
+              ? Number((subscription as any).current_period_end)
+              : typeof (subscription as any).trial_end === 'number' && (subscription as any).trial_end !== null
+                ? Number((subscription as any).trial_end)
                 : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
 
           await retryConvexOperation(
@@ -431,7 +431,7 @@ export async function POST(req: NextRequest) {
                     subscription_status: subscription.status,
                     subscription_id: subscription.id,
                     price_id: subscription.items.data[0]?.price?.id,
-                    current_period_end: subscription.current_period_end,
+                    current_period_end: (subscription as any).current_period_end,
                     cancel_at_period_end: subscription.cancel_at_period_end,
                   },
                 }),
@@ -507,7 +507,7 @@ export async function POST(req: NextRequest) {
                   customerId: sub.customer as string,
                   priceId: sub.items.data[0].price.id,
                   status: 'past_due',
-                  currentPeriodEnd: typeof sub.current_period_end === 'number' ? sub.current_period_end : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+                  currentPeriodEnd: typeof (sub as any).current_period_end === 'number' ? (sub as any).current_period_end : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
                   cancelAtPeriodEnd: !!sub.cancel_at_period_end,
                 }),
                 'updateUserSubscription',

@@ -1,8 +1,6 @@
 import { trackEvent } from "@/lib/analytics";
 import { Twitter, Github, Linkedin, MessageCircle } from "@/lib/icons";
 import React, { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { FeedbackModal } from "@/components/feedback/FeedbackModal";
 
 export const Footer: React.FC = () => {
@@ -16,17 +14,6 @@ export const Footer: React.FC = () => {
 
   return (
     <footer className="bg-muted/30 border-t py-12 px-4 text-sm text-muted-foreground">
-      {/* Newsletter Signup */}
-      <div className="max-w-6xl mx-auto mb-8">
-        <h2 className="text-lg font-bold text-shadow-sm">Stay Updated</h2>
-        <p>Get the latest features and updates delivered to your inbox</p>
-        <form className="mt-4 flex flex-col sm:flex-row gap-2" onSubmit={(e) => e.preventDefault()}>
-          <Input type="email" placeholder="Enter your email" className="flex-1 depth-layer-1 shadow-inset border-0" aria-label="Email address" />
-          <Button type="submit" className="depth-top shadow-depth-md hover:shadow-elevated">Subscribe</Button>
-        </form>
-        <p className="mt-2 text-xs">No spam. Unsubscribe anytime.</p>
-      </div>
-
       {/* Footer Columns */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
         {/* Column 1: Brand */}
@@ -36,7 +23,7 @@ export const Footer: React.FC = () => {
             <div className="h-8 w-8 bg-gray-300" />
             <span className="text-lg font-bold">Conard</span>
           </div>
-          <p className="mt-2">Build complete apps with guided Cursor prompts</p>
+          <p className="mt-2">Build complete apps with guided prompts</p>
           <p className="mt-2">
             Transform your app building workflow with step-by-step prompts that guide you from idea to production-ready application.
           </p>
@@ -64,8 +51,6 @@ export const Footer: React.FC = () => {
             <li><a href="#how-it-works" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'how_it_works' })}>How It Works</a></li>
             <li><a href="#pricing" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'pricing' })}>Pricing</a></li>
             <li><a href="/dashboard" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'dashboard' })}>Dashboard</a></li>
-            <li><span className="text-muted-foreground">Changelog (coming soon)</span></li>
-            <li><span className="text-muted-foreground">Roadmap (coming soon)</span></li>
           </ul>
         </div>
 
@@ -74,12 +59,7 @@ export const Footer: React.FC = () => {
           <h3 className="font-semibold text-shadow-sm">Resources</h3>
           <ul className="mt-2 space-y-2">
             <li><a href="/docs" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'documentation' })}>Documentation</a></li>
-            <li><a href="/api-docs" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'api_reference' })}>API Reference</a></li>
-            <li><a href="/tools" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'tools' })}>Tools</a></li>
-            <li><a href="/blog" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'blog' })}>Blog</a></li>
-            <li><a href="/tutorials" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'tutorials' })}>Tutorials</a></li>
             <li><a href="https://discord.gg/contextwizard" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'community' })}>Community</a></li>
-            <li><a href="#" className="hover:text-primary transition-colors" onClick={(e) => { e.preventDefault(); openFeedbackModal(); trackEvent('footer_link_clicked', { link_name: 'feedback' }); }}>Feedback</a></li>
             <li><a href="mailto:support@contextwizard.com" className="hover:text-primary transition-colors" onClick={() => { trackEvent('footer_link_clicked', { link_name: 'support' }); trackEvent('support_link_clicked'); }}>Support</a></li>
           </ul>
         </div>
@@ -90,8 +70,6 @@ export const Footer: React.FC = () => {
           <ul className="mt-2 space-y-2">
             <li><a href="/privacy" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'privacy' })}>Privacy Policy</a></li>
             <li><a href="/terms" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'terms' })}>Terms of Service</a></li>
-            <li><a href="/cookies" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'cookies' })}>Cookie Policy</a></li>
-            <li><a href="/gdpr" className="hover:text-primary transition-colors" onClick={() => trackEvent('footer_link_clicked', { link_name: 'gdpr' })}>GDPR Compliance</a></li>
           </ul>
         </div>
       </div>

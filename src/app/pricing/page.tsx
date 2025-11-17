@@ -123,7 +123,7 @@ export default function PricingPage() {
 							Choose the plan that fits. Upgrade anytime. Cancel whenever.
 						</p>
 						{/* Toggle */}
-						<div className="mt-6 inline-flex items-center justify-center gap-2 rounded-full border bg-card p-1 shadow-sm" role="group" aria-label="Billing period">
+						<div className="light-shine mt-6 inline-flex items-center justify-center gap-2 rounded-full border bg-card p-1 shadow-sm" role="group" aria-label="Billing period">
 							<button
 								type="button"
 								className={`rounded-full px-4 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
@@ -149,7 +149,7 @@ export default function PricingPage() {
 					</div>
 					{/* Cards */}
 					<div className="mt-12 grid grid-cols-1 gap-6 md:mt-16 md:grid-cols-2">
-						<Card ref={freeCardRef} className="relative h-full border-muted-foreground/20 shadow-lg transition hover:shadow-xl">
+						<Card ref={freeCardRef} className="light-shine relative h-full border-muted-foreground/20 shadow-lg transition hover:shadow-xl">
 							<CardHeader>
 								<CardTitle className="flex items-center justify-between text-2xl">Free <Badge variant="outline">Starter</Badge></CardTitle>
 								<CardDescription>All the basics to explore the product.</CardDescription>
@@ -167,12 +167,12 @@ export default function PricingPage() {
 									<li className="flex items-start gap-3"><Check className="mt-0.5 h-4 w-4 text-green-600" aria-hidden /> Basic context files</li>
 								</ul>
 								<div className="mt-8">
-						<Button className="w-full" size="lg" variant="outline" aria-label="Start for free" onClick={() => trackEvent('pricing_card_clicked', { plan_type: 'free' })}>Start for free</Button>
+						<Button className="light-shine w-full" size="lg" variant="outline" aria-label="Start for free" onClick={() => trackEvent('pricing_card_clicked', { plan_type: 'free' })}>Start for free</Button>
 								</div>
 							</CardContent>
 						</Card>
 
-						<Card ref={proCardRef} className="relative h-full border-primary/40 shadow-xl ring-1 ring-primary/10 transition hover:shadow-2xl">
+						<Card ref={proCardRef} className="light-shine relative h-full border-primary/40 shadow-xl ring-1 ring-primary/10 transition hover:shadow-2xl">
 							<div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-primary via-primary/80 to-primary/60" aria-hidden />
 							<CardHeader>
 								<div className="mb-2 flex items-center justify-between">
@@ -197,10 +197,10 @@ export default function PricingPage() {
 									<li className="flex items-start gap-3"><Sparkles className="mt-0.5 h-4 w-4 text-primary" aria-hidden /> Priority support</li>
 								</ul>
 								<div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
-									<Button size="lg" className="w-full" onClick={() => handleUpgrade(billingPeriod)} aria-label={`Upgrade to Pro (${billingPeriod})`}>
+									<Button size="lg" className="light-shine w-full" onClick={() => handleUpgrade(billingPeriod)} aria-label={`Upgrade to Pro (${billingPeriod})`}>
 										Upgrade to Pro
 									</Button>
-									<Button size="lg" variant="outline" className="w-full" onClick={() => handleUpgrade(billingPeriod === 'monthly' ? 'annual' : 'monthly')} aria-label="Try opposite billing period">
+									<Button size="lg" variant="outline" className="light-shine w-full" onClick={() => handleUpgrade(billingPeriod === 'monthly' ? 'annual' : 'monthly')} aria-label="Try opposite billing period">
 										{billingPeriod === 'monthly' ? 'Go annual' : 'Go monthly'}
 									</Button>
 								</div>
@@ -213,7 +213,7 @@ export default function PricingPage() {
 			{/* Comparison Table */}
 			<section className="mx-auto max-w-6xl px-4 py-12 md:py-16">
 				<h2 className="text-2xl font-semibold tracking-tight md:text-3xl">Compare plans</h2>
-				<div ref={tableRef} className="mt-6 overflow-hidden rounded-lg border bg-card shadow-sm">
+				<div ref={tableRef} className="light-shine mt-6 overflow-hidden rounded-lg border bg-card shadow-sm">
 					<table className="w-full text-sm">
 						<thead className="bg-muted/40 text-left">
 							<tr>
@@ -256,7 +256,7 @@ export default function PricingPage() {
 			{/* FAQ */}
 			<section className="mx-auto max-w-4xl px-4 pb-24">
 				<h2 className="text-2xl font-semibold tracking-tight md:text-3xl">Frequently asked questions</h2>
-				<div className="mt-6 divide-y rounded-lg border bg-card shadow-sm">
+				<div className="light-shine mt-6 divide-y rounded-lg border bg-card shadow-sm">
 					<details className="group p-4" role="group">
 						<summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left font-medium outline-none transition hover:text-foreground">
 							<span>Can I switch between monthly and annual later?</span>
@@ -295,7 +295,7 @@ export default function PricingPage() {
 						<span className="font-medium text-foreground">Ready to level up?</span>
 						<span className="ml-2">Get Pro for {priceLabel}/{priceUnit}.</span>
 					</div>
-					<Button size="lg" onClick={() => handleUpgrade(billingPeriod)} aria-label={`Upgrade to Pro (${billingPeriod}) from sticky bar`}>
+					<Button size="lg" className="light-shine" onClick={() => handleUpgrade(billingPeriod)} aria-label={`Upgrade to Pro (${billingPeriod}) from sticky bar`}>
 						Upgrade to Pro
 					</Button>
 				</div>

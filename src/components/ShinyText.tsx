@@ -5,10 +5,39 @@ interface ShinyTextProps {
   disabled?: boolean;
   speed?: number;
   className?: string;
+  highlightWord?: string;
+  highlightClassName?: string;
 }
 
-const ShinyText: React.FC<ShinyTextProps> = ({ text, disabled = false, speed = 5, className = '' }) => {
+const ShinyText: React.FC<ShinyTextProps> = ({
+  text,
+  disabled = false,
+  speed = 5,
+  className = '',
+  highlightWord,
+  highlightClassName = 'text-red-500',
+}) => {
   const animationDuration = `${speed}s`;
+  const renderContent = () => {
+    if (!highlightWord) {
+      return text;
+    }
+
+    const escapedWord = highlightWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapedWord})`, 'gi');
+    const parts = text.split(regex);
+
+    return parts.map((part, index) => {
+      if (part.toLowerCase() === highlightWord.toLowerCase()) {
+        return (
+          <span key={`${part}-${index}`} className={highlightClassName}>
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
 
   return (
     <div
@@ -21,7 +50,7 @@ const ShinyText: React.FC<ShinyTextProps> = ({ text, disabled = false, speed = 5
         animationDuration: animationDuration
       }}
     >
-      {text}
+      {renderContent()}
     </div>
   );
 };

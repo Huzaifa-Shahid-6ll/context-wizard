@@ -68,6 +68,17 @@ function ChartContainer({
   )
 }
 
+// Sanitize CSS to prevent XSS
+function sanitizeCSS(css: string): string {
+  // Remove any potentially dangerous CSS
+  return css
+    .replace(/<script/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/expression\(/gi, '')
+    .replace(/@import/gi, '')
+    .replace(/url\(javascript:/gi, '')
+}
+
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
     ([_, config]) => config.theme || config.color
@@ -77,26 +88,36 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null
   }
 
+  // Generate CSS safely
+  const cssContent = Object.entries(THEMES)
+    .map(([theme, prefix]) => {
+      const colors = colorConfig
+        .map(([key, itemConfig]) => {
+          const color =
+            itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
+            itemConfig.color
+          // Validate color is a valid CSS color value
+          if (color && /^[#a-zA-Z0-9(),.\s-]+$/.test(color)) {
+            return `--color-${key}: ${color};`
+          }
+          return null
+        })
+        .filter(Boolean)
+        .join(" ")
+      return colors
+        ? `${prefix === "" ? ":root" : prefix} { ${colors} }`
+        : null
+    })
+    .filter(Boolean)
+    .join("\n")
+
+  // Sanitize the CSS before injecting
+  const sanitizedCSS = sanitizeCSS(cssContent)
+
   return (
     <style
       dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(([theme, prefix]) => {
-            const colors = colorConfig
-              .map(([key, itemConfig]) => {
-                const color =
-                  itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
-                  itemConfig.color
-                return color ? `--color-${key}: ${color};` : null
-              })
-              .filter(Boolean)
-              .join(" ")
-            return colors
-              ? `${prefix === "" ? ":root" : prefix} { ${colors} }`
-              : null
-          })
-          .filter(Boolean)
-          .join("\n"),
+        __html: sanitizedCSS,
       }}
     />
   )

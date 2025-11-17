@@ -5,6 +5,9 @@ import { useUser } from '@clerk/nextjs';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { motion } from 'framer-motion';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from '@/lib/icons';
+import { Button } from '@/components/ui/button';
 
 const UserInitialization = ({ children }: { children: React.ReactNode }) => {
   const { user, isSignedIn } = useUser();
@@ -79,15 +82,20 @@ const UserInitialization = ({ children }: { children: React.ReactNode }) => {
   if (loadingError) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-background to-card">
-        <div className="text-center p-8 max-w-md">
-          <div className="text-red-500 text-2xl font-bold mb-4">Error</div>
-          <p className="text-foreground mb-4">{loadingError}</p>
-          <button 
+        <div className="w-full max-w-md p-8">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Initialization Error</AlertTitle>
+            <AlertDescription className="mt-2">
+              {loadingError}
+            </AlertDescription>
+          </Alert>
+          <Button 
             onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90"
+            className="mt-4 w-full"
           >
             Retry
-          </button>
+          </Button>
         </div>
       </div>
     );

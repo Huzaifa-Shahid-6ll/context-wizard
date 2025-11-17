@@ -317,6 +317,26 @@ html {
     pointer-events: none;
   }
 
+  /* Light shine effect - subtle top white line from LightRays animation */
+  .light-shine {
+    position: relative;
+  }
+  .light-shine::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.3);
+    pointer-events: none;
+    z-index: 1;
+    border-radius: inherit;
+  }
+  .dark .light-shine::before {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
   @keyframes progressGrow {
     from { width: 0; }
   }
@@ -347,6 +367,29 @@ html {
   /* TEXT SHADOW UTILITIES */
   .text-shadow-sm { text-shadow: var(--text-shadow-sm); }
   .text-shadow-md { text-shadow: var(--text-shadow-md); }
+
+  .force-bg-white {
+    background-color: #ffffff !important;
+  }
+
+  /* Card heading - really large and bold */
+  .card-heading-ratio {
+    font-size: calc(1.125rem * 3.5) !important; /* text-lg * 3.5 = ~39px */
+    font-weight: 900 !important; /* font-black - maximum boldness */
+    line-height: 1.1;
+  }
+  
+  @media (min-width: 768px) {
+    .card-heading-ratio {
+      font-size: calc(1.25rem * 3.5) !important; /* text-xl * 3.5 = ~44px */
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .card-heading-ratio {
+      font-size: calc(1.25rem * 4) !important; /* text-xl * 4 = ~50px on large screens */
+    }
+  }
 
   /* HOVER ELEVATION - From video principle */
   .hover-lift {

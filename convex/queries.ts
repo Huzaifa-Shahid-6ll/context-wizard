@@ -36,10 +36,16 @@ export const listPromptsByUser = query({
 });
 
 export const getPrompt = query({
-  args: { id: v.id("prompts") },
-  handler: async (ctx, { id }) => {
+  args: { id: v.id("prompts"), clerkId: v.string() },
+  handler: async (ctx, { id, clerkId }) => {
     const prompt = await ctx.db.get(id);
-    if (!prompt) throw new Error("Prompt not found");
+    if (!prompt) {
+      throw new Error("RESOURCE_NOT_FOUND: Prompt not found");
+    }
+    // Verify user owns this prompt
+    if (prompt.userId !== clerkId) {
+      throw new Error("UNAUTHORIZED: Not authorized to access this prompt");
+    }
     return prompt;
   },
 });
@@ -124,6 +130,7 @@ type PromptStats = {
   totalsByType: Record<string, number>;
   averageAnalysisScore: number;
   mostUsedFeatures: string[];
+  featureUsageCounts: Record<string, number>;
   successMetrics: { highQualityCount: number; highQualityRate: number };
 };
 
@@ -164,6 +171,15 @@ export const getPromptStats = query({
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([name]) => name);
+    
+    // Feature usage counts (top 5)
+    const featureUsageCounts: Record<string, number> = {};
+    Object.entries(sectionCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .forEach(([name, count]) => {
+        featureUsageCounts[name] = count;
+      });
 
     // Success metrics: high quality analyses (score >= 80)
     const highQualityCount = scores.filter(s => s >= 80).length;
@@ -173,8 +189,52 @@ export const getPromptStats = query({
       totalsByType,
       averageAnalysisScore,
       mostUsedFeatures,
+      featureUsageCounts,
       successMetrics: { highQualityCount, highQualityRate },
     };
+  },
+});
+
+// Time-series data for prompt usage over time
+export const getPromptTimeSeries = query({
+  args: { userId: v.string(), days: v.optional(v.number()) },
+  handler: async (ctx, { userId, days = 30 }): Promise<Array<{ date: string; count: number }>> => {
+    const prompts = await ctx.db
+      .query("prompts")
+      .withIndex("by_userId", q => q.eq("userId", userId))
+      .collect();
+
+    // Calculate date range (last N days)
+    const now = Date.now();
+    const startDate = now - (days * 24 * 60 * 60 * 1000);
+    
+    // Filter prompts within date range
+    const recentPrompts = prompts.filter((p) => {
+      const createdAt = (p as Record<string, unknown>).createdAt as number;
+      return createdAt >= startDate;
+    });
+
+    // Group by date (YYYY-MM-DD format)
+    const dateCounts: Record<string, number> = {};
+    for (const p of recentPrompts) {
+      const createdAt = (p as Record<string, unknown>).createdAt as number;
+      const date = new Date(createdAt);
+      const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+      dateCounts[dateKey] = (dateCounts[dateKey] || 0) + 1;
+    }
+
+    // Generate array for all days in range (including days with 0 prompts)
+    const result: Array<{ date: string; count: number }> = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(now - (i * 24 * 60 * 60 * 1000));
+      const dateKey = date.toISOString().split('T')[0];
+      result.push({
+        date: dateKey,
+        count: dateCounts[dateKey] || 0,
+      });
+    }
+
+    return result;
   },
 });
 

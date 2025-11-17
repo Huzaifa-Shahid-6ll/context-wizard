@@ -155,7 +155,7 @@ export const generateCursorAppPrompts = action({
     // Check prompt limit before processing
     const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
     if (!limitCheck.canCreate) {
-      throw new Error(`Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
     }
 
     // Determine user tier (fallback to free if not found)
@@ -197,7 +197,7 @@ export const generateCursorAppPrompts = action({
       title: "PROJECT_REQUIREMENTS.md",
       content: parsed.projectRequirements,
       context: baseContext,
-      metadata: { estimatedComplexity: parsed.estimatedComplexity } as JSONValue,
+      metadata: { estimatedComplexity: parsed.estimatedComplexity },
       createdAt: now,
       updatedAt: now,
     });
@@ -210,7 +210,7 @@ export const generateCursorAppPrompts = action({
         title: `Frontend: ${item.title}`,
         content: item.prompt,
         context: baseContext,
-        metadata: { section: "frontend", order: item.order } as JSONValue,
+        metadata: { section: "frontend", order: item.order },
         createdAt: now,
         updatedAt: now,
       });
@@ -224,7 +224,7 @@ export const generateCursorAppPrompts = action({
         title: `Backend: ${item.title}`,
         content: item.prompt,
         context: baseContext,
-        metadata: { section: "backend", order: item.order } as JSONValue,
+        metadata: { section: "backend", order: item.order },
         createdAt: now,
         updatedAt: now,
       });
@@ -237,7 +237,7 @@ export const generateCursorAppPrompts = action({
       title: ".cursorrules",
       content: parsed.cursorRules,
       context: baseContext,
-      metadata: { section: "cursorrules" } as JSONValue,
+      metadata: { section: "cursorrules" },
       createdAt: now,
       updatedAt: now,
     });
@@ -250,7 +250,7 @@ export const generateCursorAppPrompts = action({
         title: `Error: ${ef.error}`,
         content: ef.fix,
         context: baseContext,
-        metadata: { section: "error-fix" } as JSONValue,
+        metadata: { section: "error-fix" },
         createdAt: now,
         updatedAt: now,
       });
@@ -283,7 +283,7 @@ export const generateGenericPrompt = action({
     // Check prompt limit before processing
     const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
     if (!limitCheck.canCreate) {
-      throw new Error(`Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
     }
 
     // Determine user tier
@@ -371,17 +371,17 @@ Return JSON with optimizedPrompt, explanation, tips, exampleOutput
       title: "Optimized Prompt",
       content: parsed.optimizedPrompt,
       context: {
-        userGoal,
-        context: extraContext,
-        outputFormat,
-        tone,
-      } as JSONValue,
+        projectDescription: userGoal,
+        techStack: [],
+        features: [],
+        targetAudience: extraContext,
+      },
       metadata: {
         explanation: parsed.explanation,
         tips: parsed.tips,
         exampleOutput: parsed.exampleOutput,
         section: "generic",
-      } as JSONValue,
+      },
       createdAt: now,
       updatedAt: now,
     });
@@ -414,7 +414,7 @@ export const generateImagePrompt = action({
     // Check prompt limit before processing
     const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
     if (!limitCheck.canCreate) {
-      throw new Error(`Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
     }
 
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
@@ -523,16 +523,16 @@ Return JSON with platform-optimized prompts and negative prompts
         `Stable Diffusion: ${parsed.stableDiffusionPrompt}`,
       ].join("\n\n"),
       context: {
-        description,
-        style,
-        mood,
-        details,
-      } as JSONValue,
+        projectDescription: description,
+        techStack: [],
+        features: [],
+        targetAudience: style ? `${style}${mood ? `, ${mood}` : ""}${details ? `, ${details}` : ""}` : undefined,
+      },
       metadata: {
         tips: parsed.tips,
         negativePrompts: parsed.negativePrompts,
         section: "image",
-      } as JSONValue,
+      },
       createdAt: now,
       updatedAt: now,
     });
@@ -578,7 +578,7 @@ export const analyzeAndImprovePrompt = action({
     // Check prompt limit before processing
     const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
     if (!limitCheck.canCreate) {
-      throw new Error(`Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
     }
 
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
@@ -841,17 +841,16 @@ Return JSON with platform-optimized video prompts and audio elements
         `Pika Labs: ${parsed.pikaPrompt}`,
       ].join("\n\n"),
       context: {
-        description,
-        style,
-        mood,
-        duration,
-        audio,
-      } as JSONValue,
+        projectDescription: description,
+        techStack: [],
+        features: [],
+        targetAudience: style ? `${style}${mood ? `, ${mood}` : ""}${duration ? `, ${duration}` : ""}${audio ? `, ${audio}` : ""}` : undefined,
+      },
       metadata: {
         tips: parsed.tips,
         audioElements: parsed.audioElements,
         section: "video",
-      } as JSONValue,
+      },
       createdAt: now,
       updatedAt: now,
     });
@@ -881,7 +880,7 @@ export const predictPromptOutput = action({
     // Check prompt limit before processing
     const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
     if (!limitCheck.canCreate) {
-      throw new Error(`Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
     }
 
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });

@@ -14,6 +14,23 @@ export const saveOnboarding = mutation({
     sourceDetails: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Validate inputs
+    if (!args.userId || typeof args.userId !== 'string') {
+      throw new Error("INVALID_INPUT: User ID is required");
+    }
+    if (!args.role || typeof args.role !== 'string' || args.role.trim().length === 0) {
+      throw new Error("INVALID_INPUT: Role is required");
+    }
+    if (!Array.isArray(args.tools) || args.tools.length === 0) {
+      throw new Error("INVALID_INPUT: At least one tool must be selected");
+    }
+    if (args.tools.length > 20) {
+      throw new Error("INVALID_INPUT: Too many tools selected");
+    }
+    if (!args.painPoint || typeof args.painPoint !== 'string' || args.painPoint.trim().length === 0) {
+      throw new Error("INVALID_INPUT: Pain point is required");
+    }
+    
     // Save onboarding responses
     await ctx.db.insert("onboardingResponses", {
       ...args,

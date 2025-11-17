@@ -24,6 +24,9 @@ type UserStats = {
   subscriptionCurrentPeriodEnd?: number;
 };
 
+// Date utilities - using standardized functions
+// Note: These are kept here for now to avoid circular dependencies
+// TODO: Move to shared utility once Convex supports better module system
 function startOfUtcDayTimestampMs(dateMs: number): number {
   const d = new Date(dateMs);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0);
@@ -83,7 +86,8 @@ export const checkPromptLimit = mutation({
       await ctx.db.patch(user._id, { promptsCreatedToday: promptsToday, lastPromptResetDate: key });
     }
 
-    const isPro = user.isPro ?? false;
+    // Standardized tier check
+    const isPro = user?.isPro === true;
     if (isPro) {
       return { canCreate: true, remaining: Number.MAX_SAFE_INTEGER };
     }
@@ -137,7 +141,8 @@ export const getUserStats = query({
       };
     }
 
-    const isPro = user.isPro ?? false;
+    // Standardized tier check
+    const isPro = user?.isPro === true;
 
     // Prompt stats
     const prompts = await ctx.db

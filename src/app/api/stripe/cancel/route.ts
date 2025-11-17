@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { stripe } from '@/lib/stripe';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../../../../convex/_generated/api';
+import { createSafeErrorResponse } from '@/lib/errorMessages';
 
 export const runtime = 'nodejs';
 
@@ -50,10 +51,10 @@ export async function POST(_req: NextRequest) {
       cancelAtPeriodEnd: cancelledSubscription.cancel_at_period_end,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Cancel subscription error:', error);
+    const errorResponse = createSafeErrorResponse(error);
     return NextResponse.json(
-      { error: message || 'Failed to cancel subscription' },
+      errorResponse.error,
       { status: 500 }
     );
   }

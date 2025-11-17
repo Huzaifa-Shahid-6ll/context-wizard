@@ -48,7 +48,7 @@ export const createChatSession = mutation({
   handler: async (ctx, { userId, generationId, projectName, context }) => {
     const limits = await checkChatLimits(ctx, userId);
     if (!limits.canChat) {
-      throw new Error(limits.reason || "Chat limit reached");
+      throw new Error(`LIMIT_EXCEEDED: ${limits.reason || "Chat limit reached"}`);
     }
 
     const now = Date.now();
@@ -81,11 +81,11 @@ export const sendMessage = action({
     // Get session
     const session = await ctx.runQuery(api.chatQueries.getChatSession, { sessionId: sessionId as any }) as any;
     if (!session || !("userId" in session)) {
-      throw new Error("Chat session not found");
+      throw new Error("RESOURCE_NOT_FOUND: Chat session not found");
     }
 
     if (session.userId !== userId) {
-      throw new Error("Unauthorized");
+      throw new Error("UNAUTHORIZED: Not authorized to access this chat session");
     }
 
     // Check limits
@@ -94,12 +94,12 @@ export const sendMessage = action({
     if (!isPro) {
       // Check message limit per chat
       if (session.messageCount >= MAX_MESSAGES_FREE) {
-        throw new Error(`Message limit reached. Free users can send ${MAX_MESSAGES_FREE} messages per chat.`);
+        throw new Error(`LIMIT_EXCEEDED: Message limit reached. Free users can send ${MAX_MESSAGES_FREE} messages per chat.`);
       }
 
       // Check turn limit
       if (session.turnCount >= MAX_TURNS_FREE) {
-        throw new Error(`Turn limit reached. Free users can have ${MAX_TURNS_FREE} turns per session.`);
+        throw new Error(`LIMIT_EXCEEDED: Turn limit reached. Free users can have ${MAX_TURNS_FREE} turns per session.`);
       }
     }
 
@@ -282,8 +282,33 @@ export const deleteChatSession = mutation({
   },
   handler: async (ctx, { sessionId, userId }) => {
     const session = await ctx.db.get(sessionId);
-    if (!session) throw new Error("Session not found");
-    if (session.userId !== userId) throw new Error("Unauthorized");
+    if (!session) {
+      throw new Error("RESOURCE_NOT_FOUND: Chat session not found");
+    }
+    if (session.userId !== userId) {
+      // Log unauthorized access attempt
+      await ctx.db.insert("securityEvents", {
+        type: "unauthorized_access",
+        userId,
+        ip: "unknown",
+        fingerprint: "unknown",
+        details: { action: "delete_chat_session", resourceId: sessionId, resourceType: "chatSession" },
+        severity: "high",
+        timestamp: Date.now(),
+      });
+      throw new Error("UNAUTHORIZED: Not authorized to delete this chat session");
+    }
+
+    // Log successful deletion
+    await ctx.db.insert("securityEvents", {
+      type: "data_modification",
+      userId,
+      ip: "unknown",
+      fingerprint: "unknown",
+      details: { action: "delete_chat_session", resourceId: sessionId, resourceType: "chatSession" },
+      severity: "low",
+      timestamp: Date.now(),
+    });
 
     await ctx.db.delete(sessionId);
   },

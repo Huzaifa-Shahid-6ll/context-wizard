@@ -15,6 +15,7 @@ import { useUser } from '@clerk/nextjs';
 import { HoneypotField } from '@/components/forms/HoneypotField';
 import { logSecurityEvent } from '@/lib/securityLogger';
 import { sanitizeInput, sanitizeEmail } from '@/lib/sanitize';
+import { feedbackSchema, validateSchema } from '@/lib/validation-schemas';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -52,26 +53,23 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   ];
 
   const validate = () => {
-    const newErrors: { [key: string]: string } = {};
+    // Use Zod schema for validation
+    const result = validateSchema(feedbackSchema, {
+      type: feedbackType,
+      message,
+      email: email || undefined,
+      rating: rating || undefined,
+      page: initialPage,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+    });
     
-    if (!feedbackType) {
-      newErrors.type = 'Feedback type is required';
+    if (!result.success) {
+      setErrors(result.errors);
+      return false;
     }
     
-    if (message.length < 10) {
-      newErrors.message = 'Feedback must be at least 10 characters';
-    }
-    
-    if (message.length > 1000) {
-      newErrors.message = 'Feedback must be less than 1000 characters';
-    }
-    
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setErrors({});
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

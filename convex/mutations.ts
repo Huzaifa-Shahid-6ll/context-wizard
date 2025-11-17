@@ -3,14 +3,65 @@ import { mutation } from "./_generated/server";
 import { v, JSONValue } from "convex/values";
 
 export const deletePrompt = mutation({
-  args: { id: v.id("prompts"), userId: v.string() },
-  handler: async (ctx, { id, userId }) => {
+  args: { id: v.id("prompts"), clerkId: v.string() },
+  handler: async (ctx, { id, clerkId }) => {
     const p = await ctx.db.get(id);
-    if (!p) throw new Error("Not found");
-    if (p.userId !== userId) throw new Error("Not authorized");
+    if (!p) {
+      throw new Error("RESOURCE_NOT_FOUND: Prompt not found");
+    }
+    if (p.userId !== clerkId) {
+      // Log unauthorized access attempt
+      await ctx.db.insert("securityEvents", {
+        type: "unauthorized_access",
+        userId: clerkId,
+        ip: "unknown",
+        fingerprint: "unknown",
+        details: { action: "delete_prompt", resourceId: id, resourceType: "prompt" },
+        severity: "high",
+        timestamp: Date.now(),
+      });
+      throw new Error("UNAUTHORIZED: Not authorized to delete this prompt");
+    }
+    
+    // Log successful deletion
+    await ctx.db.insert("securityEvents", {
+      type: "data_modification",
+      userId: clerkId,
+      ip: "unknown",
+      fingerprint: "unknown",
+      details: { action: "delete_prompt", resourceId: id, resourceType: "prompt" },
+      severity: "low",
+      timestamp: Date.now(),
+    });
+    
     await ctx.db.delete(id);
   },
 });
+
+// Structured context validator
+const contextValidator = v.optional(
+  v.object({
+    projectDescription: v.optional(v.string()),
+    techStack: v.optional(v.array(v.string())),
+    features: v.optional(v.array(v.string())),
+    targetAudience: v.optional(v.string()),
+  })
+);
+
+// Structured metadata validator
+const metadataValidator = v.optional(
+  v.object({
+    section: v.optional(v.string()),
+    order: v.optional(v.number()),
+    views: v.optional(v.number()),
+    estimatedComplexity: v.optional(v.union(v.literal("simple"), v.literal("moderate"), v.literal("complex"))),
+    explanation: v.optional(v.string()),
+    tips: v.optional(v.array(v.string())),
+    exampleOutput: v.optional(v.string()),
+    negativePrompts: v.optional(v.array(v.string())),
+    audioElements: v.optional(v.array(v.string())),
+  })
+);
 
 export const insertPrompt = mutation({
   args: {
@@ -27,15 +78,25 @@ export const insertPrompt = mutation({
     ),
     title: v.string(),
     content: v.string(),
-    context: v.optional(v.any()),
-    metadata: v.optional(v.any()),
+    context: contextValidator,
+    metadata: metadataValidator,
     createdAt: v.number(),
     updatedAt: v.number(),
   },
   handler: async (ctx, args): Promise<string> => {
+    // Validate input lengths
+    if (args.title.length > 200) {
+      throw new Error("INVALID_INPUT: Title cannot exceed 200 characters");
+    }
+    if (args.content.length > 100000) {
+      throw new Error("INVALID_INPUT: Content cannot exceed 100,000 characters");
+    }
+    if (args.content.trim().length === 0) {
+      throw new Error("INVALID_INPUT: Content cannot be empty");
+    }
+    
     const id = await ctx.db.insert("prompts", {
       ...args,
-      // ensure loosely-typed fields are treated as unknown JSON blobs
       context: args.context as unknown,
       metadata: args.metadata as unknown,
     });
@@ -273,6 +334,17 @@ export const removeGenerationsToday = mutation({
     return { updated, total: users.length };
   },
 });
+
+// Audit logging mutation (re-exported from auditLog)
+export { logAuditEvent } from "./lib/auditLog";
+
+// Rate limiting functions (re-exported from rateLimit)
+export { 
+  incrementRateLimit, 
+  checkRateLimit, 
+  cleanupExpiredRateLimits,
+  getRateLimitStatus 
+} from "./lib/rateLimit";
 
 // Webhook logging mutation
 export const logWebhookEvent = mutation({

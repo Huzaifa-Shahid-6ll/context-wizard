@@ -331,16 +331,16 @@ export default function BillingPage() {
 						) : (
 							<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 								<div className="rounded-lg border p-4">
-									<div className="text-xs text-muted-foreground">Generations today</div>
-									<div className="mt-1 text-lg font-semibold">{userStats?.generationsToday ?? 0}</div>
-								</div>
-								<div className="rounded-lg border p-4">
 									<div className="text-xs text-muted-foreground">Prompts today</div>
 									<div className="mt-1 text-lg font-semibold">{userStats?.promptsToday ?? 0}</div>
 								</div>
 								<div className="rounded-lg border p-4">
-									<div className="text-xs text-muted-foreground">Total usage</div>
-									<div className="mt-1 text-lg font-semibold">{(userStats?.totalGenerations ?? 0) + (userStats?.totalPrompts ?? 0)}</div>
+									<div className="text-xs text-muted-foreground">Total prompts</div>
+									<div className="mt-1 text-lg font-semibold">{userStats?.totalPrompts ?? 0}</div>
+								</div>
+								<div className="rounded-lg border p-4">
+									<div className="text-xs text-muted-foreground">Remaining today</div>
+									<div className="mt-1 text-lg font-semibold">{userStats?.remainingPrompts ?? 0}</div>
 								</div>
 							</div>
 						)}
@@ -500,5 +500,6 @@ function formatAmount(cents?: number): string {
 		return '—';
 	}
 }
+
 
 
