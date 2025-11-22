@@ -74,6 +74,28 @@ const nextConfig: NextConfig = {
             key: 'X-XSS-Protection',
             value: '1; mode=block',
           },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains; preload', // HSTS
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://us.i.posthog.com https://us-assets.i.posthog.com https://va.vercel-scripts.com https://tweakcn.com https://*.clerk.accounts.dev https://clerk.com https://*.clerk.com blob:",
+              "worker-src 'self' blob:",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "img-src 'self' data: https: blob:",
+              "font-src 'self' data: https://fonts.gstatic.com",
+              "connect-src 'self' https://api.openrouter.ai https://generativelanguage.googleapis.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.convex.cloud wss://*.convex.cloud https://*.clerk.accounts.dev https://clerk.com https://*.clerk.com https://api.clerk.com https://*.api.clerk.com",
+              "frame-src 'self' https://js.stripe.com https://*.clerk.accounts.dev https://clerk.com",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "frame-ancestors 'none'",
+              "upgrade-insecure-requests",
+            ].join('; '),
+          },
         ],
       },
     ];

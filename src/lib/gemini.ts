@@ -26,7 +26,7 @@ class GeminiError extends Error {
   }
 }
 
-function getGeminiApiKey(userTier: 'free' | 'pro'): string {
+export function getGeminiApiKey(userTier: 'free' | 'pro'): string {
   const key = userTier === 'pro'
     ? (process.env.GEMINI_API_KEY_PRO || '')
     : (process.env.GEMINI_API_KEY_FREE || '');
@@ -112,10 +112,10 @@ export async function generateWithGemini(
 
   // Normalize model name (remove OpenRouter-style prefixes)
   const baseModel = model ? normalizeGeminiModelName(model) : getGeminiModel(userTier);
-  
+
   // Initialize Gemini client
   const genAI = new GoogleGenerativeAI(apiKey);
-  
+
   // Get the generative model
   const geminiModel = genAI.getGenerativeModel({ model: baseModel });
 
@@ -158,7 +158,7 @@ export async function generateWithGemini(
     // Handle Gemini-specific errors
     const errorMessage = error.message || String(error);
     const lowerErrorMsg = errorMessage.toLowerCase();
-    
+
     if (lowerErrorMsg.includes('api key') || lowerErrorMsg.includes('invalid api key')) {
       throw new GeminiError('Invalid Gemini API key', 401);
     }

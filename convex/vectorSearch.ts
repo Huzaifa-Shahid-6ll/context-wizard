@@ -1,3 +1,5 @@
+"use node";
+
 import { mutation, query, action } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
@@ -42,17 +44,17 @@ export const generateEmbedding = action({
 // Cosine similarity calculation
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
-  
+
   let dotProduct = 0;
   let normA = 0;
   let normB = 0;
-  
+
   for (let i = 0; i < a.length; i++) {
     dotProduct += a[i] * b[i];
     normA += a[i] * a[i];
     normB += b[i] * b[i];
   }
-  
+
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
@@ -205,7 +207,7 @@ export const searchSimilar = action({
     const sorted = similarities
       .sort((a: { similarity: number }, b: { similarity: number }) => b.similarity - a.similarity)
       .slice(0, limit);
-    
+
     // Remove embedding from response
     return sorted.map((item: {
       _id: any;

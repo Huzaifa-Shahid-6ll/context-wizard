@@ -164,7 +164,12 @@ export const incrementPromptViews = mutation({
 });
 
 export const saveUserPreferences = mutation({
-  args: { userId: v.string(), featureType: v.string(), formData: v.any(), preferredMode: v.optional(v.union(v.literal("quick"), v.literal("standard"), v.literal("advanced"))) },
+  args: { 
+    userId: v.string(), 
+    featureType: v.string(), 
+    formData: v.any(), // Flexible structure for user preferences (validated in handler)
+    preferredMode: v.optional(v.union(v.literal("quick"), v.literal("standard"), v.literal("advanced"))) 
+  },
   handler: async (ctx, { userId, featureType, formData, preferredMode }): Promise<string> => {
     const existing = await ctx.db
       .query("userPreferences")
@@ -391,3 +396,9 @@ export const logWebhookEvent = mutation({
   },
 });
 
+// Re-export cache mutations
+export { 
+  setCacheValue, 
+  invalidateCache, 
+  cleanupExpiredCache 
+} from "./cache";

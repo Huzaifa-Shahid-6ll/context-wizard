@@ -16,22 +16,66 @@ export const getUserByClerkId = query({
 export const listPromptsByUser = query({
   args: {
     userId: v.string(),
+    clerkId: v.optional(v.string()), // Add clerkId for authorization check
     type: v.optional(v.string()),
     limit: v.optional(v.number()),
+    cursor: v.optional(v.string()), // Pagination cursor
   },
-  handler: async (ctx, { userId, type, limit }): Promise<Array<Record<string, unknown>>> => {
-    const items = await ctx.db
-      .query("prompts")
-      .withIndex("by_userId", q => q.eq("userId", userId))
-      .collect();
+  handler: async (ctx, { userId, clerkId, type, limit = 50, cursor }): Promise<{
+    items: Array<Record<string, unknown>>;
+    nextCursor: string | null;
+    hasMore: boolean;
+  }> => {
+    // Authorization check: userId must match clerkId (if provided)
+    if (clerkId && userId !== clerkId) {
+      throw new Error("UNAUTHORIZED: Not authorized to access these prompts");
+    }
 
-    const filtered = type ? items.filter(i => (i as Record<string, unknown>).type === type) : items;
+    // Validate limit (max 100 items per page)
+    const pageLimit = Math.min(limit || 50, 100);
+
+    let query = ctx.db
+      .query("prompts")
+      .withIndex("by_userId", q => q.eq("userId", userId));
+
+    // If cursor provided, start from that point
+    if (cursor) {
+      try {
+        const cursorTimestamp = parseInt(cursor, 10);
+        query = query.filter(q => q.lt(q.field("createdAt"), cursorTimestamp));
+      } catch {
+        // Invalid cursor, ignore it
+      }
+    }
+
+    const items = await query
+      .order("desc")
+      .take(pageLimit + 1); // Fetch one extra to check if there's more
+
+    // Additional verification: ensure all items belong to the user
+    const userItems = items.filter(i => (i as Record<string, unknown>).userId === userId);
+
+    const filtered = type 
+      ? userItems.filter(i => (i as Record<string, unknown>).type === type) 
+      : userItems;
+
     const sorted = filtered.sort((a, b) => {
       const bCreatedAt = (b as Record<string, unknown>).createdAt as number;
       const aCreatedAt = (a as Record<string, unknown>).createdAt as number;
       return bCreatedAt - aCreatedAt;
     });
-    return limit ? sorted.slice(0, limit) : sorted;
+
+    const hasMore = sorted.length > pageLimit;
+    const paginatedItems = sorted.slice(0, pageLimit);
+    const nextCursor = hasMore && paginatedItems.length > 0
+      ? String((paginatedItems[paginatedItems.length - 1] as Record<string, unknown>).createdAt)
+      : null;
+
+    return {
+      items: paginatedItems,
+      nextCursor,
+      hasMore,
+    };
   },
 });
 
@@ -93,35 +137,119 @@ export const listPromptTemplates = query({
 
 // Prompt Analyses
 export const listAnalysesByUser = query({
-  args: { userId: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { userId, limit }): Promise<Array<Record<string, unknown>>> => {
-    const items = await ctx.db
+  args: { 
+    userId: v.string(), 
+    clerkId: v.optional(v.string()), 
+    limit: v.optional(v.number()),
+    cursor: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, clerkId, limit = 50, cursor }): Promise<{
+    items: Array<Record<string, unknown>>;
+    nextCursor: string | null;
+    hasMore: boolean;
+  }> => {
+    // Authorization check: userId must match clerkId (if provided)
+    if (clerkId && userId !== clerkId) {
+      throw new Error("UNAUTHORIZED: Not authorized to access these analyses");
+    }
+
+    const pageLimit = Math.min(limit || 50, 100);
+
+    let query = ctx.db
       .query("promptAnalyses")
-      .withIndex("by_userId", q => q.eq("userId", userId))
-      .collect();
-    const sorted = items.sort((a, b) => {
+      .withIndex("by_userId", q => q.eq("userId", userId));
+
+    if (cursor) {
+      try {
+        const cursorTimestamp = parseInt(cursor, 10);
+        query = query.filter(q => q.lt(q.field("createdAt"), cursorTimestamp));
+      } catch {
+        // Invalid cursor, ignore it
+      }
+    }
+
+    const items = await query
+      .order("desc")
+      .take(pageLimit + 1);
+    
+    const userItems = items.filter(i => (i as Record<string, unknown>).userId === userId);
+    
+    const sorted = userItems.sort((a, b) => {
       const bCreatedAt = (b as Record<string, unknown>).createdAt as number;
       const aCreatedAt = (a as Record<string, unknown>).createdAt as number;
       return bCreatedAt - aCreatedAt;
     });
-    return limit ? sorted.slice(0, limit) : sorted;
+
+    const hasMore = sorted.length > pageLimit;
+    const paginatedItems = sorted.slice(0, pageLimit);
+    const nextCursor = hasMore && paginatedItems.length > 0
+      ? String((paginatedItems[paginatedItems.length - 1] as Record<string, unknown>).createdAt)
+      : null;
+
+    return {
+      items: paginatedItems,
+      nextCursor,
+      hasMore,
+    };
   },
 });
 
 // Output Predictions
 export const listPredictionsByUser = query({
-  args: { userId: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { userId, limit }): Promise<Array<Record<string, unknown>>> => {
-    const items = await ctx.db
+  args: { 
+    userId: v.string(), 
+    clerkId: v.optional(v.string()), 
+    limit: v.optional(v.number()),
+    cursor: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, clerkId, limit = 50, cursor }): Promise<{
+    items: Array<Record<string, unknown>>;
+    nextCursor: string | null;
+    hasMore: boolean;
+  }> => {
+    // Authorization check: userId must match clerkId (if provided)
+    if (clerkId && userId !== clerkId) {
+      throw new Error("UNAUTHORIZED: Not authorized to access these predictions");
+    }
+
+    const pageLimit = Math.min(limit || 50, 100);
+
+    let query = ctx.db
       .query("outputPredictions")
-      .withIndex("by_userId", q => q.eq("userId", userId))
-      .collect();
-    const sorted = items.sort((a, b) => {
+      .withIndex("by_userId", q => q.eq("userId", userId));
+
+    if (cursor) {
+      try {
+        const cursorTimestamp = parseInt(cursor, 10);
+        query = query.filter(q => q.lt(q.field("createdAt"), cursorTimestamp));
+      } catch {
+        // Invalid cursor, ignore it
+      }
+    }
+
+    const items = await query
+      .order("desc")
+      .take(pageLimit + 1);
+    
+    const userItems = items.filter(i => (i as Record<string, unknown>).userId === userId);
+    
+    const sorted = userItems.sort((a, b) => {
       const bCreatedAt = (b as Record<string, unknown>).createdAt as number;
       const aCreatedAt = (a as Record<string, unknown>).createdAt as number;
       return bCreatedAt - aCreatedAt;
     });
-    return limit ? sorted.slice(0, limit) : sorted;
+
+    const hasMore = sorted.length > pageLimit;
+    const paginatedItems = sorted.slice(0, pageLimit);
+    const nextCursor = hasMore && paginatedItems.length > 0
+      ? String((paginatedItems[paginatedItems.length - 1] as Record<string, unknown>).createdAt)
+      : null;
+
+    return {
+      items: paginatedItems,
+      nextCursor,
+      hasMore,
+    };
   },
 });
 
@@ -197,8 +325,12 @@ export const getPromptStats = query({
 
 // Time-series data for prompt usage over time
 export const getPromptTimeSeries = query({
-  args: { userId: v.string(), days: v.optional(v.number()) },
-  handler: async (ctx, { userId, days = 30 }): Promise<Array<{ date: string; count: number }>> => {
+  args: { userId: v.string(), clerkId: v.optional(v.string()), days: v.optional(v.number()) },
+  handler: async (ctx, { userId, clerkId, days = 30 }): Promise<Array<{ date: string; count: number }>> => {
+    // Authorization check: userId must match clerkId (if provided)
+    if (clerkId && userId !== clerkId) {
+      throw new Error("UNAUTHORIZED: Not authorized to access this time series data");
+    }
     const prompts = await ctx.db
       .query("prompts")
       .withIndex("by_userId", q => q.eq("userId", userId))

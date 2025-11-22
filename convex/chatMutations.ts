@@ -1,3 +1,5 @@
+"use node";
+
 import { mutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
@@ -17,7 +19,7 @@ async function getUserTier(ctx: any, userId: string): Promise<{ isPro: boolean; 
 // Helper to check chat limits
 async function checkChatLimits(ctx: any, userId: string): Promise<{ canChat: boolean; reason?: string }> {
   const { isPro } = await getUserTier(ctx, userId);
-  
+
   if (isPro) {
     return { canChat: true };
   }
@@ -43,7 +45,7 @@ export const createChatSession = mutation({
     userId: v.string(),
     generationId: v.string(),
     projectName: v.string(),
-    context: v.any(),
+    context: v.any(), // Flexible context structure (validated in handler)
   },
   handler: async (ctx, { userId, generationId, projectName, context }) => {
     const limits = await checkChatLimits(ctx, userId);
@@ -90,7 +92,7 @@ export const sendMessage = action({
 
     // Check limits
     const { isPro } = await getUserTier(ctx, userId);
-    
+
     if (!isPro) {
       // Check message limit per chat
       if (session.messageCount >= MAX_MESSAGES_FREE) {
@@ -219,7 +221,7 @@ export const updateContext = mutation({
   args: {
     sessionId: v.id("chatSessions"),
     userId: v.string(),
-    context: v.any(),
+    context: v.any(), // Flexible context structure (validated in handler)
   },
   handler: async (ctx, { sessionId, userId, context }) => {
     const session = await ctx.db.get(sessionId);
@@ -250,7 +252,7 @@ export const regeneratePrompts = action({
     // Use the updated context to regenerate prompts
     // This will call the prompt generation functions with updated context
     // Implementation depends on how we want to regenerate
-    
+
     return { success: true };
   },
 });

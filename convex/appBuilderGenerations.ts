@@ -1,18 +1,18 @@
+"use node";
+
 import { action, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { generateWithOpenRouter } from "../src/lib/openrouter";
-
-// Structured formData validator (basic structure validation)
-// Note: formData is complex, so we validate structure but allow flexible content
-// Using v.any() for formData validation in the mutation args instead
+import { parseLLMJson } from "./lib/utils";
+import { genericFormDataValidator } from "./lib/formDataValidators";
 
 // Create a new generation record
 export const createGeneration = mutation({
   args: {
     userId: v.string(),
     projectName: v.string(),
-    formData: v.any(), // Keep as any for now due to complexity, but validate in handler
+    formData: genericFormDataValidator, // Structured validator for form data
     selectedPromptTypes: v.array(v.union(
       v.literal("frontend"),
       v.literal("backend"),
@@ -32,17 +32,18 @@ export const createGeneration = mutation({
     if (args.projectName.length > 100) {
       throw new Error("INVALID_INPUT: Project name cannot exceed 100 characters");
     }
-    
-    // Validate formData is an object
-    if (!args.formData || typeof args.formData !== 'object' || Array.isArray(args.formData)) {
+
+    // formData is now validated by the validator, but we can add additional checks if needed
+    // Validate formData is not null
+    if (!args.formData || typeof args.formData !== 'object') {
       throw new Error("INVALID_INPUT: formData must be an object");
     }
-    
+
     // Validate selectedPromptTypes
     if (!Array.isArray(args.selectedPromptTypes) || args.selectedPromptTypes.length === 0) {
       throw new Error("INVALID_INPUT: At least one prompt type must be selected");
     }
-    
+
     const now = Date.now();
     const generationId = await ctx.db.insert("appBuilderGenerations", {
       ...args,
@@ -57,7 +58,7 @@ export const createGeneration = mutation({
 
 // Get generation by ID
 export const getGeneration = query({
-  args: { 
+  args: {
     generationId: v.id("appBuilderGenerations"),
     clerkId: v.string(), // Add authorization check
   },
@@ -108,29 +109,77 @@ export const updateGenerationStatus = mutation({
   },
 });
 
+// Helper to sanitize formData for prompt injection
+function sanitizeFormData(formData: any): string {
+  try {
+    // Create a safe subset of formData to avoid huge payloads or sensitive data
+    const safeData = {
+      projectName: formData.projectName,
+      projectDescription: formData.projectDescription,
+      techStack: formData.techStack,
+      features: formData.features,
+      audience: formData.audienceSummary,
+      requirements: formData.problemStatement,
+      goals: formData.primaryGoal,
+    };
+    return JSON.stringify(safeData, null, 2);
+  } catch {
+    return JSON.stringify(formData, null, 2);
+  }
+}
+
+// Generic step generator to reduce duplication
+async function generateStep(
+  ctx: any,
+  {
+    generationId,
+    userId,
+    prompt,
+    statusKey,
+    statusValue,
+  }: {
+    generationId: any;
+    userId: string;
+    prompt: string;
+    statusKey: string;
+    statusValue: string;
+  }
+) {
+  // Atomic rate limit check
+  const reservation = await ctx.runMutation(api.users.reservePromptCount, { userId });
+  if (!reservation.success) {
+    throw new Error(`Daily prompt limit reached. Please upgrade to Pro.`);
+  }
+
+  // Get user tier
+  const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
+  const isPro = user?.isPro === true;
+  const tier: "free" | "pro" = isPro ? "pro" : "free";
+
+  // Generate content
+  const content = await generateWithOpenRouter(prompt, tier);
+
+  // Update generation
+  await ctx.runMutation(api.appBuilderGenerations.updateGenerationStatus, {
+    generationId,
+    status: statusValue,
+    [statusKey]: content,
+  });
+
+  return { [statusKey]: content };
+}
+
 // Generate PRD
 export const generatePRD = action({
   args: {
     generationId: v.id("appBuilderGenerations"),
     userId: v.string(),
-    formData: v.any(),
+    formData: genericFormDataValidator,
   },
   handler: async (ctx, { generationId, userId, formData }) => {
-    // Check prompt limit
-    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
-    if (!limitCheck.canCreate) {
-      throw new Error(`Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
-    }
-
-    // Get user tier
-    const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
-    const isPro = user?.isPro === true;
-    const tier: "free" | "pro" = isPro ? "pro" : "free";
-
-    // Build PRD prompt
     const prdPrompt = `You are an expert product manager and technical writer. Generate a comprehensive Product Requirements Document (PRD) based on the following project information:
 
-${JSON.stringify(formData, null, 2)}
+${sanitizeFormData(formData)}
 
 The PRD should include:
 1. Executive Summary
@@ -146,19 +195,13 @@ The PRD should include:
 
 Format the output as a well-structured markdown document.`;
 
-    const prd = await generateWithOpenRouter(prdPrompt, tier);
-
-    // Update generation
-    await ctx.runMutation(api.appBuilderGenerations.updateGenerationStatus, {
+    return generateStep(ctx, {
       generationId,
-      status: "prd_pending",
-      prd,
+      userId,
+      prompt: prdPrompt,
+      statusKey: "prd",
+      statusValue: "prd_pending",
     });
-
-    // Increment prompt count
-    await ctx.runMutation(api.users.incrementPromptCount, { userId });
-
-    return { prd };
   },
 });
 
@@ -167,29 +210,17 @@ export const generateUserFlows = action({
   args: {
     generationId: v.id("appBuilderGenerations"),
     userId: v.string(),
-    formData: v.any(),
+    formData: genericFormDataValidator,
     prd: v.string(),
   },
   handler: async (ctx, { generationId, userId, formData, prd }) => {
-    // Check prompt limit
-    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
-    if (!limitCheck.canCreate) {
-      throw new Error(`Daily prompt limit reached.`);
-    }
-
-    // Get user tier
-    const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
-    const isPro = user?.isPro === true;
-    const tier: "free" | "pro" = isPro ? "pro" : "free";
-
-    // Build User Flows prompt
     const flowsPrompt = `You are a UX designer and product strategist. Based on the following PRD and project information, generate comprehensive User Flow documentation:
 
 PRD:
 ${prd}
 
 Project Information:
-${JSON.stringify(formData, null, 2)}
+${sanitizeFormData(formData)}
 
 The User Flows document should include:
 1. User Personas
@@ -202,19 +233,13 @@ The User Flows document should include:
 
 Format as a well-structured markdown document.`;
 
-    const userFlows = await generateWithOpenRouter(flowsPrompt, tier);
-
-    // Update generation
-    await ctx.runMutation(api.appBuilderGenerations.updateGenerationStatus, {
+    return generateStep(ctx, {
       generationId,
-      status: "user_flows_pending",
-      userFlows,
+      userId,
+      prompt: flowsPrompt,
+      statusKey: "userFlows",
+      statusValue: "user_flows_pending",
     });
-
-    // Increment prompt count
-    await ctx.runMutation(api.users.incrementPromptCount, { userId });
-
-    return { userFlows };
   },
 });
 
@@ -223,23 +248,11 @@ export const generateTaskFile = action({
   args: {
     generationId: v.id("appBuilderGenerations"),
     userId: v.string(),
-    formData: v.any(),
+    formData: genericFormDataValidator,
     prd: v.string(),
     userFlows: v.string(),
   },
   handler: async (ctx, { generationId, userId, formData, prd, userFlows }) => {
-    // Check prompt limit
-    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
-    if (!limitCheck.canCreate) {
-      throw new Error(`Daily prompt limit reached.`);
-    }
-
-    // Get user tier
-    const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
-    const isPro = user?.isPro === true;
-    const tier: "free" | "pro" = isPro ? "pro" : "free";
-
-    // Build Task File prompt
     const taskPrompt = `You are a project manager and technical lead. Based on the following PRD, User Flows, and project information, generate a comprehensive Task Breakdown with milestone-based organization:
 
 PRD:
@@ -249,7 +262,7 @@ User Flows:
 ${userFlows}
 
 Project Information:
-${JSON.stringify(formData, null, 2)}
+${sanitizeFormData(formData)}
 
 The Task File should include:
 1. Milestone 1: Foundation (Setup, Infrastructure)
@@ -265,19 +278,13 @@ The Task File should include:
 
 Format as a well-structured markdown document with clear milestones and tasks.`;
 
-    const taskFile = await generateWithOpenRouter(taskPrompt, tier);
-
-    // Update generation
-    await ctx.runMutation(api.appBuilderGenerations.updateGenerationStatus, {
+    return generateStep(ctx, {
       generationId,
-      status: "tasks_pending",
-      taskFile,
+      userId,
+      prompt: taskPrompt,
+      statusKey: "taskFile",
+      statusValue: "tasks_pending",
     });
-
-    // Increment prompt count
-    await ctx.runMutation(api.users.incrementPromptCount, { userId });
-
-    return { taskFile };
   },
 });
 
@@ -286,7 +293,7 @@ export const generateLists = action({
   args: {
     generationId: v.id("appBuilderGenerations"),
     userId: v.string(),
-    formData: v.any(),
+    formData: genericFormDataValidator,
     prd: v.string(),
     userFlows: v.string(),
     selectedPromptTypes: v.array(v.union(
@@ -311,6 +318,27 @@ export const generateLists = action({
       errorScenarioList?: string[];
     } = {};
 
+    // Helper to generate and parse list
+    const generateList = async (prompt: string, fallbackError: string) => {
+      try {
+        const text = await generateWithOpenRouter(prompt, tier);
+        if (!text || text.trim().length === 0) throw new Error("Empty response");
+
+        const parsed = parseLLMJson<string[]>(text, []);
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          // Try splitting by newline if JSON parse returned empty or invalid
+          return text.split("\n")
+            .filter(line => line.trim())
+            .map(line => line.replace(/^[-*]\s*/, "").trim())
+            .filter(line => line.length > 0);
+        }
+        return parsed.filter(item => typeof item === "string" && item.trim().length > 0);
+      } catch (error: any) {
+        console.error(`[generateLists] ${fallbackError}`, { error: error.message });
+        throw new Error(`${fallbackError}: ${error.message}`);
+      }
+    };
+
     // Generate frontend screen list
     if (selectedPromptTypes.includes("frontend")) {
       const screenPrompt = `Based on the PRD and User Flows, generate a list of all screens/pages needed for the frontend:
@@ -323,13 +351,7 @@ ${userFlows}
 
 Return ONLY a JSON array of screen names, like: ["Hero Page", "Login Screen", "Dashboard", ...]`;
 
-      const screenListText = await generateWithOpenRouter(screenPrompt, tier);
-      try {
-        lists.screenList = JSON.parse(screenListText.replace(/```json\n?|\n?```/g, ""));
-      } catch {
-        // Fallback: extract from text
-        lists.screenList = screenListText.split("\n").filter(line => line.trim()).map(line => line.replace(/^[-*]\s*/, "").trim());
-      }
+      lists.screenList = await generateList(screenPrompt, "Failed to generate screen list");
     }
 
     // Generate backend endpoint list
@@ -344,12 +366,7 @@ ${userFlows}
 
 Return ONLY a JSON array of endpoint names, like: ["POST /api/auth/login", "GET /api/users", ...]`;
 
-      const endpointListText = await generateWithOpenRouter(endpointPrompt, tier);
-      try {
-        lists.endpointList = JSON.parse(endpointListText.replace(/```json\n?|\n?```/g, ""));
-      } catch {
-        lists.endpointList = endpointListText.split("\n").filter(line => line.trim()).map(line => line.replace(/^[-*]\s*/, "").trim());
-      }
+      lists.endpointList = await generateList(endpointPrompt, "Failed to generate endpoint list");
     }
 
     // Generate security feature list
@@ -361,12 +378,7 @@ ${prd}
 
 Return ONLY a JSON array of security features, like: ["JWT Authentication", "Password Hashing", ...]`;
 
-      const securityText = await generateWithOpenRouter(securityPrompt, tier);
-      try {
-        lists.securityFeatureList = JSON.parse(securityText.replace(/```json\n?|\n?```/g, ""));
-      } catch {
-        lists.securityFeatureList = securityText.split("\n").filter(line => line.trim()).map(line => line.replace(/^[-*]\s*/, "").trim());
-      }
+      lists.securityFeatureList = await generateList(securityPrompt, "Failed to generate security feature list");
     }
 
     // Generate functionality feature list
@@ -378,100 +390,7 @@ ${prd}
 
 Return ONLY a JSON array of functionality feature names as strings, like: ["Contact Management", "User Authentication", "Payment Processing"]`;
 
-      const functionalityText = await generateWithOpenRouter(functionalityPrompt, tier);
-      try {
-        const parsed = JSON.parse(functionalityText.replace(/```json\n?|\n?```/g, ""));
-        // Transform objects with 'feature' property to strings, or use strings as-is
-        if (Array.isArray(parsed)) {
-          lists.functionalityFeatureList = parsed.map((item: unknown) => {
-            // If it's already a string, use it
-            if (typeof item === "string") {
-              return item;
-            }
-            // If it's an object, check for 'feature' property (case-insensitive check)
-            if (typeof item === "object" && item !== null) {
-              const obj = item as Record<string, unknown>;
-              // Check for 'feature' property (case-sensitive first, then try different cases)
-              if ("feature" in obj && typeof obj.feature === "string") {
-                return obj.feature;
-              }
-              if ("Feature" in obj && typeof obj.Feature === "string") {
-                return obj.Feature;
-              }
-              // Try lowercase keys
-              const lowerKeys = Object.keys(obj).map(k => k.toLowerCase());
-              const featureKey = lowerKeys.find(k => k === "feature" || k === "name" || k === "title");
-              if (featureKey) {
-                const actualKey = Object.keys(obj).find(k => k.toLowerCase() === featureKey);
-                if (actualKey && typeof obj[actualKey] === "string") {
-                  return obj[actualKey] as string;
-                }
-              }
-              // If no feature property, try to stringify the object (fallback)
-              return JSON.stringify(item);
-            }
-            // Fallback: convert to string
-            return String(item);
-          }).filter((item): item is string => typeof item === "string" && item.length > 0);
-        } else {
-          // If not an array, wrap it
-          lists.functionalityFeatureList = [String(parsed)];
-        }
-      } catch {
-        lists.functionalityFeatureList = functionalityText.split("\n").filter(line => line.trim()).map(line => line.replace(/^[-*]\s*/, "").trim()).filter(line => line.length > 0);
-      }
-      
-      // Final safety check: ensure all items are strings and remove any that are still objects
-      if (lists.functionalityFeatureList) {
-        lists.functionalityFeatureList = lists.functionalityFeatureList.map(item => {
-          if (typeof item === "string") return item;
-          if (typeof item === "object" && item !== null) {
-            const obj = item as Record<string, unknown>;
-            // Try multiple property names
-            if ("feature" in obj && typeof obj.feature === "string") return obj.feature;
-            if ("Feature" in obj && typeof obj.Feature === "string") return obj.Feature;
-            if ("name" in obj && typeof obj.name === "string") return obj.name;
-            if ("Name" in obj && typeof obj.Name === "string") return obj.Name;
-            if ("title" in obj && typeof obj.title === "string") return obj.title;
-            if ("Title" in obj && typeof obj.Title === "string") return obj.Title;
-            // Last resort: stringify
-            return JSON.stringify(item);
-          }
-          return String(item);
-        }).filter((item): item is string => typeof item === "string" && item.length > 0);
-        
-        // Double-check: if any item is still an object, remove it
-        lists.functionalityFeatureList = lists.functionalityFeatureList.filter(item => {
-          try {
-            // If it's a JSON string that parses to an object, extract the feature name
-            const parsed = JSON.parse(item);
-            if (typeof parsed === "object" && parsed !== null) {
-              const obj = parsed as Record<string, unknown>;
-              if ("feature" in obj && typeof obj.feature === "string") {
-                return true; // We'll replace it below
-              }
-              return false; // Remove objects we can't extract a string from
-            }
-            return true;
-          } catch {
-            return true; // Not JSON, keep it
-          }
-        }).map(item => {
-          // One more pass to extract from JSON strings
-          try {
-            const parsed = JSON.parse(item);
-            if (typeof parsed === "object" && parsed !== null) {
-              const obj = parsed as Record<string, unknown>;
-              if ("feature" in obj && typeof obj.feature === "string") return obj.feature;
-              if ("name" in obj && typeof obj.name === "string") return obj.name;
-              if ("title" in obj && typeof obj.title === "string") return obj.title;
-            }
-            return item;
-          } catch {
-            return item;
-          }
-        });
-      }
+      lists.functionalityFeatureList = await generateList(functionalityPrompt, "Failed to generate functionality feature list");
     }
 
     // Generate error scenario list
@@ -481,32 +400,27 @@ Return ONLY a JSON array of functionality feature names as strings, like: ["Cont
 PRD:
 ${prd}
 
-Tech Stack: ${formData.techStack?.join(", ") || "Not specified"}
+Tech Stack: ${(formData as any)?.techStack?.join(", ") || "Not specified"}
 
 Return ONLY a JSON array of error scenarios, like: ["Network timeout", "Invalid input validation", ...]`;
 
-      const errorText = await generateWithOpenRouter(errorPrompt, tier);
-      try {
-        lists.errorScenarioList = JSON.parse(errorText.replace(/```json\n?|\n?```/g, ""));
-      } catch {
-        lists.errorScenarioList = errorText.split("\n").filter(line => line.trim()).map(line => line.replace(/^[-*]\s*/, "").trim());
-      }
+      lists.errorScenarioList = await generateList(errorPrompt, "Failed to generate error scenario list");
     }
 
     // Final transformation: ensure all list items are strings before saving
     const sanitizedLists: typeof lists = {};
     if (lists.screenList) {
-      sanitizedLists.screenList = lists.screenList.map(item => 
+      sanitizedLists.screenList = lists.screenList.map(item =>
         typeof item === "string" ? item : String(item)
       ).filter((item): item is string => typeof item === "string" && item.length > 0);
     }
     if (lists.endpointList) {
-      sanitizedLists.endpointList = lists.endpointList.map(item => 
+      sanitizedLists.endpointList = lists.endpointList.map(item =>
         typeof item === "string" ? item : String(item)
       ).filter((item): item is string => typeof item === "string" && item.length > 0);
     }
     if (lists.securityFeatureList) {
-      sanitizedLists.securityFeatureList = lists.securityFeatureList.map(item => 
+      sanitizedLists.securityFeatureList = lists.securityFeatureList.map(item =>
         typeof item === "string" ? item : String(item)
       ).filter((item): item is string => typeof item === "string" && item.length > 0);
     }
@@ -529,10 +443,38 @@ Return ONLY a JSON array of error scenarios, like: ["Network timeout", "Invalid 
       }).filter((item): item is string => typeof item === "string" && item.length > 0);
     }
     if (lists.errorScenarioList) {
-      sanitizedLists.errorScenarioList = lists.errorScenarioList.map(item => 
+      sanitizedLists.errorScenarioList = lists.errorScenarioList.map(item =>
         typeof item === "string" ? item : String(item)
       ).filter((item): item is string => typeof item === "string" && item.length > 0);
     }
+
+    // Validate at least one list was generated
+    const totalItems =
+      (sanitizedLists.screenList?.length || 0) +
+      (sanitizedLists.endpointList?.length || 0) +
+      (sanitizedLists.securityFeatureList?.length || 0) +
+      (sanitizedLists.functionalityFeatureList?.length || 0) +
+      (sanitizedLists.errorScenarioList?.length || 0);
+
+    if (totalItems === 0) {
+      console.error(`[generateLists] No items generated in any list`, {
+        generationId,
+        userId,
+        sanitizedLists
+      });
+      throw new Error("Failed to generate any lists. All list generations returned empty results.");
+    }
+
+    console.log(`[generateLists] Successfully generated all lists`, {
+      generationId,
+      userId,
+      totalItems,
+      screenListCount: sanitizedLists.screenList?.length || 0,
+      endpointListCount: sanitizedLists.endpointList?.length || 0,
+      securityListCount: sanitizedLists.securityFeatureList?.length || 0,
+      functionalityListCount: sanitizedLists.functionalityFeatureList?.length || 0,
+      errorListCount: sanitizedLists.errorScenarioList?.length || 0
+    });
 
     // Update generation with sanitized lists
     await ctx.runMutation(api.appBuilderGenerations.updateGenerationStatus, {
@@ -558,19 +500,17 @@ export const generateItemPrompt = action({
       v.literal("error_fixing")
     ),
     itemName: v.string(),
-    formData: v.any(),
+    formData: genericFormDataValidator,
     prd: v.string(),
     userFlows: v.string(),
     taskFile: v.string(),
     prebuiltComponents: v.optional(v.string()),
   },
   handler: async (ctx, { generationId, userId, itemType, itemName, formData, prd, userFlows, taskFile, prebuiltComponents }) => {
-    // Check prompt limit
-    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
-    if (!limitCheck.canCreate) {
-      const error = `Daily prompt limit reached.`;
-      console.error(`[generateItemPrompt] ${error}`, { generationId, userId, itemType, itemName });
-      throw new Error(error);
+    // Atomic rate limit check
+    const reservation = await ctx.runMutation(api.users.reservePromptCount, { userId });
+    if (!reservation.success) {
+      throw new Error(`Daily prompt limit reached. Please upgrade to Pro.`);
     }
 
     // Get user tier
@@ -598,7 +538,7 @@ Task File:
 ${taskFile}
 
 Project Information:
-${JSON.stringify(formData, null, 2)}
+${sanitizeFormData(formData)}
 
 Component Library: ${componentInstruction}
 
@@ -626,102 +566,89 @@ Task File:
 ${taskFile}
 
 Project Information:
-${JSON.stringify(formData, null, 2)}
+${sanitizeFormData(formData)}
 
-Generate a detailed prompt for this backend endpoint/feature including:
-1. API specification (method, path, params, body, response)
-2. Database schema requirements
-3. Business logic
-4. Error handling
-5. Authentication/authorization
-6. Validation rules
+Generate a detailed, context-engineered prompt that includes:
+1. Clear command for what to build
+2. Full context from PRD and User Flows
+3. Step-by-step logic
+4. Expert persona (senior backend developer)
+5. Precise formatting requirements
+6. API specifications (method, route, params, response)
+7. Database interactions
+8. Error handling
 
-Include a 5-line explanation in simple language.`;
+The prompt should be self-contained and ready to paste into a coding AI. Include a 5-line explanation in simple language at the end explaining what this prompt will generate.`;
     } else if (itemType === "security") {
-      itemPrompt = `You are a security expert. Generate a comprehensive prompt for implementing "${itemName}" security feature.
+      itemPrompt = `You are an expert security engineer. Generate a comprehensive prompt for implementing the "${itemName}" security feature.
 
 PRD:
 ${prd}
 
 Project Information:
-${JSON.stringify(formData, null, 2)}
+${sanitizeFormData(formData)}
 
-Generate a detailed security implementation prompt including encryption, hashing, prevention measures, etc.
+Generate a detailed, context-engineered prompt that includes:
+1. Clear command for what to build
+2. Full context from PRD
+3. Step-by-step logic
+4. Expert persona (senior security engineer)
+5. Precise formatting requirements
+6. Implementation details
+7. Best practices and compliance
+8. Testing and verification
 
-Include a 5-line explanation in simple language.`;
+The prompt should be self-contained and ready to paste into a coding AI. Include a 5-line explanation in simple language at the end explaining what this prompt will generate.`;
     } else if (itemType === "functionality") {
-      itemPrompt = `You are an expert developer. Generate a comprehensive prompt for implementing "${itemName}" functionality.
+      itemPrompt = `You are an expert full-stack developer. Generate a comprehensive prompt for implementing the "${itemName}" functionality.
 
 PRD:
 ${prd}
 
 Project Information:
-${JSON.stringify(formData, null, 2)}
+${sanitizeFormData(formData)}
 
-Generate a detailed functionality implementation prompt.
+Generate a detailed, context-engineered prompt that includes:
+1. Clear command for what to build
+2. Full context from PRD
+3. Step-by-step logic
+4. Expert persona (senior developer)
+5. Precise formatting requirements
+6. Business logic details
+7. Data flow and state management
+8. Integration points
 
-Include a 5-line explanation in simple language.`;
+The prompt should be self-contained and ready to paste into a coding AI. Include a 5-line explanation in simple language at the end explaining what this prompt will generate.`;
     } else if (itemType === "error_fixing") {
-      itemPrompt = `You are a debugging expert. Generate a comprehensive error-fixing prompt for the scenario: "${itemName}".
+      itemPrompt = `You are an expert QA engineer and developer. Generate a comprehensive prompt for handling the "${itemName}" error scenario.
 
 PRD:
 ${prd}
 
 Project Information:
-${JSON.stringify(formData, null, 2)}
+${sanitizeFormData(formData)}
 
-Generate a prompt that helps identify and fix this error scenario, including analysis steps and solutions.
+Generate a detailed, context-engineered prompt that includes:
+1. Clear command for what to build/fix
+2. Full context from PRD
+3. Step-by-step logic
+4. Expert persona (senior QA engineer)
+5. Precise formatting requirements
+6. Error reproduction steps
+7. Fix implementation details
+8. Prevention strategies
 
-Include a 5-line explanation in simple language.`;
+The prompt should be self-contained and ready to paste into a coding AI. Include a 5-line explanation in simple language at the end explaining what this prompt will generate.`;
     }
 
-    try {
-      const prompt = await generateWithOpenRouter(itemPrompt, tier);
+    const generatedPrompt = await generateWithOpenRouter(itemPrompt, tier);
 
-      // Get current generation to update generatedPrompts
-      const generation = await ctx.runQuery(api.appBuilderGenerations.getGeneration, { generationId, clerkId: userId });
-      const currentPrompts = generation?.generatedPrompts || {};
-      const typePrompts = currentPrompts[itemType] || [];
-      
-      currentPrompts[itemType] = [
-        ...typePrompts,
-        {
-          title: itemName,
-          prompt,
-          itemType,
-          createdAt: Date.now(),
-        },
-      ];
+    // Store in database (optional, but good for history)
+    // We don't have a specific table for individual item prompts yet, 
+    // but we could store them in 'prompts' table or just return them.
+    // For now, we just return it to the frontend.
 
-      // Update generation
-      await ctx.runMutation(api.appBuilderGenerations.updateGenerationStatus, {
-        generationId,
-        status: "generating_prompts",
-        generatedPrompts: currentPrompts,
-      });
-
-      // Increment prompt count
-      await ctx.runMutation(api.users.incrementPromptCount, { userId });
-
-      console.log(`[generateItemPrompt] Success: ${itemType}/${itemName}`, { generationId, userId });
-      return { prompt };
-    } catch (error: any) {
-      const errorMessage = error.message || String(error);
-      const errorContext = {
-        generationId,
-        userId,
-        itemType,
-        itemName,
-        error: errorMessage,
-        timestamp: Date.now(),
-      };
-      
-      console.error(`[generateItemPrompt] Error generating prompt for ${itemType}/${itemName}:`, errorContext);
-      
-      // Store error in generation record (could extend schema to include errorLog)
-      // For now, log it and rethrow
-      throw new Error(`Failed to generate prompt for ${itemName} (${itemType}): ${errorMessage}`);
-    }
+    return { prompt: generatedPrompt };
   },
 });
 
@@ -737,13 +664,13 @@ export const getGenerationProgress = query({
     }
 
     const generatedPrompts = generation.generatedPrompts || {};
-    const totalPrompts = 
+    const totalPrompts =
       (generation.screenList?.length || 0) +
       (generation.endpointList?.length || 0) +
       (generation.securityFeatureList?.length || 0) +
       (generation.functionalityFeatureList?.length || 0) +
       (generation.errorScenarioList?.length || 0);
-    
+
     const completedPrompts = Object.values(generatedPrompts).flat().length;
 
     return {
@@ -782,4 +709,3 @@ export const approveStep = mutation({
     });
   },
 });
-

@@ -116,6 +116,44 @@ export const incrementPromptCount = mutation({
   },
 });
 
+export const reservePromptCount = mutation({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }): Promise<{ success: boolean; remaining: number }> => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", q => q.eq("clerkId", userId))
+      .unique();
+    if (!user) throw new Error("User not found");
+
+    const isPro = user.isPro === true;
+    if (isPro) {
+      return { success: true, remaining: Number.MAX_SAFE_INTEGER };
+    }
+
+    const key = todayKey();
+    let promptsToday = user.promptsCreatedToday ?? 0;
+
+    // Reset if new day
+    if (user.lastPromptResetDate !== key) {
+      promptsToday = 0;
+      // We'll update the reset date in the patch below
+    }
+
+    if (promptsToday >= DAILY_FREE_PROMPT_LIMIT) {
+      return { success: false, remaining: 0 };
+    }
+
+    // Atomically increment
+    const nextCount = promptsToday + 1;
+    await ctx.db.patch(user._id, {
+      promptsCreatedToday: nextCount,
+      lastPromptResetDate: key,
+    });
+
+    return { success: true, remaining: DAILY_FREE_PROMPT_LIMIT - nextCount };
+  },
+});
+
 
 export const getUserStats = query({
   args: { userId: v.string() },

@@ -18,6 +18,7 @@ export async function register() {
   }
 }
 
+// Use Sentry.captureException for request errors
 export async function onRequestError(
   err: unknown,
   _request: unknown,

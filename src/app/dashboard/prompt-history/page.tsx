@@ -46,7 +46,7 @@ export default function PromptHistoryPage() {
   const pageSize = 20;
 
   const deletePrompt = useMutation(api.mutations.deletePrompt);
-  const prompts = useQuery(api.queries.listPromptsByUser, userId ? { userId } : "skip") as PromptItem[] | undefined;
+  const prompts = useQuery(api.queries.listPromptsByUser, userId ? { userId, clerkId: userId } : "skip") as PromptItem[] | undefined;
 
   const filtered = React.useMemo(() => {
     const items = (prompts || []).filter((p) => {

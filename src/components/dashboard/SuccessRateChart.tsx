@@ -1,7 +1,12 @@
 "use client";
 
 import React from "react";
-import { CheckCircle2 } from "@/lib/icons";
+import {
+  RadialBarChart,
+  RadialBar,
+  PolarAngleAxis,
+  ResponsiveContainer,
+} from "recharts";
 
 interface SuccessRateChartProps {
   highQualityCount: number;
@@ -15,47 +20,71 @@ export function SuccessRateChart({
   totalAnalyses,
 }: SuccessRateChartProps) {
   const percentage = Math.round(highQualityRate * 100);
-  const circumference = 2 * Math.PI * 45; // radius = 45
-  const offset = circumference - (highQualityRate * circumference);
+
+  const data = [
+    {
+      name: "Success Rate",
+      value: percentage,
+      fill: "url(#successGradient)",
+    },
+  ];
 
   return (
-    <div className="h-48 flex flex-col items-center justify-center">
-      <div className="relative w-32 h-32">
-        <svg className="transform -rotate-90 w-32 h-32">
-          <circle
-            cx="64"
-            cy="64"
-            r="45"
-            stroke="hsl(var(--muted))"
-            strokeWidth="8"
-            fill="none"
-          />
-          <circle
-            cx="64"
-            cy="64"
-            r="45"
-            stroke="hsl(var(--primary))"
-            strokeWidth="8"
-            fill="none"
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            className="transition-all duration-500"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <CheckCircle2 className="h-8 w-8 text-primary mb-1" />
-          <span className="text-2xl font-bold text-foreground">{percentage}%</span>
-          <span className="text-xs text-muted-foreground">Success Rate</span>
+    <div className="w-full h-full min-h-[300px] flex flex-col items-center justify-center relative">
+      <div className="relative w-full flex-1 min-h-[200px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <RadialBarChart
+            cx="50%"
+            cy="50%"
+            innerRadius="65%"
+            outerRadius="100%"
+            barSize={32}
+            data={data}
+            startAngle={90}
+            endAngle={-270}
+          >
+            <defs>
+              <linearGradient id="successGradient" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#10b981" />
+                <stop offset="100%" stopColor="#22c55e" />
+              </linearGradient>
+            </defs>
+            <PolarAngleAxis
+              type="number"
+              domain={[0, 100]}
+              angleAxisId={0}
+              tick={false}
+            />
+            <RadialBar
+              background={{ fill: "hsl(var(--muted)/0.1)" }}
+              dataKey="value"
+              cornerRadius={16}
+            />
+          </RadialBarChart>
+        </ResponsiveContainer>
+
+        {/* Centered Percentage */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span className="text-5xl font-bold tracking-tighter text-foreground">
+            {percentage}%
+          </span>
+          <span className="text-sm font-medium text-muted-foreground mt-1">
+            Success Rate
+          </span>
         </div>
       </div>
-      <div className="mt-4 text-center">
+
+      {/* Bottom Stats */}
+      <div className="mt-6 text-center space-y-1">
+        <div className="text-2xl font-bold text-foreground">
+          {highQualityCount}
+        </div>
         <p className="text-sm text-muted-foreground">
-          {highQualityCount} high quality {highQualityCount === 1 ? "analysis" : "analyses"}
-          {totalAnalyses !== undefined && ` out of ${totalAnalyses} total`}
+          High quality analyses
         </p>
       </div>
     </div>
   );
 }
+
 

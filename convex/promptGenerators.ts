@@ -1,34 +1,11 @@
+"use node";
+
 import { action } from "./_generated/server";
 import { v, JSONValue } from "convex/values";
 import { api } from "./_generated/api";
 import { generateWithOpenRouter } from "../src/lib/openrouter";
-
-// Helper function for robust JSON parsing
-function parseJsonSafely<T>(jsonText: string, fallback: T): T {
-  try {
-    return JSON.parse(jsonText);
-  } catch {
-    try {
-      const trimmed = jsonText.replace(/^```[a-zA-Z]*\n|\n```$/g, "");
-      return JSON.parse(trimmed);
-    } catch {
-      try {
-        // Try to fix common JSON issues
-        const fixedJson = jsonText
-          .replace(/^```[a-zA-Z]*\n|\n```$/g, "")
-          .replace(/\\"/g, '\\"')  // Fix escaped quotes
-          .replace(/\\n/g, '\\n')  // Fix escaped newlines
-          .replace(/\\t/g, '\\t')  // Fix escaped tabs
-          .replace(/\\r/g, '\\r')  // Fix escaped carriage returns
-          .replace(/\\\\/g, '\\\\'); // Fix double backslashes
-        
-        return JSON.parse(fixedJson);
-      } catch {
-        return fallback;
-      }
-    }
-  }
-}
+import { parseLLMJson } from "./lib/utils";
+import { hashPrompt, getCachedPrompt, setCachedPrompt } from "../src/lib/cache";
 
 type GeneratedPromptItem = { title: string; prompt: string; order: number };
 type ErrorFixItem = { error: string; fix: string };
@@ -152,10 +129,10 @@ export const generateCursorAppPrompts = action({
     targetAudience: v.optional(v.string()),
   },
   handler: async (ctx, { projectDescription, techStack, features, userId, targetAudience }): Promise<GenerationResult> => {
-    // Check prompt limit before processing
-    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
-    if (!limitCheck.canCreate) {
-      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+    // Atomic rate limit check
+    const reservation = await ctx.runMutation(api.users.reservePromptCount, { userId });
+    if (!reservation.success) {
+      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. Please upgrade to Pro.`);
     }
 
     // Determine user tier (fallback to free if not found)
@@ -166,20 +143,26 @@ export const generateCursorAppPrompts = action({
     // Compose prompt and call OpenRouter
     const system = buildSystemInstruction();
     const userPrompt = buildUserPrompt({ projectDescription, techStack, features, targetAudience });
+    const fullPrompt = `${system}\n\n${userPrompt}`;
 
+    // Check cache first
+    const promptHash = hashPrompt(fullPrompt);
+    const cachedResult = await getCachedPrompt(promptHash, tier);
+    if (cachedResult) {
+      // Return cached result
+      return JSON.parse(cachedResult) as GenerationResult;
+    }
+
+    // Generate new result
     const jsonText = await withRetry(() => generateWithOpenRouter(
-      `${system}\n\n${userPrompt}`,
+      fullPrompt,
       tier
     ));
 
-    let parsed: GenerationResult;
-    try {
-      parsed = JSON.parse(jsonText) as GenerationResult;
-    } catch {
-      // As a fallback, try to trim code fences if present
-      const trimmed = jsonText.replace(/^```[a-zA-Z]*\n|\n```$/g, "");
-      parsed = JSON.parse(trimmed) as GenerationResult;
-    }
+    // Cache the result
+    await setCachedPrompt(promptHash, tier, jsonText, 24 * 60 * 60 * 1000); // 24 hours
+
+    const parsed = parseLLMJson<GenerationResult>(jsonText);
 
     // Persist prompts into Convex `prompts` table
     const now = Date.now();
@@ -256,8 +239,6 @@ export const generateCursorAppPrompts = action({
       });
     }
 
-    // Increment prompt count after successful generation
-    await ctx.runMutation(api.users.incrementPromptCount, { userId });
     return parsed;
   },
 });
@@ -280,10 +261,10 @@ export const generateGenericPrompt = action({
     tips: string[];
     exampleOutput: string;
   }> => {
-    // Check prompt limit before processing
-    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
-    if (!limitCheck.canCreate) {
-      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+    // Atomic rate limit check
+    const reservation = await ctx.runMutation(api.users.reservePromptCount, { userId });
+    if (!reservation.success) {
+      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. Please upgrade to Pro.`);
     }
 
     // Determine user tier
@@ -356,7 +337,7 @@ Return JSON with optimizedPrompt, explanation, tips, exampleOutput
       generateWithOpenRouter(`${system}\n\n${userContent}`, tier)
     );
 
-    const parsed = parseJsonSafely(jsonText, {
+    const parsed = parseLLMJson(jsonText, {
       optimizedPrompt: jsonText.replace(/^```[a-zA-Z]*\n|\n```$/g, ""),
       explanation: "Generated prompt (JSON parsing failed)",
       tips: ["Review the generated prompt for any formatting issues"],
@@ -386,8 +367,6 @@ Return JSON with optimizedPrompt, explanation, tips, exampleOutput
       updatedAt: now,
     });
 
-    // Increment prompt count after successful generation
-    await ctx.runMutation(api.users.incrementPromptCount, { userId });
     return parsed;
   },
 });
@@ -411,10 +390,10 @@ export const generateImagePrompt = action({
     tips: string[];
     negativePrompts: string[];
   }> => {
-    // Check prompt limit before processing
-    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
-    if (!limitCheck.canCreate) {
-      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+    // Atomic rate limit check
+    const reservation = await ctx.runMutation(api.users.reservePromptCount, { userId });
+    if (!reservation.success) {
+      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. Please upgrade to Pro.`);
     }
 
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
@@ -498,19 +477,13 @@ Return JSON with platform-optimized prompts and negative prompts
       generateWithOpenRouter(`${system}\n\n${userContent}`, tier)
     );
 
-    let parsed: {
+    const parsed = parseLLMJson<{
       midjourneyPrompt: string;
       dallePrompt: string;
       stableDiffusionPrompt: string;
       tips: string[];
       negativePrompts: string[];
-    };
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch {
-      const trimmed = jsonText.replace(/^```[a-zA-Z]*\n|\n```$/g, "");
-      parsed = JSON.parse(trimmed);
-    }
+    }>(jsonText);
 
     const now = Date.now();
     await ctx.runMutation(api.mutations.insertPrompt, {
@@ -537,8 +510,6 @@ Return JSON with platform-optimized prompts and negative prompts
       updatedAt: now,
     });
 
-    // Increment prompt count after successful generation
-    await ctx.runMutation(api.users.incrementPromptCount, { userId });
     return parsed;
   },
 });
@@ -575,10 +546,10 @@ export const analyzeAndImprovePrompt = action({
       model?: string;
     };
   }> => {
-    // Check prompt limit before processing
-    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
-    if (!limitCheck.canCreate) {
-      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+    // Atomic rate limit check
+    const reservation = await ctx.runMutation(api.users.reservePromptCount, { userId });
+    if (!reservation.success) {
+      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. Please upgrade to Pro.`);
     }
 
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
@@ -667,20 +638,14 @@ Return JSON with analysis scores, issues, suggestions, and improved prompt
       generateWithOpenRouter(`${system}\n\n${userContent}`, tier, reasoningModel)
     );
 
-    let parsed: {
+    const parsed = parseLLMJson<{
       overallScore: number;
       scores: { clarity: number; specificity: number; structure: number; completeness: number };
       issues: Array<{ severity: "low" | "medium" | "high"; description: string }>;
       suggestions: string[];
       improvedPrompt: string;
       improvementExplanation: string;
-    };
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch {
-      const trimmed = jsonText.replace(/^```[a-zA-Z]*\n|\n```$/g, "");
-      parsed = JSON.parse(trimmed);
-    }
+    }>(jsonText);
 
     const now = Date.now();
     // Also store a summary row in promptAnalyses (scores/suggestions)
@@ -694,9 +659,6 @@ Return JSON with analysis scores, issues, suggestions, and improved prompt
       createdAt: now,
     });
 
-    // Increment prompt count after successful generation
-    await ctx.runMutation(api.users.incrementPromptCount, { userId });
-    
     // Token counting will be done client-side for accuracy
     // The tokenEstimate will be calculated and merged on the client
     return parsed;
@@ -723,6 +685,12 @@ export const generateVideoPrompt = action({
     tips: string[];
     audioElements: string[];
   }> => {
+    // Atomic rate limit check
+    const reservation = await ctx.runMutation(api.users.reservePromptCount, { userId });
+    if (!reservation.success) {
+      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. Please upgrade to Pro.`);
+    }
+
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
     const tier: "free" | "pro" = user?.isPro ? "pro" : "free";
 
@@ -816,19 +784,13 @@ Return JSON with platform-optimized video prompts and audio elements
       generateWithOpenRouter(`${system}\n\n${userContent}`, tier)
     );
 
-    let parsed: {
+    const parsed = parseLLMJson<{
       veo3Prompt: string;
       runwayPrompt: string;
       pikaPrompt: string;
       tips: string[];
       audioElements: string[];
-    };
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch {
-      const trimmed = jsonText.replace(/^```[a-zA-Z]*\n|\n```$/g, "");
-      parsed = JSON.parse(trimmed);
-    }
+    }>(jsonText);
 
     const now = Date.now();
     await ctx.runMutation(api.mutations.insertPrompt, {
@@ -855,8 +817,6 @@ Return JSON with platform-optimized video prompts and audio elements
       updatedAt: now,
     });
 
-    // Increment prompt count after successful generation
-    await ctx.runMutation(api.users.incrementPromptCount, { userId });
     return parsed;
   },
 });
@@ -877,10 +837,10 @@ export const predictPromptOutput = action({
     warnings: string[];
     alternatives: Array<{ modifiedPrompt: string; expectedChange: string }>;
   }> => {
-    // Check prompt limit before processing
-    const limitCheck = await ctx.runMutation(api.users.checkPromptLimit, { userId });
-    if (!limitCheck.canCreate) {
-      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. You have ${limitCheck.remaining} prompts remaining.`);
+    // Atomic rate limit check
+    const reservation = await ctx.runMutation(api.users.reservePromptCount, { userId });
+    if (!reservation.success) {
+      throw new Error(`LIMIT_EXCEEDED: Daily prompt limit reached. Please upgrade to Pro.`);
     }
 
     const user = await ctx.runQuery(api.queries.getUserByClerkId, { clerkId: userId });
@@ -902,19 +862,13 @@ export const predictPromptOutput = action({
       generateWithOpenRouter(`${system}\n\n${userContent}`, tier, preferredModel)
     );
 
-    let parsed: {
+    const parsed = parseLLMJson<{
       predictedOutput: string;
       confidence: number;
       reasoning: string;
       warnings: string[];
       alternatives: Array<{ modifiedPrompt: string; expectedChange: string }>;
-    };
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch {
-      const trimmed = jsonText.replace(/^```[a-zA-Z]*\n|\n```$/g, "");
-      parsed = JSON.parse(trimmed);
-    }
+    }>(jsonText);
 
     const now = Date.now();
     await ctx.runMutation(api.mutations.insertOutputPrediction, {
@@ -925,10 +879,6 @@ export const predictPromptOutput = action({
       createdAt: now,
     });
 
-    // Increment prompt count after successful generation
-    await ctx.runMutation(api.users.incrementPromptCount, { userId });
     return parsed;
   },
 });
-
-

@@ -2,8 +2,8 @@
 
 import React from "react";
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { format, parseISO } from "date-fns";
+import { ChartTooltip } from "./ChartTooltip";
 
 interface PromptUsageChartProps {
   data: Array<{ date: string; count: number }>;
@@ -19,13 +20,13 @@ interface PromptUsageChartProps {
 export function PromptUsageChart({ data }: PromptUsageChartProps) {
   if (!data || data.length === 0) {
     return (
-      <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
+      <div className="h-[240px] flex items-center justify-center text-muted-foreground text-sm">
         No data available
       </div>
     );
   }
 
-  // Format dates for display (show month/day for last 7 days, otherwise just day)
+  // Format dates for display
   const formattedData = data.map((item) => {
     const date = parseISO(item.date);
     const dayLabel = format(date, "MMM d");
@@ -36,44 +37,61 @@ export function PromptUsageChart({ data }: PromptUsageChartProps) {
   });
 
   return (
-    <ResponsiveContainer width="100%" height={192}>
-      <LineChart data={formattedData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-        <XAxis
-          dataKey="dayLabel"
-          stroke="hsl(var(--muted-foreground))"
-          fontSize={12}
-          tickLine={false}
-          axisLine={false}
-        />
-        <YAxis
-          stroke="hsl(var(--muted-foreground))"
-          fontSize={12}
-          tickLine={false}
-          axisLine={false}
-          width={30}
-        />
-        <Tooltip
-          contentStyle={{
-            backgroundColor: "hsl(var(--card))",
-            border: "1px solid hsl(var(--border))",
-            borderRadius: "6px",
-            padding: "8px",
-          }}
-          labelStyle={{ color: "hsl(var(--foreground))", marginBottom: "4px" }}
-          formatter={(value: number) => [value, "Prompts"]}
-          labelFormatter={(label) => `Date: ${label}`}
-        />
-        <Line
-          type="monotone"
-          dataKey="count"
-          stroke="hsl(var(--primary))"
-          strokeWidth={2}
-          dot={{ fill: "hsl(var(--primary))", r: 3 }}
-          activeDot={{ r: 5 }}
-        />
-      </LineChart>
-    </ResponsiveContainer>
+    <div className="h-[240px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart
+          data={formattedData}
+          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+        >
+          <defs>
+            <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="hsl(var(--border))"
+            opacity={0.1}
+            vertical={false}
+          />
+          <XAxis
+            dataKey="dayLabel"
+            stroke="#E2E8F0"
+            fontSize={12}
+            tickLine={false}
+            axisLine={false}
+            dy={10}
+          />
+          <YAxis
+            stroke="#64748B"
+            fontSize={12}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value) => `${value}`}
+          />
+          <Tooltip
+            content={<ChartTooltip labelFormatter={(label) => `${label}`} />}
+            cursor={{
+              stroke: "#06b6d4",
+              strokeWidth: 1,
+              strokeDasharray: "5 5",
+              opacity: 0.5,
+            }}
+          />
+          <Area
+            type="monotone"
+            dataKey="count"
+            name="Prompts"
+            stroke="#06b6d4"
+            strokeWidth={3}
+            fillOpacity={1}
+            fill="url(#colorCount)"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
+
 

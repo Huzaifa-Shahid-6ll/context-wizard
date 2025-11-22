@@ -69,7 +69,7 @@ export function recordSubmission(featureType: string, fields: Record<string, unk
     arr.unshift({ featureType, fields, timestamp: Date.now() });
     if (arr.length > 10) arr.length = 10; // limit history for quick scan
     localStorage.setItem(key, JSON.stringify(arr));
-  } catch {}
+  } catch { }
 }
 
 export class AutofillService {
@@ -129,14 +129,14 @@ export class AutofillService {
   }
 
   private generateSuggestionsFromHistory(
-    previousInputs: unknown[], 
+    previousInputs: unknown[],
     currentInputs: Record<string, unknown>
   ): AutofillSuggestion[] {
     const suggestions: AutofillSuggestion[] = [];
-    
+
     // Find patterns in previous inputs
     const fieldPatterns = this.analyzeFieldPatterns(previousInputs);
-    
+
     for (const [field, pattern] of Object.entries(fieldPatterns)) {
       if (!currentInputs[field] && pattern.mostCommon) {
         suggestions.push({
@@ -152,14 +152,14 @@ export class AutofillService {
   }
 
   private generateSuggestionsFromSimilarProjects(
-    similarProjects: unknown[], 
+    similarProjects: unknown[],
     currentInputs: Record<string, unknown>
   ): AutofillSuggestion[] {
     const suggestions: AutofillSuggestion[] = [];
-    
+
     // Analyze similar projects for common patterns
     const commonPatterns = this.findCommonPatterns(similarProjects);
-    
+
     for (const [field, value] of Object.entries(commonPatterns)) {
       if (!currentInputs[field]) {
         suggestions.push({
@@ -185,7 +185,7 @@ export class AutofillService {
   }
 
   private async getTemplateSuggestions(
-    featureType: string, 
+    featureType: string,
     currentInputs: Record<string, unknown>
   ): Promise<AutofillSuggestion[]> {
     try {
@@ -199,23 +199,23 @@ export class AutofillService {
 
   private analyzeFieldPatterns(inputs: unknown[]): Record<string, { mostCommon: unknown; frequency: number }> {
     const patterns: Record<string, Record<string, number>> = {};
-    
+
     for (const input of inputs) {
       if (typeof input !== 'object' || input === null) continue;
       for (const [field, value] of Object.entries(input)) {
         if (!patterns[field]) {
           patterns[field] = {};
         }
-        
+
         const valueKey = String(value);
         patterns[field][valueKey] = (patterns[field][valueKey] || 0) + 1;
       }
     }
 
     const result: Record<string, { mostCommon: unknown; frequency: number }> = {};
-    
+
     for (const [field, values] of Object.entries(patterns)) {
-      const sortedValues = Object.entries(values).sort(([,a], [,b]) => b - a);
+      const sortedValues = Object.entries(values).sort(([, a], [, b]) => b - a);
       if (sortedValues.length > 0) {
         result[field] = {
           mostCommon: sortedValues[0][0],
@@ -229,7 +229,7 @@ export class AutofillService {
 
   private findCommonPatterns(projects: unknown[]): Record<string, unknown> {
     const patterns: Record<string, unknown> = {};
-    
+
     // Simple pattern matching - in a real implementation, this would be more sophisticated
     for (const project of projects) {
       if (typeof project !== 'object' || project === null) continue;
@@ -303,7 +303,7 @@ Return suggestions in this format:
         userId,
         featureType
       });
-      
+
       return preferences?.savedInputs || {};
     } catch (error) {
       console.error('Error getting autofill data:', error);

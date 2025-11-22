@@ -12,9 +12,17 @@
  * 
  * The fallback mechanism is transparent - no code changes needed at call sites.
  * Fallback uses the same user tier (free/pro) to select appropriate Gemini API key.
+ * 
+ * SECURITY: This module must only be used server-side. API keys are never exposed to the client.
  */
 
+// Server-only guard - prevent client-side usage
+if (typeof window !== 'undefined') {
+  throw new Error('OpenRouter utilities can only be used server-side. API keys must never be exposed to the client.');
+}
+
 import { generateWithGemini } from './gemini';
+import { getCircuitBreaker } from './circuitBreaker';
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -70,7 +78,7 @@ const BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v
 const SITE_URL = process.env.OPENROUTER_SITE_URL || 'https://localhost';
 const APP_NAME = process.env.OPENROUTER_APP_NAME || 'context-wizard';
 
-function getApiKey(userTier: 'free' | 'pro'): string {
+export function getApiKey(userTier: 'free' | 'pro'): string {
   const key = userTier === 'pro'
     ? (process.env.OPENROUTER_API_KEY_PRO || '')
     : (process.env.OPENROUTER_API_KEY_FREE || '');
@@ -227,75 +235,83 @@ export async function generateWithOpenRouter(
   model?: string,
   timeoutMs: number = 60000 // Default 60 second timeout
 ): Promise<string> {
-  const apiKey = getApiKey(userTier);
-  if (!apiKey) throw new OpenRouterError('API key is missing', 401);
+  const circuitBreaker = getCircuitBreaker('openrouter', {
+    failureThreshold: 5,
+    resetTimeout: 60000, // 1 minute
+    monitoringWindow: 60000, // 1 minute
+  });
 
-  const chosenModel = model || getDefaultModel(userTier);
-  const body: OpenRouterRequest = {
-    model: chosenModel,
-    messages: [
-      { role: 'system', content: 'You are a helpful assistant.' },
-      { role: 'user', content: prompt },
-    ],
-  };
+  return circuitBreaker.execute(async () => {
+    const apiKey = getApiKey(userTier);
+    if (!apiKey) throw new OpenRouterError('API key is missing', 401);
 
-  // Create AbortController for timeout
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const chosenModel = model || getDefaultModel(userTier);
+    const body: OpenRouterRequest = {
+      model: chosenModel,
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'user', content: prompt },
+      ],
+    };
 
-  try {
-    const res = await requestWithRetry(
-      `${BASE_URL}/chat/completions`,
-      {
-        method: 'POST',
-        headers: buildHeaders(apiKey),
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      },
-      { maxRetries: 3, baseDelayMs: 800 }
-    );
-    clearTimeout(timeoutId);
-    const json = await handleOpenRouterResponse(res);
-    const text = json.choices?.[0]?.message?.content ?? '';
-    return text;
-  } catch (error: any) {
-    clearTimeout(timeoutId);
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    // Handle timeout errors
-    if (error.name === 'AbortError' || error.message?.includes('aborted')) {
-      throw new Error(`Request timeout: Generation took longer than ${timeoutMs / 1000} seconds`);
-    }
+    try {
+      const res = await requestWithRetry(
+        `${BASE_URL}/chat/completions`,
+        {
+          method: 'POST',
+          headers: buildHeaders(apiKey),
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        },
+        { maxRetries: 3, baseDelayMs: 800 }
+      );
+      clearTimeout(timeoutId);
+      const json = await handleOpenRouterResponse(res);
+      const text = json.choices?.[0]?.message?.content ?? '';
+      return text;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
 
-    // Check if we should fallback to Gemini
-    if (shouldFallbackToGemini(error)) {
-      console.warn('OpenRouter failed, falling back to Gemini', {
-        error: error.message,
-        status: error.status,
-        tier: userTier,
-        timestamp: new Date().toISOString()
-      });
-
-      try {
-        const fallbackResult = await generateWithGemini(prompt, userTier, undefined, timeoutMs);
-        console.info('Gemini fallback succeeded', {
-          tier: userTier,
-          timestamp: new Date().toISOString()
-        });
-        return fallbackResult;
-      } catch (fallbackError: any) {
-        console.error('Gemini fallback also failed', {
-          error: fallbackError.message,
-          tier: userTier,
-          timestamp: new Date().toISOString()
-        });
-        // If Gemini also fails, throw the original OpenRouter error
-        throw error;
+      // Handle timeout errors
+      if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+        throw new Error(`Request timeout: Generation took longer than ${timeoutMs / 1000} seconds`);
       }
-    }
 
-    // Don't fallback for other errors
-    throw error;
-  }
+      // Check if we should fallback to Gemini
+      if (shouldFallbackToGemini(error)) {
+        console.warn('OpenRouter failed, falling back to Gemini', {
+          error: error.message,
+          status: error.status,
+          tier: userTier,
+          timestamp: new Date().toISOString()
+        });
+
+        try {
+          const fallbackResult = await generateWithGemini(prompt, userTier, undefined, timeoutMs);
+          console.info('Gemini fallback succeeded', {
+            tier: userTier,
+            timestamp: new Date().toISOString()
+          });
+          return fallbackResult;
+        } catch (fallbackError: any) {
+          console.error('Gemini fallback also failed', {
+            error: fallbackError.message,
+            tier: userTier,
+            timestamp: new Date().toISOString()
+          });
+          // If Gemini also fails, throw the original OpenRouter error
+          throw error;
+        }
+      }
+
+      // Don't fallback for other errors
+      throw error;
+    }
+  });
 }
 
 export async function analyzePrompt(prompt: string): Promise<PromptAnalysis> {

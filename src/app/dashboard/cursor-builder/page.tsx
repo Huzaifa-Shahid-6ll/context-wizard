@@ -93,7 +93,7 @@ export default function CursorBuilderPage() {
 
   // Sequential generation state
   const [generationId, setGenerationId] = React.useState<string | null>(null);
-  
+
   // Get generation progress (must be after generationId state declaration)
   const getGenerationProgress = useQuery(
     api.appBuilderGenerations.getGenerationProgress,
@@ -330,7 +330,7 @@ export default function CursorBuilderPage() {
         similarProjects, designInspiration, specialRequirements,
       };
       localStorage.setItem("cursorBuilder.v1", JSON.stringify(payload));
-    } catch {}
+    } catch { }
   }, [projectName, projectDescription, projectType, oneSentence, audienceSummary, problemStatement, primaryGoal, successCriteria, frontend, backend, database, tools, features, mvpDate, launchDate, devBudget, infraBudget, teamSize, expectedUsers, perfRequirements, securityReqs, compliance, dataRetention, backupFrequency, codeStyle, testingApproach, docsLevel, similarProjects, designInspiration, specialRequirements]);
 
   React.useEffect(() => {
@@ -368,8 +368,8 @@ export default function CursorBuilderPage() {
       setSimilarProjects(data.similarProjects || "");
       setDesignInspiration(data.designInspiration || "");
       setSpecialRequirements(data.specialRequirements || "");
-    } catch {}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    } catch { }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Tip rotation effect
@@ -377,11 +377,11 @@ export default function CursorBuilderPage() {
     if (isSubmitting && generationStep === "prompts") {
       // Set initial tip
       setLoadingTip(loadingTips[Math.floor(Math.random() * loadingTips.length)]);
-      
+
       const tipInterval = setInterval(() => {
         setLoadingTip(loadingTips[Math.floor(Math.random() * loadingTips.length)]);
       }, 3000);
-      
+
       return () => clearInterval(tipInterval);
     }
   }, [isSubmitting, generationStep]);
@@ -396,22 +396,22 @@ export default function CursorBuilderPage() {
     // Extract dependencies to variables to avoid complex expressions in dependency array
     const currentIndex = currentPromptIndex ?? null;
     const startTime = generationStartTime ?? 0;
-    
+
     // Use refs to avoid dependency on state that changes frequently
     const prompts = generatedPromptsRef.current;
     const lists = generatedListsRef.current || generatedLists;
-    
+
     // Only run if we have all required data
     if (!currentIndex || !prompts || !lists) {
       return;
     }
-    
+
     const completed = Object.values(prompts).flat().length;
     const total = calculateTotalPrompts();
     const remaining = total - completed;
     const estimated = remaining * avgGenerationTimeRef.current; // Use ref value
     setEstimatedTime(Math.max(0, estimated));
-    
+
     // Update average generation time based on actual performance
     // Use ref to prevent infinite loops by tracking when we last updated
     if (startTime > 0 && completed > 0) {
@@ -485,17 +485,17 @@ export default function CursorBuilderPage() {
         if (ts.find((s) => /postgres|pg/i.test(s))) setDatabase("PostgreSQL");
         if (ts.find((s) => /mongo/i.test(s))) setDatabase("MongoDB");
         if (ts.find((s) => /mysql/i.test(s))) setDatabase("MySQL");
-        setTools((prev) => Array.from(new Set([...(prev || []), ...ts.filter((s) => !["React","Vue","Svelte","Node.js","Python","Go","PostgreSQL","MongoDB","MySQL"].includes(s))])));
+        setTools((prev) => Array.from(new Set([...(prev || []), ...ts.filter((s) => !["React", "Vue", "Svelte", "Node.js", "Python", "Go", "PostgreSQL", "MongoDB", "MySQL"].includes(s))])));
       }
       sessionStorage.removeItem("cursorBuilderPrefill");
-    } catch {}
+    } catch { }
   }, []);
 
   // Build form data object
   function buildFormData() {
     const techStack = [frontend, backend, database, ...tools.filter(Boolean), projectType].filter(Boolean);
     const featureList = features.map((f) => ({ name: f.name, description: f.description, priority: featurePriorities[f.id] || "must-have" }));
-    
+
     return {
       projectName,
       projectDescription,
@@ -618,7 +618,7 @@ export default function CursorBuilderPage() {
       toast.error(`Daily prompt limit reached. You have ${stats.remainingPrompts} prompts remaining. Please upgrade to Pro for unlimited prompts.`, {
         action: {
           label: 'Upgrade',
-          onClick: () => { try { window.location.href = '/dashboard/billing'; } catch {} },
+          onClick: () => { try { window.location.href = '/dashboard/billing'; } catch { } },
         },
       });
       return;
@@ -636,13 +636,13 @@ export default function CursorBuilderPage() {
 
     setIsSubmitting(true);
     setProgress(5);
-    
+
     try {
       toast.info("Starting generation...");
       const formData = buildFormData();
       const techStack = [frontend, backend, database, ...tools.filter(Boolean), projectType].filter(Boolean);
       const featureList = features.map((f) => f.name);
-      
+
       trackEvent('cursor_builder_submitted', { tech_stack: techStack.join(', '), feature_count: featureList.length });
 
       // Create generation record
@@ -660,16 +660,28 @@ export default function CursorBuilderPage() {
       setGenerationStep("prd"); // Set step first to show loading screen
       setIsSubmitting(true);
       toast.info("Generating PRD...");
+      logger.info("[submit] Starting PRD generation", { generationId: genId, userId: user.id });
       const { prd } = await generatePRD({
         generationId: genId as GenerationId,
         userId: user.id,
         formData,
       });
+      
+      if (!prd || prd.trim().length === 0) {
+        throw new Error("PRD generation returned empty content");
+      }
+      
+      logger.info("[submit] PRD generated successfully", {
+        generationId: genId,
+        prdLength: prd.length,
+        hasContent: prd.trim().length > 0
+      });
+      
       setPrdContent(prd);
       setProgress(30);
       toast.success("PRD generated! Please review and approve.");
       setIsSubmitting(false);
-      
+
       // Save to autofill history
       recordSubmission("cursor-app", {
         projectType,
@@ -690,8 +702,12 @@ export default function CursorBuilderPage() {
 
   // Approve PRD and generate User Flows
   async function approvePRD() {
-    if (!generationId || !prdContent || !user?.id) return;
+    if (!generationId || !prdContent || !user?.id) {
+      logger.warn("[approvePRD] Missing required data", { generationId, hasPrd: !!prdContent, userId: user?.id });
+      return;
+    }
     
+    logger.info("[approvePRD] Starting user flows generation", { generationId, userId: user.id });
     setIsSubmitting(true);
     setProgress(40);
     
@@ -713,6 +729,16 @@ export default function CursorBuilderPage() {
         prd: prdContent,
       });
       
+      if (!userFlows || userFlows.trim().length === 0) {
+        throw new Error("User flows generation returned empty content");
+      }
+      
+      logger.info("[approvePRD] User flows generated successfully", {
+        generationId,
+        userId: user.id,
+        userFlowsLength: userFlows.length
+      });
+
       setUserFlowsContent(userFlows);
       setProgress(50);
       toast.success("User Flows generated! Please review and approve.");
@@ -728,10 +754,10 @@ export default function CursorBuilderPage() {
   // Approve User Flows and generate Tasks
   async function approveUserFlows() {
     if (!generationId || !userFlowsContent || !prdContent || !user?.id) return;
-    
+
     setIsSubmitting(true);
     setProgress(60);
-    
+
     try {
       await approveStep({
         generationId: generationId as GenerationId,
@@ -751,6 +777,16 @@ export default function CursorBuilderPage() {
         userFlows: userFlowsContent,
       });
       
+      if (!taskFile || taskFile.trim().length === 0) {
+        throw new Error("Task file generation returned empty content");
+      }
+      
+      logger.info("[approveUserFlows] Task file generated successfully", {
+        generationId,
+        userId: user.id,
+        taskFileLength: taskFile.length
+      });
+
       setTaskFileContent(taskFile);
       setProgress(70);
       toast.success("Task File generated! Please review and approve.");
@@ -766,10 +802,10 @@ export default function CursorBuilderPage() {
   // Approve Tasks and generate lists
   async function approveTasks() {
     if (!generationId || !taskFileContent || !userFlowsContent || !prdContent || !user?.id) return;
-    
+
     setIsSubmitting(true);
     setProgress(75);
-    
+
     try {
       await approveStep({
         generationId: generationId as GenerationId,
@@ -784,6 +820,12 @@ export default function CursorBuilderPage() {
         .filter(([_, selected]) => selected)
         .map(([key, _]) => (key === "errorFixing" ? "error_fixing" : key) as PromptType);
 
+      logger.debug("[approveTasks] Calling generateLists", {
+        generationId,
+        userId: user.id,
+        selectedTypes
+      });
+      
       const lists = await generateLists({
         generationId: generationId as GenerationId,
         userId: user.id,
@@ -793,6 +835,16 @@ export default function CursorBuilderPage() {
         selectedPromptTypes: selectedTypes,
       });
       
+      logger.info("[approveTasks] Lists generated successfully", {
+        generationId,
+        userId: user.id,
+        frontendCount: (lists as any).screenList?.length || 0,
+        backendCount: (lists as any).endpointList?.length || 0,
+        securityCount: (lists as any).securityFeatureList?.length || 0,
+        functionalityCount: (lists as any).functionalityFeatureList?.length || 0,
+        errorFixingCount: (lists as any).errorScenarioList?.length || 0
+      });
+
       // Transform the result to match GeneratedLists type
       const transformedLists: GeneratedLists = {
         frontend: (lists as any).screenList?.map((name: string) => ({ name, type: "frontend" })) || [],
@@ -801,23 +853,33 @@ export default function CursorBuilderPage() {
         functionality: (lists as any).functionalityFeatureList?.map((name: string) => ({ name, type: "functionality" })) || [],
         errorFixing: (lists as any).errorScenarioList?.map((name: string) => ({ name, type: "errorFixing" })) || [],
       };
-      
+
       setGeneratedLists(transformedLists);
       generatedListsRef.current = transformedLists; // Also update ref
       setProgress(80);
       setGenerationStartTime(Date.now());
-      
+
       // Transition to prompts step
       setGenerationStep("prompts");
       setGenerationError(null);
       setIsSubmitting(true); // Set to true before starting generation
-      
+
       // Start generating prompts for first item
       // Pass transformedLists directly to avoid race condition with state update
+      logger.info("[approveTasks] Starting prompt generation", {
+        generationId,
+        userId: user.id,
+        totalItems: calculateTotalPrompts()
+      });
       await generateNextPrompt(transformedLists);
     } catch (e: unknown) {
       const error = e instanceof Error ? e : new Error(String(e));
-      logger.error("Failed to generate lists", { error: error.message });
+      logger.error("[approveTasks] Failed to generate lists", {
+        error: error.message,
+        generationId,
+        userId: user.id,
+        stack: error.stack
+      });
       toast.error(error.message || "Failed to generate lists");
       setIsSubmitting(false);
     }
@@ -827,7 +889,7 @@ export default function CursorBuilderPage() {
   function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
     return Promise.race([
       promise,
-      new Promise<T>((_, reject) => 
+      new Promise<T>((_, reject) =>
         setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
       )
     ]);
@@ -840,39 +902,48 @@ export default function CursorBuilderPage() {
     baseDelayMs: number = 1000
   ): Promise<T> {
     let lastError: Error | null = null;
-    
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         return await fn();
       } catch (error: unknown) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        
+
         // Don't retry on validation errors or user errors
         const errorMsg = lastError.message.toLowerCase();
-        if (errorMsg.includes("validation") || 
-            errorMsg.includes("limit reached") || 
-            errorMsg.includes("permission") ||
-            errorMsg.includes("cannot generate")) {
+        if (errorMsg.includes("validation") ||
+          errorMsg.includes("limit reached") ||
+          errorMsg.includes("permission") ||
+          errorMsg.includes("cannot generate")) {
           throw lastError;
         }
-        
+
         // If this is the last attempt, throw the error
         if (attempt === maxRetries - 1) {
           throw lastError;
         }
-        
+
         // Exponential backoff: 1s, 2s, 4s
         const delay = baseDelayMs * Math.pow(2, attempt);
         logger.debug(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms delay...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-    
+
     throw lastError || new Error("Retry failed");
   }
 
   // Generate next prompt in sequence
   async function generateNextPrompt(lists?: GeneratedLists) {
+    // STRONG GUARD: Prevent concurrent calls - check ref first before any async operations
+    if (isGeneratingRef.current) {
+      logger.debug("[generateNextPrompt] Already in progress, skipping duplicate call", {
+        timestamp: Date.now(),
+        stack: new Error().stack?.split('\n').slice(1, 4).join('\n')
+      });
+      return;
+    }
+    
     // Use provided lists parameter, ref, or fall back to state
     const listsToUse = lists || generatedListsRef.current || generatedLists;
     
@@ -892,34 +963,45 @@ export default function CursorBuilderPage() {
     
     if (missing.length > 0) {
       const errorMsg = `Cannot generate prompts: Missing required data (${missing.join(", ")})`;
-      logger.error("generateNextPrompt validation failed", { missing });
+      logger.error("[generateNextPrompt] Validation failed", { missing, generationId, hasLists: !!listsToUse });
       toast.error(errorMsg);
       setIsSubmitting(false);
       setGenerationError(errorMsg);
       return;
     }
     
-    // Add generation lock to prevent concurrent calls
-    if (isGeneratingRef.current) {
-      logger.debug("Generation already in progress, skipping...");
+    // Validate lists have actual content
+    const hasValidLists = listsToUse && (
+      (listsToUse.frontend && listsToUse.frontend.length > 0) ||
+      (listsToUse.backend && listsToUse.backend.length > 0) ||
+      (listsToUse.security && listsToUse.security.length > 0) ||
+      (listsToUse.functionality && listsToUse.functionality.length > 0) ||
+      (listsToUse.errorFixing && listsToUse.errorFixing.length > 0)
+    );
+    
+    if (!hasValidLists) {
+      const errorMsg = "Generated lists are empty. Please regenerate lists.";
+      logger.error("[generateNextPrompt] Lists validation failed", { listsToUse });
+      toast.error(errorMsg);
+      setIsSubmitting(false);
+      setGenerationError(errorMsg);
       return;
     }
     
+    // Set lock BEFORE any async operations
     isGeneratingRef.current = true;
     setIsSubmitting(true);
     setGenerationError(null);
     
+    logger.info("[generateNextPrompt] Starting generation", {
+      generationId,
+      timestamp: Date.now()
+    });
+    
     try {
-      // Sync state from backend before generating
-      let syncedPrompts = generatedPromptsRef.current || generatedPrompts;
-      if (getGenerationProgress?.generatedPrompts) {
-        setGeneratedPrompts(getGenerationProgress.generatedPrompts);
-        generatedPromptsRef.current = getGenerationProgress.generatedPrompts; // Update ref immediately
-        syncedPrompts = getGenerationProgress.generatedPrompts; // Use synced prompts for duplicate detection
-        // Small delay to ensure state updates
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-      
+      // Use local ref for duplicate detection to avoid race conditions with server state
+      const syncedPrompts = generatedPromptsRef.current || generatedPrompts;
+
       const formData = buildFormData();
       const selectedTypes = Object.entries(selectedPromptTypes)
         .filter(([_, selected]) => selected)
@@ -930,22 +1012,33 @@ export default function CursorBuilderPage() {
         const syncedPromptsList = (syncedPrompts as any)[type] || [];
         const refPromptsList = (generatedPromptsRef.current as any)[type] || [];
         // Check both synced and ref to catch all cases
-        return syncedPromptsList.some((p: GeneratedItem) => p.title === name) ||
-               refPromptsList.some((p: GeneratedItem) => p.title === name);
+        const alreadyExists = syncedPromptsList.some((p: GeneratedItem) => p.title === name) ||
+          refPromptsList.some((p: GeneratedItem) => p.title === name);
+        
+        if (alreadyExists) {
+          logger.debug("[generateNextPrompt] Item already generated, skipping", {
+            type,
+            name,
+            syncedCount: syncedPromptsList.length,
+            refCount: refPromptsList.length
+          });
+        }
+        
+        return alreadyExists;
       }
 
       // Determine which item to generate next
       let nextItem: { type: string; name: string; index: number } | null = null;
-      
+
       if (!listsToUse) return;
-      
+
       // Check frontend screens - with duplicate detection
       if (selectedTypes.includes("frontend") && listsToUse.frontend) {
         const frontendPrompts = syncedPrompts.frontend || [];
         const remainingScreens = listsToUse.frontend.filter(
           (item) => !itemAlreadyGenerated("frontend", item.name)
         );
-        
+
         if (remainingScreens.length > 0) {
           const nextScreen = remainingScreens[0];
           const originalIndex = listsToUse.frontend.findIndex(item => item.name === nextScreen.name);
@@ -956,14 +1049,14 @@ export default function CursorBuilderPage() {
           };
         }
       }
-      
+
       // Check backend endpoints - with duplicate detection
       if (!nextItem && selectedTypes.includes("backend") && listsToUse.backend) {
         const backendPrompts = syncedPrompts.backend || [];
         const remainingEndpoints = listsToUse.backend.filter(
           (item) => !itemAlreadyGenerated("backend", item.name)
         );
-        
+
         if (remainingEndpoints.length > 0) {
           const nextEndpoint = remainingEndpoints[0];
           const originalIndex = listsToUse.backend.findIndex(item => item.name === nextEndpoint.name);
@@ -974,14 +1067,14 @@ export default function CursorBuilderPage() {
           };
         }
       }
-      
+
       // Check security features - with duplicate detection
       if (!nextItem && selectedTypes.includes("security") && listsToUse.security) {
         const securityPrompts = syncedPrompts.security || [];
         const remainingFeatures = listsToUse.security.filter(
           (item) => !itemAlreadyGenerated("security", item.name)
         );
-        
+
         if (remainingFeatures.length > 0) {
           const nextFeature = remainingFeatures[0];
           const originalIndex = listsToUse.security.findIndex(item => item.name === nextFeature.name);
@@ -992,14 +1085,14 @@ export default function CursorBuilderPage() {
           };
         }
       }
-      
+
       // Check functionality features - with duplicate detection
       if (!nextItem && selectedTypes.includes("functionality") && listsToUse.functionality) {
         const functionalityPrompts = syncedPrompts.functionality || [];
         const remainingFeatures = listsToUse.functionality.filter(
           (item) => !itemAlreadyGenerated("functionality", item.name)
         );
-        
+
         if (remainingFeatures.length > 0) {
           const nextFeature = remainingFeatures[0];
           const originalIndex = listsToUse.functionality.findIndex(item => item.name === nextFeature.name);
@@ -1010,14 +1103,14 @@ export default function CursorBuilderPage() {
           };
         }
       }
-      
+
       // Check error scenarios - with duplicate detection
       if (!nextItem && selectedTypes.includes("error_fixing") && listsToUse.errorFixing) {
         const errorPrompts = syncedPrompts.error_fixing || [];
         const remainingScenarios = listsToUse.errorFixing.filter(
           (item) => !itemAlreadyGenerated("error_fixing", item.name)
         );
-        
+
         if (remainingScenarios.length > 0) {
           const nextScenario = remainingScenarios[0];
           const originalIndex = listsToUse.errorFixing.findIndex(item => item.name === nextScenario.name);
@@ -1031,6 +1124,11 @@ export default function CursorBuilderPage() {
 
       if (!nextItem) {
         // All prompts generated, show summary
+        logger.info("[generateNextPrompt] All prompts generated, showing summary", {
+          generationId,
+          totalPrompts: Object.values(syncedPrompts).flat().length,
+          timestamp: Date.now()
+        });
         setGenerationStep("summary");
         setIsSubmitting(false);
         setShowConfetti(true);
@@ -1038,20 +1136,37 @@ export default function CursorBuilderPage() {
         isGeneratingRef.current = false;
         return;
       }
+      
+      logger.debug("[generateNextPrompt] Selected next item to generate", {
+        type: nextItem.type,
+        name: nextItem.name,
+        index: nextItem.index,
+        generationId
+      });
 
       // Only show toast if this is a new item (not a retry or duplicate)
       const isRetry = currentPromptIndex?.name === nextItem.name && currentPromptIndex?.type === nextItem.type;
-      const isDuplicateToast = lastGeneratedItemRef.current?.name === nextItem.name && 
-                                lastGeneratedItemRef.current?.type === nextItem.type;
-      
+      const isDuplicateToast = lastGeneratedItemRef.current?.name === nextItem.name &&
+        lastGeneratedItemRef.current?.type === nextItem.type;
+
       // Don't show toast if it's a retry, duplicate, or if item is already generated
       if (!isRetry && !isDuplicateToast && !itemAlreadyGenerated(nextItem.type, nextItem.name)) {
+        logger.info("[generateNextPrompt] Showing toast for new item", {
+          type: nextItem.type,
+          name: nextItem.name
+        });
         toast.info(`Generating prompt for ${nextItem.name}...`);
         lastGeneratedItemRef.current = { type: nextItem.type, name: nextItem.name };
+      } else {
+        logger.debug("[generateNextPrompt] Skipping toast", {
+          isRetry,
+          isDuplicateToast,
+          alreadyGenerated: itemAlreadyGenerated(nextItem.type, nextItem.name)
+        });
       }
-      
+
       setCurrentPromptIndex(nextItem);
-      
+
       // Validate required data before calling API
       if (!user?.id || !prdContent || !userFlowsContent || !taskFileContent) {
         throw new Error("Missing required data for prompt generation");
@@ -1083,12 +1198,12 @@ export default function CursorBuilderPage() {
         const refPrompts = generatedPromptsRef.current[nextItem!.type as keyof GeneratedPrompts] || [];
         const allExisting = [...existingPrompts, ...refPrompts];
         const alreadyExists = allExisting.some((p: GeneratedItem) => p.title === nextItem!.name);
-        
+
         if (alreadyExists) {
           logger.warn(`Prompt for ${nextItem!.name} already exists, skipping duplicate`);
           return prev;
         }
-        
+
         const updated = {
           ...prev,
           [nextItem!.type]: [
@@ -1096,10 +1211,10 @@ export default function CursorBuilderPage() {
             { title: nextItem!.name, prompt },
           ],
         };
-        
+
         // Update ref immediately to prevent race conditions
         generatedPromptsRef.current = updated;
-        
+
         // Persist progress to localStorage
         if (generationId) {
           try {
@@ -1120,27 +1235,61 @@ export default function CursorBuilderPage() {
       setCurrentPromptIndex(null);
       setIsSubmitting(false);
       setGenerationError(null);
-      isGeneratingRef.current = false;
       lastGeneratedItemRef.current = null; // Clear last item on success
       
-      // Continue to next prompt - pass lists via ref to avoid state timing issues
-      setTimeout(() => generateNextPrompt(generatedListsRef.current || listsToUse), 500);
+      // CRITICAL: Clear lock BEFORE attempting next generation to prevent infinite loops
+      isGeneratingRef.current = false;
+      
+      logger.info("[generateNextPrompt] Successfully generated prompt", {
+        itemType: nextItem.type,
+        itemName: nextItem.name,
+        generationId,
+        timestamp: Date.now()
+      });
+      
+      // Continue to next prompt - but only if we're not already generating
+      // Use a small delay to ensure state has settled, but check guard first
+      setTimeout(() => {
+        // Double-check guard before calling again
+        if (!isGeneratingRef.current) {
+          logger.debug("[generateNextPrompt] Continuing to next prompt", {
+            generationId,
+            timestamp: Date.now()
+          });
+          generateNextPrompt(generatedListsRef.current || listsToUse);
+        } else {
+          logger.warn("[generateNextPrompt] Skipping continuation - already generating", {
+            generationId,
+            timestamp: Date.now()
+          });
+        }
+      }, 500);
     } catch (e: any) {
       const errorMsg = e.message || "Failed to generate prompt";
-      logger.error("generateNextPrompt error", { errorMsg, error: e instanceof Error ? e.message : String(e) });
+      logger.error("[generateNextPrompt] Error occurred", {
+        errorMsg,
+        error: e instanceof Error ? e.message : String(e),
+        itemName: currentPromptIndex?.name || "unknown",
+        itemType: currentPromptIndex?.type || "unknown",
+        generationId,
+        timestamp: Date.now(),
+        stack: e instanceof Error ? e.stack : undefined
+      });
       toast.error(errorMsg);
       setIsSubmitting(false);
       setGenerationError(`Failed to generate prompt for ${currentPromptIndex?.name || "unknown item"}: ${errorMsg}`);
       setCurrentPromptIndex(null);
+      // CRITICAL: Always clear lock on error to prevent stuck state
       isGeneratingRef.current = false;
       // Don't clear lastGeneratedItemRef on error - this prevents showing toast again on retry
+      // DO NOT automatically retry - let user manually retry via button
     }
   }
 
   // Continue to chat
   async function continueToChat() {
     if (!generationId || !user?.id) return;
-    
+
     try {
       const formData = buildFormData();
       const context = {
@@ -1174,12 +1323,12 @@ export default function CursorBuilderPage() {
       Object.entries(generatedPrompts).forEach(([type, prompts]: [string, GeneratedItem[] | undefined]) => {
         if (Array.isArray(prompts)) {
           prompts.forEach((p: GeneratedItem, idx: number) => {
-            const promptType: "frontend_prompt" | "backend_prompt" | "security_prompt" | "functionality_prompt" | "error_fixing_prompt" | "chat_message" = 
+            const promptType: "frontend_prompt" | "backend_prompt" | "security_prompt" | "functionality_prompt" | "error_fixing_prompt" | "chat_message" =
               type === "frontend" ? "frontend_prompt" :
-              type === "backend" ? "backend_prompt" :
-              type === "security" ? "security_prompt" :
-              type === "functionality" ? "functionality_prompt" :
-              type === "error_fixing" ? "error_fixing_prompt" : "chat_message";
+                type === "backend" ? "backend_prompt" :
+                  type === "security" ? "security_prompt" :
+                    type === "functionality" ? "functionality_prompt" :
+                      type === "error_fixing" ? "error_fixing_prompt" : "chat_message";
             embeddingItems.push({
               content: p.prompt,
               metadata: {
@@ -1271,17 +1420,17 @@ export default function CursorBuilderPage() {
         budget: 'Small team (2-3 developers)',
         resourceConstraints: 'Standard cloud hosting, standard development tools',
         competitors: 'Salesforce, HubSpot, Pipedrive',
-        
+
         // Audience
-        audienceSummary: { 
-          ageRange: '26-35', 
-          profession: 'Manager', 
-          expertiseLevel: 'intermediate', 
-          industry: 'Technology', 
-          useCase: 'Team collaboration' 
+        audienceSummary: {
+          ageRange: '26-35',
+          profession: 'Manager',
+          expertiseLevel: 'intermediate',
+          industry: 'Technology',
+          useCase: 'Team collaboration'
         },
         platforms: ['Web', 'Mobile (responsive)'],
-        
+
         // Problem & Goals
         problemStatement: 'Sales teams struggle with scattered customer data, lack of visibility into deal pipelines, and inefficient lead tracking processes.',
         primaryGoal: 'Increase efficiency',
@@ -1290,7 +1439,7 @@ export default function CursorBuilderPage() {
           'Increase deal closure rate by 25%',
           'Improve team collaboration and visibility'
         ],
-        
+
         // Features
         features: [
           { id: 'f1', name: 'Contact Management', description: 'Store, organize, and filter contacts with custom fields and tags' },
@@ -1314,7 +1463,7 @@ export default function CursorBuilderPage() {
         thirdPartyIntegrations: 'Email providers (Gmail, Outlook), calendar systems, payment processors, analytics tools',
         realTimeFeatures: true,
         analyticsTracking: 'User engagement, feature usage, sales metrics, conversion funnels',
-        
+
         // User Experience & Design
         lookAndFeel: 'Professional, clean, modern interface with emphasis on data visualization',
         brandingGuidelines: 'Corporate blue and white color scheme, professional typography',
@@ -1325,7 +1474,7 @@ export default function CursorBuilderPage() {
         themeCustomization: true,
         accessibilityFeatures: ['Keyboard navigation', 'Screen reader support', 'High contrast mode', 'ARIA labels'],
         prebuiltComponents: 'shadcn-ui',
-        
+
         // Tech Stack - Frontend
         frontend: 'React',
         frontendFrameworks: ['Next.js'],
@@ -1336,7 +1485,7 @@ export default function CursorBuilderPage() {
         frontendOptimization: ['Code splitting', 'Lazy loading', 'Image optimization', 'Bundle size optimization'],
         apiStructure: 'RESTful API with React Query for data fetching',
         frontendTesting: 'Jest, React Testing Library, Playwright for E2E',
-        
+
         // Tech Stack - Backend
         backend: 'Node.js',
         backendFrameworks: ['Express'],
@@ -1346,14 +1495,14 @@ export default function CursorBuilderPage() {
         expectedTraffic: '100-1000 concurrent users',
         dataFetching: 'REST API with pagination, filtering, and sorting',
         loggingMonitoring: 'Winston for logging, Sentry for error tracking, DataDog for monitoring',
-        
+
         // Constraints
         mvpDate: '8 weeks',
         launchDate: '4 months',
         devBudget: 'Small team (2-3 developers)',
         infraBudget: 'Standard cloud hosting costs',
         teamSize: '2-3 developers',
-        
+
         // Performance & Scale
         expectedUsers: '100-1K',
         perfRequirements: [
@@ -1370,7 +1519,7 @@ export default function CursorBuilderPage() {
         loadTesting: true,
         environmentalConsiderations: 'Optimize bundle size, minimize API calls, efficient database queries',
         successMetrics: 'User engagement, feature adoption, sales metrics, system performance',
-        
+
         // Security & Compliance
         securityReqs: [
           'Auth required',
@@ -1390,7 +1539,7 @@ export default function CursorBuilderPage() {
         backupFrequency: 'Daily automated backups with 30-day retention',
         rateLimiting: 'API rate limiting: 100 requests per minute per user',
         dataPrivacy: ['Right to deletion', 'Data portability', 'Consent management', 'Privacy by design', 'Data minimization'],
-        
+
         // Functionality & Logic
         coreBusinessLogic: 'Contact management, deal pipeline management, activity tracking, sales forecasting, reporting',
         aiMlIntegrations: 'Optional: Lead scoring, sales forecasting predictions',
@@ -1401,7 +1550,7 @@ export default function CursorBuilderPage() {
         backgroundJobs: 'Scheduled reports, email notifications, data synchronization, cleanup tasks',
         multiTenancy: false,
         updateMigrations: 'Database migration scripts, backward compatibility, rollback procedures',
-        
+
         // Error-Fixing & Maintenance
         commonErrors: 'API timeout errors, validation errors, authentication failures, data sync issues',
         errorLogTemplates: true,
@@ -1412,14 +1561,14 @@ export default function CursorBuilderPage() {
         cicdTools: 'GitHub Actions',
         rollbackPlans: 'Automated rollback on deployment failure, database migration rollback procedures',
         userFeedbackLoops: 'In-app feedback forms, user surveys, support ticket system',
-        
+
         // Dev Preferences
         codeStyle: 'Clean, readable, TypeScript with strict mode, ESLint and Prettier',
         testingApproach: 'Test-driven development with unit and integration tests, 80%+ code coverage',
         docsLevel: 'Comprehensive API documentation, inline code comments, README with setup instructions',
         versionControl: 'Git with feature branches, pull request reviews, semantic commits',
         deploymentDetails: 'CI/CD pipeline, automated testing, staging environment, blue-green deployment',
-        
+
         // Additional Context
         similarProjects: 'Salesforce, HubSpot, Pipedrive, Zoho CRM',
         designInspiration: 'Modern SaaS dashboards, clean data visualization, intuitive navigation',
@@ -1429,10 +1578,10 @@ export default function CursorBuilderPage() {
         sustainabilityGoals: 'Efficient resource usage, minimize server load, optimize database queries',
         futureExpansions: 'Mobile apps, AI-powered insights, advanced analytics, integrations marketplace',
         uniqueAspects: 'Focus on ease of use, fast performance, customizable workflows, strong reporting capabilities',
-        
+
         // Tools
         tools: ['Auth', 'Analytics', 'Email Service', 'Payment Processing'],
-        
+
         // Technical Details (for TechnicalDetailsBuilder component)
         techDetails: {
           category: 'code',
@@ -1449,10 +1598,10 @@ export default function CursorBuilderPage() {
   ];
 
   function applyTemplate(template: Template) {
-    try { trackEvent('generic_prompt_template_selected', { template_name: template.name }); } catch {}
-    
+    try { trackEvent('generic_prompt_template_selected', { template_name: template.name }); } catch { }
+
     const fields = template.fields;
-    
+
     // Overview
     setProjectName(String(fields.projectName || ''));
     setProjectDescription(String(fields.projectDescription || ''));
@@ -1464,16 +1613,16 @@ export default function CursorBuilderPage() {
     setBudget(String(fields.budget || ''));
     setResourceConstraints(String(fields.resourceConstraints || ''));
     setCompetitors(String(fields.competitors || ''));
-    
+
     // Audience
     setAudienceSummary((fields.audienceSummary as { ageRange: string; profession: string; expertiseLevel: string; industry: string; useCase: string; }) || { ageRange: "", profession: "", expertiseLevel: "", industry: "", useCase: "" });
     setPlatforms(Array.isArray(fields.platforms) ? fields.platforms as string[] : []);
-    
+
     // Problem & Goals
     setProblemStatement(String(fields.problemStatement || ''));
     setPrimaryGoal(String(fields.primaryGoal || ''));
     setSuccessCriteria(Array.isArray(fields.successCriteria) ? fields.successCriteria as string[] : []);
-    
+
     // Features
     type FeatureItem = { id: string; name: string; description: string };
     setFeatures(Array.isArray(fields.features) ? (fields.features as FeatureItem[]) : []);
@@ -1486,7 +1635,7 @@ export default function CursorBuilderPage() {
     setThirdPartyIntegrations(String(fields.thirdPartyIntegrations || ''));
     setRealTimeFeatures(Boolean(fields.realTimeFeatures));
     setAnalyticsTracking(String(fields.analyticsTracking || ''));
-    
+
     // User Experience & Design
     setLookAndFeel(String(fields.lookAndFeel || ''));
     setBrandingGuidelines(String(fields.brandingGuidelines || ''));
@@ -1497,7 +1646,7 @@ export default function CursorBuilderPage() {
     setThemeCustomization(Boolean(fields.themeCustomization));
     setAccessibilityFeatures(Array.isArray(fields.accessibilityFeatures) ? fields.accessibilityFeatures as string[] : []);
     setPrebuiltComponents(String(fields.prebuiltComponents || 'shadcn-ui'));
-    
+
     // Tech Stack - Frontend
     setFrontend(String(fields.frontend || 'React'));
     setFrontendFrameworks(Array.isArray(fields.frontendFrameworks) ? fields.frontendFrameworks as string[] : []);
@@ -1508,7 +1657,7 @@ export default function CursorBuilderPage() {
     setFrontendOptimization(Array.isArray(fields.frontendOptimization) ? fields.frontendOptimization as string[] : []);
     setApiStructure(String(fields.apiStructure || ''));
     setFrontendTesting(String(fields.frontendTesting || ''));
-    
+
     // Tech Stack - Backend
     setBackend(String(fields.backend || 'Node.js'));
     setBackendFrameworks(Array.isArray(fields.backendFrameworks) ? fields.backendFrameworks as string[] : []);
@@ -1518,14 +1667,14 @@ export default function CursorBuilderPage() {
     setExpectedTraffic(String(fields.expectedTraffic || ''));
     setDataFetching(String(fields.dataFetching || ''));
     setLoggingMonitoring(String(fields.loggingMonitoring || ''));
-    
+
     // Constraints
     setMvpDate(String(fields.mvpDate || ''));
     setLaunchDate(String(fields.launchDate || ''));
     setDevBudget(String(fields.devBudget || ''));
     setInfraBudget(String(fields.infraBudget || ''));
     setTeamSize(String(fields.teamSize || ''));
-    
+
     // Performance & Scale
     setExpectedUsers(String(fields.expectedUsers || ''));
     setPerfRequirements(Array.isArray(fields.perfRequirements) ? fields.perfRequirements as string[] : []);
@@ -1538,7 +1687,7 @@ export default function CursorBuilderPage() {
     setLoadTesting(Boolean(fields.loadTesting));
     setEnvironmentalConsiderations(String(fields.environmentalConsiderations || ''));
     setSuccessMetrics(String(fields.successMetrics || ''));
-    
+
     // Security & Compliance
     setSecurityReqs(Array.isArray(fields.securityReqs) ? fields.securityReqs as string[] : []);
     setCompliance(Array.isArray(fields.compliance) ? fields.compliance as string[] : []);
@@ -1552,7 +1701,7 @@ export default function CursorBuilderPage() {
     setBackupFrequency(String(fields.backupFrequency || ''));
     setRateLimiting(String(fields.rateLimiting || ''));
     setDataPrivacy(Array.isArray(fields.dataPrivacy) ? fields.dataPrivacy as string[] : []);
-    
+
     // Functionality & Logic
     setCoreBusinessLogic(String(fields.coreBusinessLogic || ''));
     setAiMlIntegrations(String(fields.aiMlIntegrations || ''));
@@ -1563,7 +1712,7 @@ export default function CursorBuilderPage() {
     setBackgroundJobs(String(fields.backgroundJobs || ''));
     setMultiTenancy(Boolean(fields.multiTenancy));
     setUpdateMigrations(String(fields.updateMigrations || ''));
-    
+
     // Error-Fixing & Maintenance
     setCommonErrors(String(fields.commonErrors || ''));
     setErrorLogTemplates(Boolean(fields.errorLogTemplates));
@@ -1574,14 +1723,14 @@ export default function CursorBuilderPage() {
     setCicdTools(String(fields.cicdTools || ''));
     setRollbackPlans(String(fields.rollbackPlans || ''));
     setUserFeedbackLoops(String(fields.userFeedbackLoops || ''));
-    
+
     // Dev Preferences
     setCodeStyle(String(fields.codeStyle || 'Clean, readable, typed where applicable'));
     setTestingApproach(String(fields.testingApproach || 'Unit + integration with mocks'));
     setDocsLevel(String(fields.docsLevel || 'Pragmatic with examples'));
     setVersionControl(String(fields.versionControl || ''));
     setDeploymentDetails(String(fields.deploymentDetails || ''));
-    
+
     // Additional Context
     setSimilarProjects(String(fields.similarProjects || ''));
     setDesignInspiration(String(fields.designInspiration || ''));
@@ -1591,10 +1740,10 @@ export default function CursorBuilderPage() {
     setSustainabilityGoals(String(fields.sustainabilityGoals || ''));
     setFutureExpansions(String(fields.futureExpansions || ''));
     setUniqueAspects(String(fields.uniqueAspects || ''));
-    
+
     // Tools
     setTools(Array.isArray(fields.tools) ? fields.tools as string[] : []);
-    
+
     // Technical Details (for TechnicalDetailsBuilder component)
     if (fields.techDetails && typeof fields.techDetails === 'object') {
       const techDetailsValue = fields.techDetails as { category: string; details: Record<string, unknown> };
@@ -1609,7 +1758,7 @@ export default function CursorBuilderPage() {
         }
       });
     }
-    
+
     toast.success(`Template "${template.name}" applied successfully!`);
   }
 
@@ -1624,7 +1773,7 @@ export default function CursorBuilderPage() {
         // Only show notification on initial restore, not every field update
         didRestore = true;
       }
-    } catch {}
+    } catch { }
     if (didRestore) {
       setShowRestoreHelper(true);
       setTimeout(() => setShowRestoreHelper(false), 4200);
@@ -1691,7 +1840,7 @@ export default function CursorBuilderPage() {
             setDesignInspiration(data.designInspiration || "");
             setSpecialRequirements(data.specialRequirements || "");
           }
-        } catch {}
+        } catch { }
         toast.info('Progress manually restored from autosave.');
       }
     };
@@ -1734,6 +1883,29 @@ export default function CursorBuilderPage() {
                 <p className="text-sm text-foreground/80">
                   💡 This may take 30-60 seconds. We're analyzing your requirements and creating a detailed document.
                 </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* PRD Error/Empty State */}
+        {generationStep === "prd" && !isSubmitting && !prdContent && (
+          <Card className="p-8 border-destructive/50 bg-destructive/5">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <h2 className="text-xl font-bold text-destructive mb-2">Generation Failed</h2>
+              <p className="text-foreground/60 mb-6 max-w-md">
+                We couldn't generate the Product Requirements Document. This might be due to an API error or content policy.
+              </p>
+              <div className="flex gap-4">
+                <Button variant="outline" onClick={() => setGenerationStep("form")}>
+                  Back to Form
+                </Button>
+                <Button onClick={submit}>
+                  Retry Generation
+                </Button>
               </div>
             </div>
           </Card>
@@ -1801,6 +1973,29 @@ export default function CursorBuilderPage() {
           </Card>
         )}
 
+        {/* User Flows Error/Empty State */}
+        {generationStep === "user_flows" && !isSubmitting && !userFlowsContent && (
+          <Card className="p-8 border-destructive/50 bg-destructive/5">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <h2 className="text-xl font-bold text-destructive mb-2">Generation Failed</h2>
+              <p className="text-foreground/60 mb-6 max-w-md">
+                We couldn't generate the User Flows. Please try again.
+              </p>
+              <div className="flex gap-4">
+                <Button variant="outline" onClick={() => setGenerationStep("prd")}>
+                  Back to PRD
+                </Button>
+                <Button onClick={approvePRD}>
+                  Retry Generation
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* User Flows Review */}
         {generationStep === "user_flows" && userFlowsContent && (
           <Card className="p-6">
@@ -1858,6 +2053,29 @@ export default function CursorBuilderPage() {
                 <p className="text-sm text-foreground/80">
                   💡 Organizing tasks by priority and dependencies for efficient development.
                 </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Tasks Error/Empty State */}
+        {generationStep === "tasks" && !isSubmitting && !taskFileContent && (
+          <Card className="p-8 border-destructive/50 bg-destructive/5">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <h2 className="text-xl font-bold text-destructive mb-2">Generation Failed</h2>
+              <p className="text-foreground/60 mb-6 max-w-md">
+                We couldn't generate the Task Breakdown. Please try again.
+              </p>
+              <div className="flex gap-4">
+                <Button variant="outline" onClick={() => setGenerationStep("user_flows")}>
+                  Back to User Flows
+                </Button>
+                <Button onClick={approveUserFlows}>
+                  Retry Generation
+                </Button>
               </div>
             </div>
           </Card>
@@ -1930,43 +2148,43 @@ export default function CursorBuilderPage() {
           <Card className="p-6">
             <div className="mb-6 text-center">
               {/* Resume Generation Button - if stopped but not complete */}
-              {!isSubmitting && !generationError && getGenerationProgress && 
-               getGenerationProgress.completedPrompts < getGenerationProgress.totalPrompts && (
-                <div className="mb-4 p-4 bg-secondary/10 border border-border rounded-lg">
-                  <p className="text-sm text-foreground/80 mb-3">
-                    Generation paused. {getGenerationProgress.completedPrompts} of {getGenerationProgress.totalPrompts} prompts completed.
-                  </p>
-                  <Button 
-                    onClick={() => {
-                      // Sync state from backend
-                      if (getGenerationProgress.generatedPrompts) {
-                        setGeneratedPrompts(getGenerationProgress.generatedPrompts);
-                        generatedPromptsRef.current = getGenerationProgress.generatedPrompts; // Update ref
-                      }
-                      if ((getGenerationProgress as any).screenList && !generatedLists?.frontend) {
-                        const progressLists = getGenerationProgress as any;
-                        const updatedLists: GeneratedLists = {
-                          frontend: progressLists.screenList?.map((name: string) => ({ name, type: "frontend" })) || [],
-                          backend: progressLists.endpointList?.map((name: string) => ({ name, type: "backend" })) || [],
-                          security: progressLists.securityFeatureList?.map((name: string) => ({ name, type: "security" })) || [],
-                          functionality: progressLists.functionalityFeatureList?.map((name: string) => ({ name, type: "functionality" })) || [],
-                          errorFixing: progressLists.errorScenarioList?.map((name: string) => ({ name, type: "errorFixing" })) || [],
-                        };
-                        setGeneratedLists(updatedLists);
-                        generatedListsRef.current = updatedLists; // Update ref
-                      }
-                      setGenerationError(null);
-                      setIsSubmitting(true);
-                      generateNextPrompt(generatedListsRef.current || generatedLists);
-                    }}
-                    variant="default"
-                    size="sm"
-                  >
-                    Resume Generation
-                  </Button>
-                </div>
-              )}
-              
+              {!isSubmitting && !generationError && getGenerationProgress &&
+                getGenerationProgress.completedPrompts < getGenerationProgress.totalPrompts && (
+                  <div className="mb-4 p-4 bg-secondary/10 border border-border rounded-lg">
+                    <p className="text-sm text-foreground/80 mb-3">
+                      Generation paused. {getGenerationProgress.completedPrompts} of {getGenerationProgress.totalPrompts} prompts completed.
+                    </p>
+                    <Button
+                      onClick={() => {
+                        // Sync state from backend
+                        if (getGenerationProgress.generatedPrompts) {
+                          setGeneratedPrompts(getGenerationProgress.generatedPrompts);
+                          generatedPromptsRef.current = getGenerationProgress.generatedPrompts; // Update ref
+                        }
+                        if ((getGenerationProgress as any).screenList && !generatedLists?.frontend) {
+                          const progressLists = getGenerationProgress as any;
+                          const updatedLists: GeneratedLists = {
+                            frontend: progressLists.screenList?.map((name: string) => ({ name, type: "frontend" })) || [],
+                            backend: progressLists.endpointList?.map((name: string) => ({ name, type: "backend" })) || [],
+                            security: progressLists.securityFeatureList?.map((name: string) => ({ name, type: "security" })) || [],
+                            functionality: progressLists.functionalityFeatureList?.map((name: string) => ({ name, type: "functionality" })) || [],
+                            errorFixing: progressLists.errorScenarioList?.map((name: string) => ({ name, type: "errorFixing" })) || [],
+                          };
+                          setGeneratedLists(updatedLists);
+                          generatedListsRef.current = updatedLists; // Update ref
+                        }
+                        setGenerationError(null);
+                        setIsSubmitting(true);
+                        generateNextPrompt(generatedListsRef.current || generatedLists);
+                      }}
+                      variant="default"
+                      size="sm"
+                    >
+                      Resume Generation
+                    </Button>
+                  </div>
+                )}
+
               {/* Error Display */}
               {generationError && (
                 <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-left">
@@ -1975,7 +2193,7 @@ export default function CursorBuilderPage() {
                     <div className="flex-1">
                       <h3 className="font-semibold text-destructive mb-1">Generation Error</h3>
                       <p className="text-sm text-foreground/80 mb-3">{generationError}</p>
-                      <Button 
+                      <Button
                         onClick={() => {
                           setGenerationError(null);
                           setIsSubmitting(true);
@@ -1990,7 +2208,7 @@ export default function CursorBuilderPage() {
                   </div>
                 </div>
               )}
-              
+
               {!generationError && (
                 <div className="mb-4">
                   {/* Enhanced animated spinner */}
@@ -2006,7 +2224,7 @@ export default function CursorBuilderPage() {
                   </div>
                 </div>
               )}
-              
+
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold">Generating Prompts</h2>
                 {isSubmitting && (
@@ -2038,13 +2256,13 @@ export default function CursorBuilderPage() {
                 )}
               </div>
               <p className="text-foreground/60 mb-4">
-                {generationError 
+                {generationError
                   ? "Generation paused due to error"
-                  : currentPromptIndex 
+                  : currentPromptIndex
                     ? `Creating prompt for: ${currentPromptIndex.name} (${currentPromptIndex.type})`
                     : "Preparing to generate prompts..."}
               </p>
-              
+
               {/* Progress with stats */}
               {generatedLists && (
                 <div className="mb-4">
@@ -2058,15 +2276,15 @@ export default function CursorBuilderPage() {
                       </span>
                     )}
                   </div>
-                  <Progress 
-                    value={calculateTotalPrompts() > 0 
-                      ? (Object.values(generatedPrompts).flat().length / calculateTotalPrompts()) * 100 
-                      : 0} 
+                  <Progress
+                    value={calculateTotalPrompts() > 0
+                      ? (Object.values(generatedPrompts).flat().length / calculateTotalPrompts()) * 100
+                      : 0}
                     className="h-3"
                   />
                 </div>
               )}
-              
+
               {/* Rotating tips */}
               {loadingTip && (
                 <div className="mt-6 p-4 bg-secondary/10 rounded-lg border border-border">
@@ -2075,7 +2293,7 @@ export default function CursorBuilderPage() {
                   </p>
                 </div>
               )}
-              
+
               {/* Mini preview of what's being generated */}
               {currentPromptIndex && (
                 <div className="mt-4 p-3 bg-background border border-border rounded text-left">
@@ -2179,9 +2397,9 @@ export default function CursorBuilderPage() {
           <div className="text-xs text-foreground/60">Step {currentStep + 1} of {steps.length}</div>
         </div>
         <div className="h-2 w-full rounded bg-secondary/20">
-          <div 
-            className="h-2 rounded bg-primary transition-[width] duration-300" 
-            style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }} 
+          <div
+            className="h-2 rounded bg-primary transition-[width] duration-300"
+            style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
           />
         </div>
       </Card>
@@ -2233,15 +2451,15 @@ export default function CursorBuilderPage() {
                   <Label htmlFor="projectType">
                     <TooltipWrapper content="What kind of app are you building?" glossaryTerm="Project Type">Project Type</TooltipWrapper>
                   </Label>
-                  <select 
-                    id="projectType" 
+                  <select
+                    id="projectType"
                     aria-label="Select Project Type"
-                    className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm focus-visible:ring-2 ring-primary" 
-                    value={projectType} 
-                    onChange={(e) => setProjectType(e.target.value)} 
+                    className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm focus-visible:ring-2 ring-primary"
+                    value={projectType}
+                    onChange={(e) => setProjectType(e.target.value)}
                     required
                   >
-                    { ["web app","mobile app","API","desktop app","library","cli"].map((t) => <option key={t}>{t}</option>) }
+                    {["web app", "mobile app", "API", "desktop app", "library", "cli"].map((t) => <option key={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
@@ -2268,12 +2486,12 @@ export default function CursorBuilderPage() {
                     Is this a new app, enhancement, or prototype?
                   </TooltipWrapper>
                 </Label>
-                <select 
-                  id="isNewApp" 
+                <select
+                  id="isNewApp"
                   aria-label="Is this a new app, enhancement, or prototype?"
-                  className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" 
-                  value={isNewApp} 
-                  onChange={(e) => setIsNewApp(e.target.value as "new" | "enhancement" | "prototype")} 
+                  className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm"
+                  value={isNewApp}
+                  onChange={(e) => setIsNewApp(e.target.value as "new" | "enhancement" | "prototype")}
                   required
                 >
                   <option value="new">New app from scratch</option>
@@ -2332,10 +2550,10 @@ export default function CursorBuilderPage() {
                     Upload Documents, Design Inspirations, Wireframes, or Mockups
                   </TooltipWrapper>
                 </Label>
-                <Input 
-                  type="file" 
-                  className="mt-2" 
-                  multiple 
+                <Input
+                  type="file"
+                  className="mt-2"
+                  multiple
                   accept=".pdf,.png,.jpg,.jpeg,.fig,.sketch,.doc,.docx"
                   onChange={(e) => {
                     const files = Array.from(e.target.files || []);
@@ -2374,9 +2592,8 @@ export default function CursorBuilderPage() {
                         key={platform}
                         type="button"
                         onClick={() => setPlatforms((arr) => (arr.includes(platform) ? arr.filter((x) => x !== platform) : [...arr, platform]))}
-                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${
-                          active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
-                        }`}
+                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
+                          }`}
                       >
                         {active && <span className="mr-1">✓</span>}
                         {platform}
@@ -2411,16 +2628,16 @@ export default function CursorBuilderPage() {
                     Primary goal
                   </TooltipWrapper>
                 </Label>
-                <select 
-                  id="primaryGoal" 
+                <select
+                  id="primaryGoal"
                   aria-label="Select Primary Goal"
-                  className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" 
-                  value={primaryGoal} 
-                  onChange={(e) => setPrimaryGoal(e.target.value)} 
+                  className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm"
+                  value={primaryGoal}
+                  onChange={(e) => setPrimaryGoal(e.target.value)}
                   required
                 >
                   <option value="">Select...</option>
-                  {["Increase efficiency","Reduce costs","Improve user experience","Enable new capability","Other"].map((t) => <option key={t}>{t}</option>)}
+                  {["Increase efficiency", "Reduce costs", "Improve user experience", "Enable new capability", "Other"].map((t) => <option key={t}>{t}</option>)}
                 </select>
                 <p className="text-xs text-foreground/60 mt-1">
                   💡 Tip: Choose the main goal that drives your project. This helps prioritize features and decisions.
@@ -2436,12 +2653,12 @@ export default function CursorBuilderPage() {
                   {successCriteria.map((c, i) => (
                     <div key={i} className="flex gap-2">
                       <Label htmlFor={`success-criteria-${i}`} className="sr-only">Success Criteria {i + 1}</Label>
-                      <Input 
+                      <Input
                         id={`success-criteria-${i}`}
-                        value={c} 
-                        onChange={(e) => updateCriteria(i, e.target.value)} 
-                        placeholder="Measurable outcome (e.g., '1000 users in first month')" 
-                        required 
+                        value={c}
+                        onChange={(e) => updateCriteria(i, e.target.value)}
+                        placeholder="Measurable outcome (e.g., '1000 users in first month')"
+                        required
                       />
                       <Button variant="outline" size="sm" onClick={() => removeCriteria(i)}>Remove</Button>
                     </div>
@@ -2459,14 +2676,14 @@ export default function CursorBuilderPage() {
                   </TooltipWrapper>
                 </Label>
                 <Label htmlFor="analyticsTracking" className="sr-only">Analytics & Tracking Requirements</Label>
-                <Textarea 
+                <Textarea
                   id="analyticsTracking"
-                  className="mt-2" 
-                  rows={3} 
-                  value={analyticsTracking} 
-                  onChange={(e) => setAnalyticsTracking(e.target.value)} 
-                  placeholder="What metrics do you want to track? (e.g., user engagement, conversion rates, performance metrics)" 
-                  required 
+                  className="mt-2"
+                  rows={3}
+                  value={analyticsTracking}
+                  onChange={(e) => setAnalyticsTracking(e.target.value)}
+                  placeholder="What metrics do you want to track? (e.g., user engagement, conversion rates, performance metrics)"
+                  required
                 />
                 <p className="text-xs text-foreground/60 mt-1">
                   💡 Tip: Think about what you want to measure: user signups, page views, feature usage, conversion rates, etc.
@@ -2499,15 +2716,15 @@ export default function CursorBuilderPage() {
                           }
                         }}
                       >{idx + 1}</Badge>
-                      <Input 
+                      <Input
                         id={`feature-name-${f.id}`}
-                        value={f.name} 
-                        onChange={(e) => setFeatures((arr) => arr.map((x) => x.id === f.id ? { ...x, name: e.target.value } : x))} 
-                        className="flex-1" 
-                        aria-label={`Feature ${idx + 1} name`} 
-                        required 
+                        value={f.name}
+                        onChange={(e) => setFeatures((arr) => arr.map((x) => x.id === f.id ? { ...x, name: e.target.value } : x))}
+                        className="flex-1"
+                        aria-label={`Feature ${idx + 1} name`}
+                        required
                       />
-                      <select 
+                      <select
                         id={`feature-priority-${f.id}`}
                         aria-label={`Feature ${idx + 1} priority`}
                         className="rounded-md border border-border bg-background p-2 text-sm"
@@ -2522,13 +2739,13 @@ export default function CursorBuilderPage() {
                     <div className="mt-2">
                       <Label>Description</Label>
                       <Label htmlFor={`feature-description-${f.id}`} className="sr-only">Feature {idx + 1} Description</Label>
-                      <textarea 
+                      <textarea
                         id={`feature-description-${f.id}`}
-                        className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" 
-                        rows={3} 
-                        value={f.description} 
-                        onChange={(e) => setFeatures((arr) => arr.map((x) => x.id === f.id ? { ...x, description: e.target.value } : x))} 
-                        required 
+                        className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm"
+                        rows={3}
+                        value={f.description}
+                        onChange={(e) => setFeatures((arr) => arr.map((x) => x.id === f.id ? { ...x, description: e.target.value } : x))}
+                        required
                       />
                     </div>
                   </li>
@@ -2620,12 +2837,12 @@ export default function CursorBuilderPage() {
                   </TooltipWrapper>
                 </Label>
                 <Label htmlFor="prebuiltComponents" className="sr-only">Pre-built Component Library</Label>
-                <select 
+                <select
                   id="prebuiltComponents"
                   aria-label="Pre-built Component Library"
-                  className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" 
-                  value={prebuiltComponents} 
-                  onChange={(e) => setPrebuiltComponents(e.target.value)} 
+                  className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm"
+                  value={prebuiltComponents}
+                  onChange={(e) => setPrebuiltComponents(e.target.value)}
                   required
                 >
                   <option value="shadcn-ui">shadcn-ui</option>
@@ -2673,9 +2890,8 @@ export default function CursorBuilderPage() {
                         key={pattern}
                         type="button"
                         onClick={() => setUiuxPatterns((arr) => (arr.includes(pattern) ? arr.filter((x) => x !== pattern) : [...arr, pattern]))}
-                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${
-                          active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
-                        }`}
+                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
+                          }`}
                       >
                         {active && <span className="mr-1">✓</span>}
                         {pattern}
@@ -2708,12 +2924,12 @@ export default function CursorBuilderPage() {
                   {keyScreens.map((screen, i) => (
                     <div key={i} className="flex gap-2">
                       <Label htmlFor={`key-screen-${i}`} className="sr-only">Key Screen {i + 1}</Label>
-                      <Input 
+                      <Input
                         id={`key-screen-${i}`}
-                        value={screen} 
-                        onChange={(e) => setKeyScreens((arr) => arr.map((s, idx) => idx === i ? e.target.value : s))} 
-                        placeholder="Screen name (e.g., Home, Dashboard, Profile)" 
-                        required 
+                        value={screen}
+                        onChange={(e) => setKeyScreens((arr) => arr.map((s, idx) => idx === i ? e.target.value : s))}
+                        placeholder="Screen name (e.g., Home, Dashboard, Profile)"
+                        required
                       />
                       <Button variant="outline" size="sm" onClick={() => setKeyScreens((arr) => arr.filter((_, idx) => idx !== i))}>Remove</Button>
                     </div>
@@ -2761,9 +2977,8 @@ export default function CursorBuilderPage() {
                         key={feature}
                         type="button"
                         onClick={() => setAccessibilityFeatures((arr) => (arr.includes(feature) ? arr.filter((x) => x !== feature) : [...arr, feature]))}
-                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${
-                          active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
-                        }`}
+                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
+                          }`}
                       >
                         {active && <span className="mr-1">✓</span>}
                         {feature}
@@ -2799,9 +3014,8 @@ export default function CursorBuilderPage() {
                         key={fw}
                         type="button"
                         onClick={() => setFrontendFrameworks((arr) => (arr.includes(fw) ? arr.filter((x) => x !== fw) : [...arr, fw]))}
-                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${
-                          active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
-                        }`}
+                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
+                          }`}
                       >
                         {active && <span className="mr-1">✓</span>}
                         {fw}
@@ -2871,9 +3085,8 @@ export default function CursorBuilderPage() {
                         key={opt}
                         type="button"
                         onClick={() => setFrontendOptimization((arr) => (arr.includes(opt) ? arr.filter((x) => x !== opt) : [...arr, opt]))}
-                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${
-                          active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
-                        }`}
+                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
+                          }`}
                       >
                         {active && <span className="mr-1">✓</span>}
                         {opt}
@@ -2938,9 +3151,8 @@ export default function CursorBuilderPage() {
                         key={fw}
                         type="button"
                         onClick={() => setBackendFrameworks((arr) => (arr.includes(fw) ? arr.filter((x) => x !== fw) : [...arr, fw]))}
-                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${
-                          active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
-                        }`}
+                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
+                          }`}
                       >
                         {active && <span className="mr-1">✓</span>}
                         {fw}
@@ -3025,14 +3237,14 @@ export default function CursorBuilderPage() {
                   </TooltipWrapper>
                 </Label>
                 <Label htmlFor="loggingMonitoring" className="sr-only">Logging & Monitoring</Label>
-                <Textarea 
+                <Textarea
                   id="loggingMonitoring"
-                  className="mt-2" 
-                  rows={2} 
-                  value={loggingMonitoring} 
-                  onChange={(e) => setLoggingMonitoring(e.target.value)} 
-                  placeholder="e.g., Winston, Pino, Datadog, Sentry, or describe what you want to track" 
-                  required 
+                  className="mt-2"
+                  rows={2}
+                  value={loggingMonitoring}
+                  onChange={(e) => setLoggingMonitoring(e.target.value)}
+                  placeholder="e.g., Winston, Pino, Datadog, Sentry, or describe what you want to track"
+                  required
                 />
                 <p className="text-xs text-foreground/60 mt-1">
                   💡 Tip: Monitoring helps you understand app performance and catch errors. If unsure, describe what you want to track (errors, user activity, performance, etc.).
@@ -3051,7 +3263,7 @@ export default function CursorBuilderPage() {
                   </TooltipWrapper>
                 </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {["Auth required","RBAC","Encrypt at rest","Encrypt in transit","2FA"]
+                  {["Auth required", "RBAC", "Encrypt at rest", "Encrypt in transit", "2FA"]
                     .map((t) => {
                       const active = securityReqs.includes(t);
                       return (
@@ -3090,9 +3302,8 @@ export default function CursorBuilderPage() {
                         key={method}
                         type="button"
                         onClick={() => setAuthenticationMethods((arr) => (arr.includes(method) ? arr.filter((x) => x !== method) : [...arr, method]))}
-                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${
-                          active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
-                        }`}
+                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
+                          }`}
                       >
                         {active && <span className="mr-1">✓</span>}
                         {method}
@@ -3111,14 +3322,14 @@ export default function CursorBuilderPage() {
                   </TooltipWrapper>
                 </Label>
                 <Label htmlFor="authorizationLevels" className="sr-only">Authorization Levels</Label>
-                <Textarea 
+                <Textarea
                   id="authorizationLevels"
-                  className="mt-2" 
-                  rows={2} 
-                  value={authorizationLevels} 
-                  onChange={(e) => setAuthorizationLevels(e.target.value)} 
-                  placeholder="e.g., Admin (full access), User (limited access), Guest (read-only), or describe user roles and permissions" 
-                  required 
+                  className="mt-2"
+                  rows={2}
+                  value={authorizationLevels}
+                  onChange={(e) => setAuthorizationLevels(e.target.value)}
+                  placeholder="e.g., Admin (full access), User (limited access), Guest (read-only), or describe user roles and permissions"
+                  required
                 />
                 <p className="text-xs text-foreground/60 mt-1">
                   💡 Tip: Think about who needs access to what features. Common roles: Admin, User, Guest, Moderator, Manager, etc.
@@ -3149,9 +3360,8 @@ export default function CursorBuilderPage() {
                         key={vuln}
                         type="button"
                         onClick={() => setVulnerabilityPrevention((arr) => (arr.includes(vuln) ? arr.filter((x) => x !== vuln) : [...arr, vuln]))}
-                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${
-                          active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
-                        }`}
+                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
+                          }`}
                       >
                         {active && <span className="mr-1">✓</span>}
                         {vuln}
@@ -3189,7 +3399,7 @@ export default function CursorBuilderPage() {
                   </TooltipWrapper>
                 </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {["GDPR","HIPAA","SOC 2","PCI DSS","CCPA"]
+                  {["GDPR", "HIPAA", "SOC 2", "PCI DSS", "CCPA"]
                     .map((t) => {
                       const active = compliance.includes(t);
                       return (
@@ -3217,9 +3427,8 @@ export default function CursorBuilderPage() {
                         key={req}
                         type="button"
                         onClick={() => setDataPrivacy((arr) => (arr.includes(req) ? arr.filter((x) => x !== req) : [...arr, req]))}
-                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${
-                          active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
-                        }`}
+                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
+                          }`}
                       >
                         {active && <span className="mr-1">✓</span>}
                         {req}
@@ -3238,15 +3447,15 @@ export default function CursorBuilderPage() {
                       How long should data be kept?
                     </TooltipWrapper>
                   </Label>
-                  <select 
-                    id="dataRetention" 
+                  <select
+                    id="dataRetention"
                     aria-label="Select Data Retention"
-                    className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" 
-                    value={dataRetention} 
-                    onChange={(e) => setDataRetention(e.target.value)} 
+                    className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm"
+                    value={dataRetention}
+                    onChange={(e) => setDataRetention(e.target.value)}
                     required
                   >
-                    {["30 days","90 days","1 year","7 years","Indefinite"].map((t) => <option key={t}>{t}</option>)}
+                    {["30 days", "90 days", "1 year", "7 years", "Indefinite"].map((t) => <option key={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
@@ -3255,15 +3464,15 @@ export default function CursorBuilderPage() {
                       How often should data be backed up?
                     </TooltipWrapper>
                   </Label>
-                  <select 
-                    id="backupFrequency" 
+                  <select
+                    id="backupFrequency"
                     aria-label="Select Backup Frequency"
-                    className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" 
-                    value={backupFrequency} 
-                    onChange={(e) => setBackupFrequency(e.target.value)} 
+                    className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm"
+                    value={backupFrequency}
+                    onChange={(e) => setBackupFrequency(e.target.value)}
                     required
                   >
-                    {["Hourly","Daily","Weekly"].map((t) => <option key={t}>{t}</option>)}
+                    {["Hourly", "Daily", "Weekly"].map((t) => <option key={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
@@ -3280,14 +3489,14 @@ export default function CursorBuilderPage() {
                   </TooltipWrapper>
                 </Label>
                 <Label htmlFor="coreBusinessLogic" className="sr-only">Core Business Logic</Label>
-                <Textarea 
+                <Textarea
                   id="coreBusinessLogic"
-                  className="mt-2" 
-                  rows={4} 
-                  value={coreBusinessLogic} 
-                  onChange={(e) => setCoreBusinessLogic(e.target.value)} 
-                  placeholder="Describe the main processes, rules, and workflows your app needs to handle..." 
-                  required 
+                  className="mt-2"
+                  rows={4}
+                  value={coreBusinessLogic}
+                  onChange={(e) => setCoreBusinessLogic(e.target.value)}
+                  placeholder="Describe the main processes, rules, and workflows your app needs to handle..."
+                  required
                 />
                 <p className="text-xs text-foreground/60 mt-1">
                   💡 Tip: Think about what your app does step-by-step. For example: "Users can create accounts, upload files, share with others, and receive notifications."
@@ -3322,14 +3531,14 @@ export default function CursorBuilderPage() {
                   </TooltipWrapper>
                 </Label>
                 <Label htmlFor="customFunctionalities" className="sr-only">Custom Functionalities</Label>
-                <Textarea 
+                <Textarea
                   id="customFunctionalities"
-                  className="mt-2" 
-                  rows={3} 
-                  value={customFunctionalities} 
-                  onChange={(e) => setCustomFunctionalities(e.target.value)} 
-                  placeholder="Describe any unique or custom features specific to your app" 
-                  required 
+                  className="mt-2"
+                  rows={3}
+                  value={customFunctionalities}
+                  onChange={(e) => setCustomFunctionalities(e.target.value)}
+                  placeholder="Describe any unique or custom features specific to your app"
+                  required
                 />
                 <p className="text-xs text-foreground/60 mt-1">
                   💡 Tip: Think about what makes your app special. What features set it apart from similar apps?
@@ -3459,9 +3668,8 @@ export default function CursorBuilderPage() {
                         key={type}
                         type="button"
                         onClick={() => setTestingTypes((arr) => (arr.includes(type) ? arr.filter((x) => x !== type) : [...arr, type]))}
-                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${
-                          active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
-                        }`}
+                        className={`rounded-md border px-3 py-1 text-sm transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-secondary/20 border-border"
+                          }`}
                       >
                         {active && <span className="mr-1">✓</span>}
                         {type}
@@ -3502,14 +3710,14 @@ export default function CursorBuilderPage() {
                   </TooltipWrapper>
                 </Label>
                 <Label htmlFor="userFeedbackLoops" className="sr-only">User Feedback Loops</Label>
-                <Textarea 
+                <Textarea
                   id="userFeedbackLoops"
-                  className="mt-2" 
-                  rows={2} 
-                  value={userFeedbackLoops} 
-                  onChange={(e) => setUserFeedbackLoops(e.target.value)} 
-                  placeholder="e.g., in-app feedback forms, email support, bug reporting, or describe your feedback process" 
-                  required 
+                  className="mt-2"
+                  rows={2}
+                  value={userFeedbackLoops}
+                  onChange={(e) => setUserFeedbackLoops(e.target.value)}
+                  placeholder="e.g., in-app feedback forms, email support, bug reporting, or describe your feedback process"
+                  required
                 />
                 <p className="text-xs text-foreground/60 mt-1">
                   💡 Tip: Think about how users will report bugs or suggest improvements, and how you'll prioritize and implement those changes.
@@ -3528,7 +3736,7 @@ export default function CursorBuilderPage() {
                   </TooltipWrapper>
                 </Label>
                 <select id="expectedUsers" title="Select Expected Users" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm" value={expectedUsers} onChange={(e) => setExpectedUsers(e.target.value)} required>
-                  {["< 100","100-1K","1K-10K","10K-100K","100K-1M","1M+"].map((t) => <option key={t}>{t}</option>)}
+                  {["< 100", "100-1K", "1K-10K", "10K-100K", "100K-1M", "1M+"].map((t) => <option key={t}>{t}</option>)}
                 </select>
                 <p className="text-xs text-foreground/60 mt-1">
                   💡 Tip: Be realistic about your expected user count. This helps determine server capacity and infrastructure needs.
@@ -3541,7 +3749,7 @@ export default function CursorBuilderPage() {
                   </TooltipWrapper>
                 </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {["Real-time updates","Offline support","Low latency (<200ms)","High availability (99.9%+)"]
+                  {["Real-time updates", "Offline support", "Low latency (<200ms)", "High availability (99.9%+)"]
                     .map((t) => {
                       const active = perfRequirements.includes(t);
                       return (
@@ -3861,13 +4069,13 @@ export default function CursorBuilderPage() {
                       {stats.remainingPrompts <= 0 ? "Limit reached" : `${stats.remainingPrompts} remaining today`}
                     </span>
                   )}
-                  <Button 
-                    onClick={submit} 
+                  <Button
+                    onClick={submit}
                     disabled={
-                      isSubmitting || 
-                      !user?.id || 
+                      isSubmitting ||
+                      !user?.id ||
                       (!!stats && !stats.isPro && stats.remainingPrompts < 10)
-                    } 
+                    }
                     className="h-11"
                   >
                     Generate Prompts
@@ -4195,11 +4403,11 @@ function ResultToolbar({ content, filename, compact, promptType }: { content: st
     URL.revokeObjectURL(url);
   }
   async function useInCursor() {
-    try { await navigator.clipboard.writeText(content); } catch {}
+    try { await navigator.clipboard.writeText(content); } catch { }
     alert("Copied! In Cursor, paste into the chat or appropriate file.");
   }
   return (
-    <div className={"flex gap-2 " + (compact ? "" : "justify-end") }>
+    <div className={"flex gap-2 " + (compact ? "" : "justify-end")}>
       <Button variant="outline" size="sm" onClick={copy} className="shadow-sm hover:shadow-md">Copy</Button>
       <Button variant="outline" size="sm" onClick={download} className="shadow-sm hover:shadow-md">Download</Button>
       <Button variant="outline" size="sm" onClick={downloadMd} className="shadow-sm hover:shadow-md">Download .md</Button>
@@ -4210,7 +4418,7 @@ function ResultToolbar({ content, filename, compact, promptType }: { content: st
 
 function PreBlock({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <pre className={"overflow-x-auto rounded-md bg-secondary/10 p-3 text-sm leading-6 ring-1 ring-border " + (className ?? "") }>
+    <pre className={"overflow-x-auto rounded-md bg-secondary/10 p-3 text-sm leading-6 ring-1 ring-border " + (className ?? "")}>
       {children}
     </pre>
   );

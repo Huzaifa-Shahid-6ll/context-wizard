@@ -118,7 +118,7 @@ export default function GenericPromptPage() {
         dataType, analysisGoal, needViz, statsMethods,
       };
       localStorage.setItem("genericPrompt.v1", JSON.stringify(payload));
-    } catch {}
+    } catch { }
   }, [step, category, outputConfig, toneConfig, goal, context, emailRecipient, emailPurpose, emailKeyPoints, emailCta, codeLanguage, codeFramework, codeTaskType, codeComplexity, codeIncludeTests, codeIncludeDocs, contentType, contentTopic, audienceConfig, contentWordCount, contentKeyPoints, contentSeo, dataType, analysisGoal, needViz, statsMethods]);
 
   React.useEffect(() => {
@@ -152,7 +152,7 @@ export default function GenericPromptPage() {
       setAnalysisGoal(data.analysisGoal || "");
       setNeedViz(!!data.needViz);
       setStatsMethods(Array.isArray(data.statsMethods) ? data.statsMethods : []);
-    } catch {}
+    } catch { }
   }, []);
 
   React.useEffect(() => {
@@ -300,7 +300,7 @@ export default function GenericPromptPage() {
       toast.error(`Daily prompt limit reached. You have ${stats.remainingPrompts} prompts remaining. Please upgrade to Pro for unlimited prompts.`, {
         action: {
           label: 'Upgrade',
-          onClick: () => { try { window.location.href = '/dashboard/billing'; } catch {} },
+          onClick: () => { try { window.location.href = '/dashboard/billing'; } catch { } },
         },
       });
       return;
@@ -369,7 +369,7 @@ export default function GenericPromptPage() {
   React.useEffect(() => {
     if (user?.id) {
       localStorage.setItem('mode:genericPrompt', mode);
-      savePrefs({ userId: user.id, featureType: "generic", formData: {}, preferredMode: mode }).catch(() => {});
+      savePrefs({ userId: user.id, featureType: "generic", formData: {}, preferredMode: mode }).catch(() => { });
     }
   }, [mode, savePrefs, user?.id]);
 
@@ -479,7 +479,7 @@ export default function GenericPromptPage() {
               setToneConfig(prev => ({ ...prev, tone: (typeof data.tone === 'string' ? data.tone : prev.tone) }));
               setGoal(typeof data.goal === 'string' ? data.goal : '');
               setContext(typeof data.context === 'string' ? data.context : '');
-            } catch {}
+            } catch { }
           };
           reader.readAsText(file);
         }} />
@@ -498,7 +498,7 @@ export default function GenericPromptPage() {
         <div className="mb-3 flex items-center justify-between">
           <div className="text-sm font-medium" id="wizard-step-heading">Step {step} of 7</div>
           <div className="h-2 w-2/3 rounded bg-secondary/20">
-            <div className="h-2 rounded bg-primary transition-[width] duration-300" style={{ width: `${(step/7)*100}%` }} />
+            <div className="h-2 rounded bg-primary transition-[width] duration-300" style={{ width: `${(step / 7) * 100}%` }} />
           </div>
         </div>
         {step === 1 && (
@@ -511,7 +511,7 @@ export default function GenericPromptPage() {
                   </TooltipWrapper>
                 </Label>
                 <select id="category" title="Select Category" className="w-full rounded-md border border-border bg-background p-2 text-sm focus-visible:ring-2 ring-primary" value={category} onChange={(e) => setCategory(e.target.value)}>
-                  {["Email Writing","Code Generation","Content Creation","Data Analysis","Other"].map((c) => <option key={c}>{c}</option>)}
+                  {["Email Writing", "Code Generation", "Content Creation", "Data Analysis", "Other"].map((c) => <option key={c}>{c}</option>)}
                 </select>
               </>
             )}
@@ -544,7 +544,7 @@ export default function GenericPromptPage() {
                   </TooltipWrapper>
                 </Label>
                 <select id="emailRecipient" title="Select Email Recipient" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm focus-visible:ring-2 ring-primary" value={emailRecipient} onChange={(e) => setEmailRecipient(e.target.value)}>
-                  {["Client","Team member","Manager","Customer","Vendor"].map((v) => <option key={v}>{v}</option>)}
+                  {["Client", "Team member", "Manager", "Customer", "Vendor"].map((v) => <option key={v}>{v}</option>)}
                 </select>
               </>
             )}
@@ -556,7 +556,7 @@ export default function GenericPromptPage() {
                   </TooltipWrapper>
                 </Label>
                 <select id="emailPurpose" title="Select Email Purpose" className="mt-2 w-full rounded-md border border-border bg-background p-2 text-sm focus-visible:ring-2 ring-primary" value={emailPurpose} onChange={(e) => setEmailPurpose(e.target.value)}>
-                  {["Update","Request","Apology","Announcement","Follow-up"].map((v) => <option key={v}>{v}</option>)}
+                  {["Update", "Request", "Apology", "Announcement", "Follow-up"].map((v) => <option key={v}>{v}</option>)}
                 </select>
               </>
             )}
@@ -753,7 +753,7 @@ export default function GenericPromptPage() {
 
 function Toolbar({ content }: { content: string }) {
   async function onCopy() {
-    try { await navigator.clipboard.writeText(content); } catch {}
+    try { await navigator.clipboard.writeText(content); } catch { }
   }
   function onDownload() {
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });

@@ -1,3 +1,5 @@
+"use node";
+
 import { action, query } from "./_generated/server";
 
 export const debugEnvironment = action({

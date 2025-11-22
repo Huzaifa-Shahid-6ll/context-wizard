@@ -75,7 +75,8 @@ const outputPredictions = defineTable({
   createdAt: v.number(),
 })
   .index("by_userId", ["userId"]) // lookup by user
-  .index("by_createdAt", ["createdAt"]); // sort/filter by creation time
+  .index("by_createdAt", ["createdAt"]) // sort/filter by creation time
+  .index("by_userId_createdAt", ["userId", "createdAt"]); // Composite index for pagination
 
 // Security Events table schema
 const securityEvents = defineTable({
@@ -379,6 +380,17 @@ const rateLimits = defineTable({
   .index("by_key", ["key"])
   .index("by_resetAt", ["resetAt"]); // For cleanup of expired entries
 
+// Cache table schema for caching layer
+const cache = defineTable({
+  key: v.string(), // Cache key
+  value: v.any(), // Cached value (flexible type)
+  expiresAt: v.number(), // Unix timestamp in milliseconds
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+  .index("by_key", ["key"])
+  .index("by_expiresAt", ["expiresAt"]); // For cleanup of expired entries
+
 // Export the schema
 export default defineSchema({
   users,
@@ -401,6 +413,7 @@ export default defineSchema({
   promptVersions,
   appBuilderGenerations,
   rateLimits,
+  cache,
 });
 
 // Type helpers generated via convex codegen (imported by consumers):

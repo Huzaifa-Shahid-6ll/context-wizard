@@ -2,7 +2,7 @@ import { trackEvent } from './analytics';
 import { logger } from './logger';
 
 export function logSecurityEvent(
-  eventType: 'rate_limit' | 'bot_detected' | 'honeypot_triggered' | 'suspicious_ip',
+  eventType: 'rate_limit' | 'bot_detected' | 'honeypot_triggered' | 'suspicious_ip' | 'csrf_validation_failed' | 'request_size_exceeded' | 'banned_ip_access_attempt',
   details: Record<string, unknown>
 ) {
   // Log to PostHog
