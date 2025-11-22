@@ -3,13 +3,24 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  images: {
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'api.dicebear.com',
+        pathname: '/**',
+      },
+    ],
+  },
   webpack: (config, { isServer }) => {
     // Enable WebAssembly support
     config.experiments = {
       ...config.experiments,
       asyncWebAssembly: true,
     };
-    
+
     // Handle WASM files
     if (!isServer) {
       config.resolve.fallback = {
@@ -17,13 +28,13 @@ const nextConfig: NextConfig = {
         fs: false,
       };
     }
-    
+
     // Configure WASM module handling
     config.module.rules.push({
       test: /\.wasm$/,
       type: 'asset/resource',
     });
-    
+
     return config;
   },
   async rewrites() {

@@ -57,8 +57,8 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
     }
 
     // Track question answered
-    posthog.capture('onboarding_question_answered', { 
-      questionNumber: currentStep + 1, 
+    posthog.capture('onboarding_question_answered', {
+      questionNumber: currentStep + 1,
       answer: value,
       userId
     });
@@ -82,7 +82,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
       const newValues = currentValues.includes(option)
         ? currentValues.filter(item => item !== option)
         : [...currentValues, option];
-      
+
       return {
         ...prev,
         [question]: newValues
@@ -104,7 +104,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
     try {
       // Sanitize text inputs
       const sanitizedSourceDetails = answers.sourceDetails ? sanitizeInput(answers.sourceDetails) : undefined;
-      
+
       // Save to Convex
       await saveOnboarding({
         userId,
@@ -138,9 +138,9 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
       });
 
       setIsCompleted(true);
-      
+
       // Show success message and complete the onboarding
-      toast.success('Onboarding completed! Welcome to Context Wizard.');
+      toast.success('Onboarding completed! Welcome to Conard.');
       onComplete();
     } catch (error) {
       console.error('Error saving onboarding data:', error);
@@ -149,16 +149,16 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
   };
 
   const getRecommendation = () => {
-    if (answers.role === 'Vibe Coder (Using AI tools, learning to code)' && 
-        answers.painPoint === 'AI generates broken/buggy code') {
+    if (answers.role === 'Vibe Coder (Using AI tools, learning to code)' &&
+      answers.painPoint === 'AI generates broken/buggy code') {
       return {
         heading: "Start with our Cursor Builder",
         description: "It'll generate step-by-step prompts that prevent common mistakes.",
         cta: "Try Cursor Builder First",
         action: () => router.push('/cursor-builder')
       };
-    } else if (answers.role === 'Professional Developer (3+ years experience)' && 
-               answers.goal === 'Build features 10x faster') {
+    } else if (answers.role === 'Professional Developer (3+ years experience)' &&
+      answers.goal === 'Build features 10x faster') {
       return {
         heading: "Jump straight to GitHub analysis",
         description: "Save hours on every new project.",
@@ -189,7 +189,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
           <div className="w-full max-w-md">
             <h2 className="text-2xl font-bold text-foreground mb-4 leading-tight">Welcome! Let{'\''}s personalize your experience</h2>
             <h3 className="text-lg font-semibold text-foreground mb-6 leading-relaxed">What best describes your role?</h3>
-            
+
             <div className="space-y-3">
               {[
                 { emoji: '👨‍💻', label: 'Vibe Coder (Using AI tools, learning to code)' },
@@ -201,11 +201,10 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
               ].map((option) => (
                 <button
                   key={option.label}
-                  className={`w-full text-left p-4 rounded-lg border transition-all shadow-depth-sm hover:shadow-depth-md ${
-                    answers.role === option.label
+                  className={`w-full text-left p-4 rounded-lg border transition-all shadow-depth-sm hover:shadow-depth-md ${answers.role === option.label
                       ? 'border-primary bg-primary/10 text-foreground font-medium'
                       : 'border-border hover:border-primary/50 bg-card hover:bg-secondary/50 text-foreground'
-                  }`}
+                    }`}
                   onClick={() => handleAnswer('role', option.label)}
                 >
                   <span className="mr-3 text-lg">{option.emoji}</span>
@@ -215,13 +214,13 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
             </div>
           </div>
         );
-      
+
       case 1: // Current Tool Usage
         return (
           <div className="w-full max-w-md">
             <h2 className="text-2xl font-bold text-foreground mb-2 leading-tight">Which AI coding tools are you currently using?</h2>
             <p className="text-muted-foreground mb-6 text-sm">(Select all that apply)</p>
-            
+
             <div className="space-y-3">
               {[
                 { emoji: '⚡', label: 'Cursor' },
@@ -239,8 +238,8 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
                     onChange={() => handleCheckboxChange('tools', option.label)}
                     className="w-5 h-5 text-primary bg-secondary border-border rounded focus:ring-primary focus:ring-2"
                   />
-                  <label 
-                    htmlFor={`tool-${option.label}`} 
+                  <label
+                    htmlFor={`tool-${option.label}`}
                     className="ml-3 text-foreground flex items-center cursor-pointer w-full py-3 text-sm md:text-base"
                   >
                     <span className="mr-3 text-lg">{option.emoji}</span>
@@ -251,12 +250,12 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
             </div>
           </div>
         );
-      
+
       case 2: // Main Pain Point
         return (
           <div className="w-full max-w-md">
             <h2 className="text-2xl font-bold text-foreground mb-6 leading-tight">What{'\''}s your biggest frustration with AI coding tools?</h2>
-            
+
             <div className="space-y-3">
               {[
                 { emoji: '😤', label: 'AI generates broken/buggy code' },
@@ -268,11 +267,10 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
               ].map((option) => (
                 <button
                   key={option.label}
-                  className={`w-full text-left p-4 rounded-lg border transition-all shadow-depth-sm hover:shadow-depth-md ${
-                    answers.painPoint === option.label
+                  className={`w-full text-left p-4 rounded-lg border transition-all shadow-depth-sm hover:shadow-depth-md ${answers.painPoint === option.label
                       ? 'border-primary bg-primary/10 text-foreground font-medium'
                       : 'border-border hover:border-primary/50 bg-card hover:bg-secondary/50 text-foreground'
-                  }`}
+                    }`}
                   onClick={() => handleAnswer('painPoint', option.label)}
                 >
                   <span className="mr-3 text-lg">{option.emoji}</span>
@@ -282,13 +280,13 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
             </div>
           </div>
         );
-      
+
       case 3: // Project Types
         return (
           <div className="w-full max-w-md">
             <h2 className="text-2xl font-bold text-foreground mb-2 leading-tight">What types of projects do you build?</h2>
             <p className="text-muted-foreground mb-6 text-sm">(Select all that apply)</p>
-            
+
             <div className="grid grid-cols-1 gap-3">
               {[
                 { emoji: '🌐', label: 'Web Applications (React, Vue, etc.)' },
@@ -309,8 +307,8 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
                     onChange={() => handleCheckboxChange('projectTypes', option.label)}
                     className="w-5 h-5 text-primary bg-secondary border-border rounded focus:ring-primary focus:ring-2"
                   />
-                  <label 
-                    htmlFor={`project-${option.label}`} 
+                  <label
+                    htmlFor={`project-${option.label}`}
                     className="ml-3 text-foreground flex items-center cursor-pointer w-full py-3 text-sm md:text-base"
                   >
                     <span className="mr-3 text-lg">{option.emoji}</span>
@@ -321,12 +319,12 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
             </div>
           </div>
         );
-      
+
       case 4: // Tech Stack Familiarity
         return (
           <div className="w-full max-w-md">
             <h2 className="text-2xl font-bold text-foreground mb-6 leading-tight">How familiar are you with your tech stack?</h2>
-            
+
             <div className="space-y-3">
               {[
                 { emoji: '🎓', label: 'Just learning - need lots of guidance' },
@@ -336,11 +334,10 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
               ].map((option) => (
                 <button
                   key={option.label}
-                  className={`w-full text-left p-4 rounded-lg border transition-all shadow-depth-sm hover:shadow-depth-md ${
-                    answers.techFamiliarity === option.label
+                  className={`w-full text-left p-4 rounded-lg border transition-all shadow-depth-sm hover:shadow-depth-md ${answers.techFamiliarity === option.label
                       ? 'border-primary bg-primary/10 text-foreground font-medium'
                       : 'border-border hover:border-primary/50 bg-card hover:bg-secondary/50 text-foreground'
-                  }`}
+                    }`}
                   onClick={() => handleAnswer('techFamiliarity', option.label)}
                 >
                   <span className="mr-3 text-lg">{option.emoji}</span>
@@ -350,12 +347,12 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
             </div>
           </div>
         );
-      
+
       case 5: // Desired Outcome
         return (
           <div className="w-full max-w-md">
             <h2 className="text-2xl font-bold text-foreground mb-6 leading-tight">What{'\''}s your main goal in the next 30 days?</h2>
-            
+
             <div className="space-y-3">
               {[
                 { emoji: '🚀', label: 'Ship my first AI-generated project' },
@@ -367,11 +364,10 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
               ].map((option) => (
                 <button
                   key={option.label}
-                  className={`w-full text-left p-4 rounded-lg border transition-all shadow-depth-sm hover:shadow-depth-md ${
-                    answers.goal === option.label
+                  className={`w-full text-left p-4 rounded-lg border transition-all shadow-depth-sm hover:shadow-depth-md ${answers.goal === option.label
                       ? 'border-primary bg-primary/10 text-foreground font-medium'
                       : 'border-border hover:border-primary/50 bg-card hover:bg-secondary/50 text-foreground'
-                  }`}
+                    }`}
                   onClick={() => handleAnswer('goal', option.label)}
                 >
                   <span className="mr-3 text-lg">{option.emoji}</span>
@@ -381,12 +377,12 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
             </div>
           </div>
         );
-      
+
       case 6: // How They Found Us
         return (
           <div className="w-full max-w-md">
-            <h2 className="text-2xl font-bold text-foreground mb-6 leading-tight">How did you hear about Context Wizard?</h2>
-            
+            <h2 className="text-2xl font-bold text-foreground mb-6 leading-tight">How did you hear about Conard?</h2>
+
             <div className="space-y-3 mb-6">
               {[
                 { emoji: '🐦', label: 'Twitter/X' },
@@ -400,11 +396,10 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
               ].map((option) => (
                 <button
                   key={option.label}
-                  className={`w-full text-left p-4 rounded-lg border transition-all shadow-depth-sm hover:shadow-depth-md ${
-                    answers.source === option.label
+                  className={`w-full text-left p-4 rounded-lg border transition-all shadow-depth-sm hover:shadow-depth-md ${answers.source === option.label
                       ? 'border-primary bg-primary/10 text-foreground font-medium'
                       : 'border-border hover:border-primary/50 bg-card hover:bg-secondary/50 text-foreground'
-                  }`}
+                    }`}
                   onClick={() => handleAnswer('source', option.label)}
                 >
                   <span className="mr-3 text-lg">{option.emoji}</span>
@@ -412,7 +407,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
                 </button>
               ))}
             </div>
-            
+
             <div>
               <label htmlFor="sourceDetails" className="block text-foreground mb-2">Any other details? (optional)</label>
               <input
@@ -426,17 +421,17 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
             </div>
           </div>
         );
-      
+
       case 7: // Final Recommendation Screen
         const recommendation = getRecommendation();
         return (
           <div className="w-full max-w-md">
             <h2 className="text-2xl font-bold text-foreground mb-6 leading-tight">Perfect! Here{'\''}s What We Recommend For You</h2>
-            
+
             <div className="bg-secondary/50 p-6 rounded-lg border border-border shadow-depth-md">
               <h3 className="text-xl font-semibold text-primary mb-2">{recommendation.heading}</h3>
               <p className="text-foreground mb-6">{recommendation.description}</p>
-              
+
               <button
                 onClick={recommendation.action}
                 className="w-full py-3 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors shadow-depth-sm hover:shadow-elevated"
@@ -444,7 +439,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
                 {recommendation.cta}
               </button>
             </div>
-            
+
             <div className="mt-8 p-4 bg-secondary/30 rounded-lg border border-border">
               <h4 className="font-semibold text-foreground mb-2">Quick Tips for Success:</h4>
               <ul className="text-muted-foreground space-y-1">
@@ -462,7 +457,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
                 </li>
               </ul>
             </div>
-            
+
             <div className="mt-6">
               <button
                 onClick={() => {
@@ -475,7 +470,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
             </div>
           </div>
         );
-      
+
       default:
         return null;
     }
@@ -487,30 +482,30 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 overflow-y-auto">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={(e) => e.stopPropagation()} />
-      
+
       {/* Modal Container with scroll support */}
       <div className="relative w-full max-w-2xl bg-card rounded-xl border border-border overflow-hidden shadow-depth-lg my-8">
         {/* Progress Bar */}
         <div className="h-1.5 bg-muted">
-          <motion.div 
+          <motion.div
             className="h-full bg-primary"
             initial={{ width: `${progress}%` }}
             animate={{ width: `${progress}%` }}
             transition={{ duration: 0.3 }}
           />
         </div>
-        
+
         {/* Header with step indicator */}
         <div className="p-6 border-b border-border bg-card">
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground text-sm font-medium">
               Step {currentStep + 1} of {totalSteps}
             </span>
-            <button 
+            <button
               onClick={() => {
-                posthog.capture('onboarding_abandoned', { 
-                  userId, 
-                  lastQuestion: currentStep + 1 
+                posthog.capture('onboarding_abandoned', {
+                  userId,
+                  lastQuestion: currentStep + 1
                 });
                 onComplete();
               }}
@@ -520,7 +515,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
             </button>
           </div>
         </div>
-        
+
         {/* Content */}
         <div className="p-6 flex flex-col items-center min-h-[400px] bg-card">
           <HoneypotField />
@@ -546,22 +541,21 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ userId, onComplete })
             </motion.div>
           </AnimatePresence>
         </div>
-        
+
         {/* Navigation */}
         {currentStep < 7 && (
           <div className="p-6 border-t border-border flex justify-between bg-card">
             <button
               onClick={handleBack}
               disabled={currentStep === 0}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                currentStep === 0 
-                  ? 'text-muted-foreground/50 cursor-not-allowed' 
+              className={`px-4 py-2 rounded-lg transition-colors ${currentStep === 0
+                  ? 'text-muted-foreground/50 cursor-not-allowed'
                   : 'text-foreground hover:bg-secondary'
-              }`}
+                }`}
             >
               Back
             </button>
-            
+
             <button
               onClick={handleNext}
               disabled={

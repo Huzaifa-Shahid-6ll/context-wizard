@@ -20,11 +20,10 @@ export default function ToolsClient() {
           ].map((tab) => (
             <button
               key={tab.id}
-              className={`px-4 py-2 rounded-lg transition-colors shadow-depth-sm ${
-                activeTab === tab.id
+              className={`px-4 py-2 rounded-lg transition-colors shadow-depth-sm ${activeTab === tab.id
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-card text-foreground hover:bg-secondary border border-border'
-              }`}
+                }`}
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.label}
@@ -46,7 +45,7 @@ export default function ToolsClient() {
                   <span className="bg-red-500 text-white text-xs px-2 py-1 rounded">🔥 Our Top Pick</span>
                 </div>
                 <p className="text-muted-foreground mb-4">
-                  The best AI coding tool we{'\''}ve used. Context Wizard generates perfect .cursorrules files specifically for Cursor. Integrated GitHub Copilot++ and GPT-4.
+                  The best AI coding tool we{'\''}ve used. Conard generates perfect .cursorrules files specifically for Cursor. Integrated GitHub Copilot++ and GPT-4.
                 </p>
                 <ul className="mb-4 space-y-2">
                   <li className="flex items-center text-foreground"><span className="text-green-500 mr-2">✓</span> AI-powered code completion</li>
@@ -55,7 +54,7 @@ export default function ToolsClient() {
                   <li className="flex items-center text-foreground"><span className="text-green-500 mr-2">✓</span> Works with .cursorrules</li>
                 </ul>
                 <div className="text-muted-foreground text-sm mb-4">Pricing: Free trial, then $20/month</div>
-                <a 
+                <a
                   href="https://cursor.sh"
                   onClick={() => trackAffiliateClick('Cursor', 'AI Coding', 'https://cursor.sh')}
                   target="_blank"
@@ -75,7 +74,7 @@ export default function ToolsClient() {
                   </div>
                 </div>
                 <p className="text-muted-foreground mb-4">
-                  Another excellent AI code editor with great context understanding. Works beautifully with Context Wizard{'\''}s generated files.
+                  Another excellent AI code editor with great context understanding. Works beautifully with Conard{'\''}s generated files.
                 </p>
                 <ul className="mb-4 space-y-2">
                   <li className="flex items-center text-foreground"><span className="text-green-500 mr-2">✓</span> Real-time AI collaboration</li>
@@ -83,7 +82,7 @@ export default function ToolsClient() {
                   <li className="flex items-center text-foreground"><span className="text-green-500 mr-2">✓</span> Context-aware suggestions</li>
                 </ul>
                 <div className="text-muted-foreground text-sm mb-4">Pricing: Free forever, Pro $10/month</div>
-                <a 
+                <a
                   href="https://windsurf.ai"
                   onClick={() => trackAffiliateClick('Windsurf', 'AI Coding', 'https://windsurf.ai')}
                   target="_blank"
@@ -111,7 +110,7 @@ export default function ToolsClient() {
                   <li className="flex items-center text-foreground"><span className="text-green-500 mr-2">✓</span> Multi-IDE support</li>
                 </ul>
                 <div className="text-muted-foreground text-sm mb-4">Pricing: $10/month or $100/year</div>
-                <a 
+                <a
                   href="https://github.com/features/copilot"
                   onClick={() => trackAffiliateClick('GitHub Copilot', 'AI Coding', 'https://github.com/features/copilot')}
                   target="_blank"
@@ -136,7 +135,7 @@ export default function ToolsClient() {
                   Build and deploy apps directly in browser. Perfect for quick prototypes and learning.
                 </p>
                 <div className="text-muted-foreground text-sm mb-4">Pricing: Free, Pro $7/month</div>
-                <a 
+                <a
                   href="https://replit.com"
                   onClick={() => trackAffiliateClick('Replit', 'Development', 'https://replit.com')}
                   target="_blank"
@@ -151,10 +150,10 @@ export default function ToolsClient() {
               <div className="bg-card rounded-xl p-6 border border-border hover:border-primary transition-all duration-300 shadow-depth-md hover:shadow-elevated">
                 <h3 className="text-xl font-bold mb-2 text-foreground">Vercel</h3>
                 <p className="text-muted-foreground mb-4">
-                  Deploy your Next.js, React, and frontend projects in seconds. We use it for Context Wizard.
+                  Deploy your Next.js, React, and frontend projects in seconds. We use it for Conard.
                 </p>
                 <div className="text-muted-foreground text-sm mb-4">Pricing: Free hobby tier, Pro $20/month</div>
-                <a 
+                <a
                   href="https://vercel.com"
                   onClick={() => trackAffiliateClick('Vercel', 'Development', 'https://vercel.com')}
                   target="_blank"
@@ -172,7 +171,7 @@ export default function ToolsClient() {
                   Open source Firebase alternative. Postgres database, authentication, real-time subscriptions.
                 </p>
                 <div className="text-muted-foreground text-sm mb-4">Pricing: Free, Pro $25/month</div>
-                <a 
+                <a
                   href="https://supabase.com"
                   onClick={() => trackAffiliateClick('Supabase', 'Development', 'https://supabase.com')}
                   target="_blank"
@@ -198,7 +197,7 @@ export default function ToolsClient() {
                   Learn to build full-stack apps using AI tools. Perfect for vibe coders.
                 </p>
                 <div className="text-muted-foreground text-sm mb-4">Price: $99 (Use code CONTEXTWIZARD for 20%)</div>
-                <a 
+                <a
                   href="#"
                   onClick={() => trackAffiliateClick('AI Developer Course', 'Learning', '#')}
                   target="_blank"
@@ -217,7 +216,7 @@ export default function ToolsClient() {
                   Complete guide to prompt engineering for developers.
                 </p>
                 <div className="text-muted-foreground text-sm mb-4">Price: $29</div>
-                <a 
+                <a
                   href="#"
                   onClick={() => trackAffiliateClick('AI Developer Handbook', 'Learning', '#')}
                   target="_blank"
@@ -242,7 +241,7 @@ export default function ToolsClient() {
                   The browser designed for developers. Spaces, split view, and AI features.
                 </p>
                 <div className="text-muted-foreground text-sm mb-4">Pricing: Free</div>
-                <a 
+                <a
                   href="https://arc.net"
                   onClick={() => trackAffiliateClick('Arc Browser', 'Productivity', 'https://arc.net')}
                   target="_blank"
@@ -260,7 +259,7 @@ export default function ToolsClient() {
                   Extendable launcher for Mac. Search, calculate, and control your tools.
                 </p>
                 <div className="text-muted-foreground text-sm mb-4">Pricing: Free, Pro $8/month</div>
-                <a 
+                <a
                   href="https://raycast.com"
                   onClick={() => trackAffiliateClick('Raycast', 'Productivity', 'https://raycast.com')}
                   target="_blank"
@@ -285,7 +284,7 @@ export default function ToolsClient() {
                   Generate UI with AI, export to React/Next.js code.
                 </p>
                 <div className="text-muted-foreground text-sm mb-4">Pricing: Free credits, then paid</div>
-                <a 
+                <a
                   href="https://v0.dev"
                   onClick={() => trackAffiliateClick('v0 by Vercel', 'Design', 'https://v0.dev')}
                   target="_blank"
@@ -303,7 +302,7 @@ export default function ToolsClient() {
                   Design tool every developer should know. Create mockups before coding.
                 </p>
                 <div className="text-muted-foreground text-sm mb-4">Pricing: Free, Pro $12/month</div>
-                <a 
+                <a
                   href="https://figma.com"
                   onClick={() => trackAffiliateClick('Figma', 'Design', 'https://figma.com')}
                   target="_blank"

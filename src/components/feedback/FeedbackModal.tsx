@@ -23,9 +23,9 @@ interface FeedbackModalProps {
   initialPage?: string;
 }
 
-export const FeedbackModal: React.FC<FeedbackModalProps> = ({ 
-  isOpen, 
-  onClose, 
+export const FeedbackModal: React.FC<FeedbackModalProps> = ({
+  isOpen,
+  onClose,
   initialPage = typeof window !== 'undefined' ? window.location.pathname : ''
 }) => {
   const [feedbackType, setFeedbackType] = useState('');
@@ -62,19 +62,19 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
       page: initialPage,
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
     });
-    
+
     if (!result.success) {
       setErrors(result.errors);
       return false;
     }
-    
+
     setErrors({});
     return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Check honeypot
     const formData = new FormData(e.target as HTMLFormElement);
     if (formData.get('website_url')) {
@@ -85,23 +85,23 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
       // Silently fail - don't show error to bot
       return;
     }
-    
+
     if (!validate()) return;
-    
+
     setIsSubmitting(true);
-    
+
     try {
       // Sanitize inputs
       const sanitizedMessage = sanitizeInput(message);
       const sanitizedEmail = email ? sanitizeEmail(email) : undefined;
-      
+
       // Track the submission attempt
       trackEvent('feedback_submitted', {
         type: feedbackType,
         rating: rating || 0,
         page: initialPage
       });
-      
+
       // Submit feedback via Convex mutation
       await submitFeedback({
         userId: user?.id,
@@ -112,10 +112,10 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
         page: initialPage,
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
       });
-      
+
       setSubmitSuccess(true);
       setShowSuccess(true);
-      
+
       // Auto close after 2 seconds
       setTimeout(() => {
         setShowSuccess(false);
@@ -169,7 +169,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               >
                 <X className="h-4 w-4" />
               </button>
-              
+
               <AnimatePresence>
                 {showSuccess ? (
                   <motion.div
@@ -196,15 +196,15 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   >
                     <DialogHeader className="mb-4">
                       <DialogTitle className="text-2xl font-bold text-primary">Help Us Build Better</DialogTitle>
-                      <p className="text-muted-foreground">Your feedback shapes Context Wizard. What can we improve?</p>
+                      <p className="text-muted-foreground">Your feedback shapes Conard. What can we improve?</p>
                     </DialogHeader>
-                    
+
                     <form onSubmit={handleSubmit} className="space-y-4">
                       <HoneypotField />
                       <div>
                         <label className="block text-sm font-medium mb-2">Feedback Type *</label>
-                        <Select 
-                          value={feedbackType} 
+                        <Select
+                          value={feedbackType}
                           onChange={(e) => setFeedbackType(e.target.value)}
                           className="w-full depth-layer-1 shadow-inset"
                         >
@@ -217,7 +217,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                         </Select>
                         {errors.type && <p className="text-red-500 text-sm mt-1">{errors.type}</p>}
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium mb-2">Your Feedback *</label>
                         <Textarea
@@ -232,7 +232,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                           <span>{message.length}/1000</span>
                         </div>
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium mb-2">Your Email (Optional)</label>
                         <Input
@@ -245,7 +245,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                         {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
                         <p className="text-xs text-muted-foreground mt-1">Only if you want a response</p>
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           How would you rate your experience so far?
@@ -266,7 +266,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                           ))}
                         </div>
                       </div>
-                      
+
                       <div className="flex space-x-3 pt-4">
                         <Button
                           type="button"

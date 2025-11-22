@@ -11,12 +11,12 @@ import { toast } from "sonner";
 export default function ApiDocsPage() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  
-  React.useEffect(() => { 
-    initPostHog(); 
-    trackEvent('api_docs_page_viewed'); 
+
+  React.useEffect(() => {
+    initPostHog();
+    trackEvent('api_docs_page_viewed');
   }, []);
-  
+
   const handleNotify = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !email.includes('@')) {
@@ -28,7 +28,7 @@ export default function ApiDocsPage() {
     toast.success('You\'ll be notified when the API is available!');
     setEmail("");
   };
-  
+
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
       <header className="mb-8 text-center">
@@ -49,7 +49,7 @@ export default function ApiDocsPage() {
           Our API will allow you to:
         </p>
         <ul>
-          <li>Integrate Context Wizard into your own applications</li>
+          <li>Integrate Conard into your own applications</li>
           <li>Automate prompt generation workflows</li>
           <li>Access advanced features programmatically</li>
           <li>Build custom integrations and tools</li>

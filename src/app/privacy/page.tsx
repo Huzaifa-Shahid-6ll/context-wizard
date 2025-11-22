@@ -17,7 +17,7 @@ export default function PrivacyPolicyPage() {
       <article className="prose prose-neutral dark:prose-invert">
         <h2>1. Introduction</h2>
         <p>
-          This Privacy Policy explains how Context Wizard (the “Service”) collects, uses,
+          This Privacy Policy explains how Conard (the “Service”) collects, uses,
           shares, and protects information about you. We are committed to protecting your
           privacy and complying with applicable data protection laws, including the EU/UK
           GDPR.

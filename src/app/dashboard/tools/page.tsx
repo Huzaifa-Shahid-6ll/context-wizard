@@ -18,7 +18,7 @@ export default function ToolsPage() {
           </p>
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 max-w-3xl mx-auto">
             <p className="text-yellow-600 dark:text-yellow-400">
-              <span className="font-bold">Note:</span> We only recommend tools we actually use. Some links are affiliate links—using them supports Context Wizard at no cost to you.
+              <span className="font-bold">Note:</span> We only recommend tools we actually use. Some links are affiliate links—using them supports Conard at no cost to you.
             </p>
           </div>
         </div>
@@ -104,12 +104,12 @@ export default function ToolsPage() {
               <div>
                 <h2 className="text-2xl font-bold mb-4 text-foreground">What We Actually Use</h2>
                 <p className="text-muted-foreground mb-4">
-                  I personally use Cursor for 90% of my coding. Combined with Context Wizard{'\''}s generated files, it{'\''}s like having a senior developer pair programming with you.
+                  I personally use Cursor for 90% of my coding. Combined with Conard{'\''}s generated files, it{'\''}s like having a senior developer pair programming with you.
                 </p>
                 <p className="text-muted-foreground mb-4">
                   For quick prototypes, I switch to Replit. For deployment, always Vercel. And yes, I pay for all of these tools myself— they{'\''}re worth every penny.
                 </p>
-                <p className="text-foreground font-medium">[Your Name], Founder of Context Wizard</p>
+                <p className="text-foreground font-medium">[Your Name], Founder of Conard</p>
               </div>
             </div>
           </div>
@@ -124,7 +124,7 @@ export default function ToolsPage() {
             <div className="bg-card rounded-xl p-6 border border-border shadow-depth-sm">
               <h3 className="text-xl font-bold mb-2 text-foreground">Are these affiliate links?</h3>
               <p className="text-muted-foreground">
-                Some are! If you purchase through our links, we earn a small commission at no extra cost to you. This helps keep Context Wizard free and improving. We only recommend tools we genuinely use and love.
+                Some are! If you purchase through our links, we earn a small commission at no extra cost to you. This helps keep Conard free and improving. We only recommend tools we genuinely use and love.
               </p>
             </div>
             <div className="bg-card rounded-xl p-6 border border-border shadow-depth-sm">
@@ -136,7 +136,7 @@ export default function ToolsPage() {
             <div className="bg-card rounded-xl p-6 border border-border shadow-depth-sm">
               <h3 className="text-xl font-bold mb-2 text-foreground">Do I need all of these tools?</h3>
               <p className="text-muted-foreground">
-                No! Start with Cursor + Context Wizard. Add other tools as your needs grow.
+                No! Start with Cursor + Conard. Add other tools as your needs grow.
               </p>
             </div>
           </div>
@@ -149,9 +149,9 @@ export default function ToolsPage() {
           <div className="bg-gradient-to-r from-primary/30 to-purple-600/30 rounded-2xl p-8 text-center border border-border shadow-depth-lg">
             <h2 className="text-3xl font-bold mb-4 text-foreground">Ready to supercharge your AI coding workflow?</h2>
             <p className="text-xl text-muted-foreground mb-6">
-              Context Wizard generates perfect configuration files for all these tools. Try it free.
+              Conard generates perfect configuration files for all these tools. Try it free.
             </p>
-            <a 
+            <a
               href="/dashboard"
               className="inline-block bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 px-8 rounded-lg transition-colors shadow-depth-sm hover:shadow-elevated"
             >
@@ -160,7 +160,7 @@ export default function ToolsPage() {
           </div>
         </div>
       </section>
-      
+
       {/* Last Updated */}
       <div className="text-center py-6 text-muted-foreground text-sm">
         Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}

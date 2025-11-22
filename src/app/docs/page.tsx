@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { BookOpen } from "@/lib/icons";
 
 export default function DocsPage() {
-  React.useEffect(() => { 
-    initPostHog(); 
-    trackEvent('docs_page_viewed'); 
+  React.useEffect(() => {
+    initPostHog();
+    trackEvent('docs_page_viewed');
   }, []);
-  
+
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
       <header className="mb-8 text-center">
@@ -21,7 +21,7 @@ export default function DocsPage() {
         </div>
         <h1 className="text-4xl font-bold tracking-tight">Documentation Coming Soon</h1>
         <p className="mt-4 text-lg text-muted-foreground">
-          We're working on comprehensive documentation to help you get the most out of Context Wizard.
+          We're working on comprehensive documentation to help you get the most out of Conard.
         </p>
       </header>
 

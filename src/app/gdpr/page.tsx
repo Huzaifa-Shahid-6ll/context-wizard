@@ -3,11 +3,11 @@ import React from "react";
 import { initPostHog, trackEvent } from "@/lib/analytics";
 
 export default function GDPRPage() {
-  React.useEffect(() => { 
-    initPostHog(); 
-    trackEvent('gdpr_page_viewed'); 
+  React.useEffect(() => {
+    initPostHog();
+    trackEvent('gdpr_page_viewed');
   }, []);
-  
+
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
       <header className="mb-8">
@@ -21,7 +21,7 @@ export default function GDPRPage() {
       <article className="prose prose-neutral dark:prose-invert">
         <h2>1. Our Commitment</h2>
         <p>
-          Context Wizard is committed to protecting your privacy and complying with the General
+          Conard is committed to protecting your privacy and complying with the General
           Data Protection Regulation (GDPR) and other applicable data protection laws. We process
           your personal data lawfully, fairly, and transparently.
         </p>

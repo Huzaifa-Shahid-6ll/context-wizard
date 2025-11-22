@@ -1,5 +1,20 @@
-// OpenRouter API utility
-// Provides: generateWithOpenRouter, analyzePrompt, predictOutput
+/**
+ * OpenRouter API utility
+ * 
+ * Provides: generateWithOpenRouter, analyzePrompt, predictOutput
+ * 
+ * Features:
+ * - Automatic fallback to Gemini API when OpenRouter encounters:
+ *   - Rate limits (HTTP 429)
+ *   - Credit exhaustion (HTTP 401 with credit/quota error)
+ *   - Service unavailable (HTTP 503)
+ *   - Server errors (HTTP 5xx)
+ * 
+ * The fallback mechanism is transparent - no code changes needed at call sites.
+ * Fallback uses the same user tier (free/pro) to select appropriate Gemini API key.
+ */
+
+import { generateWithGemini } from './gemini';
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -42,10 +57,12 @@ export type OutputPrediction = {
 
 class OpenRouterError extends Error {
   status?: number;
-  constructor(message: string, status?: number) {
+  shouldFallback?: boolean; // Flag to indicate if fallback should be attempted
+  constructor(message: string, status?: number, shouldFallback: boolean = false) {
     super(message);
     this.name = 'OpenRouterError';
     this.status = status;
+    this.shouldFallback = shouldFallback;
   }
 }
 
@@ -116,20 +133,92 @@ async function handleOpenRouterResponse(res: Response): Promise<OpenRouterRespon
   }
 
   let message = `OpenRouter API error: ${res.status} ${res.statusText}`;
+  let errorBody: any = null;
+
   try {
-    const body = await res.json();
-    if (body && typeof body.error === 'object' && body.error && 'message' in body.error) {
-      message = String(body.error.message || message);
+    errorBody = await res.json();
+    if (errorBody && typeof errorBody.error === 'object' && errorBody.error && 'message' in errorBody.error) {
+      message = String(errorBody.error.message || message);
     }
   } catch {
     // ignore JSON parse error
   }
 
-  if (res.status === 401) throw new OpenRouterError('Invalid API key', 401);
-  if (res.status === 429) throw new OpenRouterError('Rate limit exceeded', 429);
-  if (res.status === 503) throw new OpenRouterError('Model unavailable', 503);
-  if (res.status >= 500) throw new OpenRouterError(message, res.status);
-  throw new OpenRouterError(message, res.status);
+  // Determine if fallback should be attempted based on error type
+  let shouldFallback = false;
+
+  if (res.status === 429) {
+    // Rate limit exceeded - always fallback
+    shouldFallback = true;
+    throw new OpenRouterError('Rate limit exceeded', 429, shouldFallback);
+  }
+
+  if (res.status === 401) {
+    // Check if it's credit exhaustion vs invalid key
+    const errorMsg = (errorBody?.error?.message || message).toLowerCase();
+    const isCreditExhausted =
+      errorMsg.includes('credit') ||
+      errorMsg.includes('quota') ||
+      errorMsg.includes('insufficient') ||
+      errorMsg.includes('balance') ||
+      errorMsg.includes('exceeded');
+
+    if (isCreditExhausted) {
+      // Credit exhausted - trigger fallback
+      shouldFallback = true;
+      throw new OpenRouterError('Credit exhausted', 401, shouldFallback);
+    } else {
+      // Invalid API key - don't fallback (configuration error)
+      throw new OpenRouterError('Invalid API key', 401, false);
+    }
+  }
+
+  if (res.status === 503) {
+    // Service unavailable - fallback
+    shouldFallback = true;
+    throw new OpenRouterError('Model unavailable', 503, shouldFallback);
+  }
+
+  if (res.status >= 500) {
+    // Server errors - consider fallback
+    shouldFallback = true;
+    throw new OpenRouterError(message, res.status, shouldFallback);
+  }
+
+  // Other errors (400, 402, etc.) - don't fallback
+  throw new OpenRouterError(message, res.status, false);
+}
+
+/**
+ * Helper function to determine if an error should trigger Gemini fallback
+ */
+function shouldFallbackToGemini(error: any): boolean {
+  // Check if error is an OpenRouterError with shouldFallback flag
+  if (error instanceof OpenRouterError && error.shouldFallback) {
+    return true;
+  }
+
+  // Check for specific error conditions
+  if (error?.status === 429 || error?.status === 503) {
+    return true;
+  }
+
+  // Check for credit exhaustion in 401 errors
+  if (error?.status === 401) {
+    const errorMsg = (error.message || '').toLowerCase();
+    return errorMsg.includes('credit') ||
+      errorMsg.includes('quota') ||
+      errorMsg.includes('insufficient') ||
+      errorMsg.includes('balance') ||
+      errorMsg.includes('exceeded');
+  }
+
+  // Check for server errors (5xx)
+  if (error?.status >= 500) {
+    return true;
+  }
+
+  return false;
 }
 
 export async function generateWithOpenRouter(
@@ -171,9 +260,40 @@ export async function generateWithOpenRouter(
     return text;
   } catch (error: any) {
     clearTimeout(timeoutId);
+
+    // Handle timeout errors
     if (error.name === 'AbortError' || error.message?.includes('aborted')) {
       throw new Error(`Request timeout: Generation took longer than ${timeoutMs / 1000} seconds`);
     }
+
+    // Check if we should fallback to Gemini
+    if (shouldFallbackToGemini(error)) {
+      console.warn('OpenRouter failed, falling back to Gemini', {
+        error: error.message,
+        status: error.status,
+        tier: userTier,
+        timestamp: new Date().toISOString()
+      });
+
+      try {
+        const fallbackResult = await generateWithGemini(prompt, userTier, undefined, timeoutMs);
+        console.info('Gemini fallback succeeded', {
+          tier: userTier,
+          timestamp: new Date().toISOString()
+        });
+        return fallbackResult;
+      } catch (fallbackError: any) {
+        console.error('Gemini fallback also failed', {
+          error: fallbackError.message,
+          tier: userTier,
+          timestamp: new Date().toISOString()
+        });
+        // If Gemini also fails, throw the original OpenRouter error
+        throw error;
+      }
+    }
+
+    // Don't fallback for other errors
     throw error;
   }
 }
@@ -196,28 +316,70 @@ Only return JSON, no extra text.`;
     ],
   };
 
-  const res = await requestWithRetry(
-    `${BASE_URL}/chat/completions`,
-    {
-      method: 'POST',
-      headers: buildHeaders(apiKey),
-      body: JSON.stringify(body),
-    },
-    { maxRetries: 2, baseDelayMs: 600 }
-  );
-
-  const json = await handleOpenRouterResponse(res);
-  const content = json.choices?.[0]?.message?.content ?? '';
-
   try {
-    const parsed = JSON.parse(content) as Partial<PromptAnalysis>;
-    return {
-      score: Number(parsed.score) || 0,
-      issues: Array.isArray(parsed.issues) ? parsed.issues.map(String) : [],
-      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.map(String) : [],
-    };
-  } catch {
-    // Fallback heuristic if the model returns non-JSON
+    const res = await requestWithRetry(
+      `${BASE_URL}/chat/completions`,
+      {
+        method: 'POST',
+        headers: buildHeaders(apiKey),
+        body: JSON.stringify(body),
+      },
+      { maxRetries: 2, baseDelayMs: 600 }
+    );
+
+    const json = await handleOpenRouterResponse(res);
+    const content = json.choices?.[0]?.message?.content ?? '';
+
+    try {
+      const parsed = JSON.parse(content) as Partial<PromptAnalysis>;
+      return {
+        score: Number(parsed.score) || 0,
+        issues: Array.isArray(parsed.issues) ? parsed.issues.map(String) : [],
+        suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.map(String) : [],
+      };
+    } catch {
+      // Fallback heuristic if the model returns non-JSON
+      return { score: 0, issues: [], suggestions: [] };
+    }
+  } catch (error: any) {
+    // Check if we should fallback to Gemini
+    if (shouldFallbackToGemini(error)) {
+      const userTier = apiKey === getApiKey('pro') ? 'pro' : 'free';
+
+      console.warn('OpenRouter failed in analyzePrompt, falling back to Gemini', {
+        error: error.message,
+        status: error.status,
+        tier: userTier,
+        timestamp: new Date().toISOString()
+      });
+
+      try {
+        const fullPrompt = `${analysisInstruction}\n\nUser prompt: ${prompt}`;
+        const fallbackResult = await generateWithGemini(fullPrompt, userTier, 'gemini-2.0-flash-exp');
+
+        try {
+          const parsed = JSON.parse(fallbackResult) as Partial<PromptAnalysis>;
+          return {
+            score: Number(parsed.score) || 0,
+            issues: Array.isArray(parsed.issues) ? parsed.issues.map(String) : [],
+            suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.map(String) : [],
+          };
+        } catch {
+          // Fallback heuristic if the model returns non-JSON
+          return { score: 0, issues: [], suggestions: [] };
+        }
+      } catch (fallbackError: any) {
+        console.error('Gemini fallback also failed in analyzePrompt', {
+          error: fallbackError.message,
+          tier: userTier,
+          timestamp: new Date().toISOString()
+        });
+        // If Gemini also fails, return default analysis
+        return { score: 0, issues: [], suggestions: [] };
+      }
+    }
+
+    // If not a fallback error, return default analysis
     return { score: 0, issues: [], suggestions: [] };
   }
 }
@@ -253,11 +415,36 @@ Return 1-2 sentences.`;
     const json = await handleOpenRouterResponse(res);
     const content = json.choices?.[0]?.message?.content ?? '';
     return { predictedResponse: content };
-  } catch {
+  } catch (error: any) {
+    // Check if we should fallback to Gemini
+    if (shouldFallbackToGemini(error)) {
+      const userTier = apiKey === getApiKey('pro') ? 'pro' : 'free';
+
+      console.warn('OpenRouter failed in predictOutput, falling back to Gemini', {
+        error: error.message,
+        status: error.status,
+        tier: userTier,
+        timestamp: new Date().toISOString()
+      });
+
+      try {
+        const fullPrompt = `${instruction}\n\nUser prompt: ${prompt}`;
+        const fallbackResult = await generateWithGemini(fullPrompt, userTier, 'gemini-2.0-flash-exp');
+        return { predictedResponse: fallbackResult };
+      } catch (fallbackError: any) {
+        console.error('Gemini fallback also failed in predictOutput', {
+          error: fallbackError.message,
+          tier: userTier,
+          timestamp: new Date().toISOString()
+        });
+        // If Gemini also fails, return empty prediction
+        return { predictedResponse: '' };
+      }
+    }
+
+    // If not a fallback error, return empty prediction
     return { predictedResponse: '' };
   }
 }
 
 export type { ChatMessage };
-
-

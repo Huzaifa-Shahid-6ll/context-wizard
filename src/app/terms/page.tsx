@@ -31,7 +31,7 @@ export default function TermsPage() {
 
         <h2>3. Description of Service</h2>
         <p>
-          Context Wizard provides developer productivity tools and related features,
+          Conard provides developer productivity tools and related features,
           including but not limited to content generation, workflow utilities, and
           integrations. We may update, modify, or discontinue features at any time with
           or without notice.
@@ -96,7 +96,7 @@ export default function TermsPage() {
         <h2>8. Limitation of Liability</h2>
         <p>
           To the maximum extent permitted by law, the Service is provided “as is” and
-          “as available.” Context Wizard and its affiliates will not be liable for any
+          “as available.” Conard and its affiliates will not be liable for any
           indirect, incidental, special, consequential, or exemplary damages, or for any
           loss of profits, revenues, data, or goodwill, arising from or related to your
           use of the Service, even if we have been advised of the possibility of such
