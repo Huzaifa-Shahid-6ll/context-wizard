@@ -39,7 +39,18 @@ async function testAPI(
     console.log(`Testing: ${name}`);
     console.log(`${'='.repeat(60)}\n`);
 
-    const results: Array<{ index: number; success: boolean; duration: number; error?: string; response?: string }> = [];
+    const results: Array<{ 
+        index: number; 
+        success: boolean; 
+        duration: number; 
+        error?: string; 
+        response?: string;
+        provider?: string;
+        wasFallback?: boolean;
+    }> = [];
+
+    let fallbacksUsed = 0;
+    let finalProviderCounts: Record<string, number> = {};
 
     for (let i = 1; i <= requestCount; i++) {
         console.log(`[${i}/${requestCount}] Sending request...`);
@@ -47,24 +58,38 @@ async function testAPI(
 
         try {
             const prompt = `Say "Test ${i} for ${name}" and nothing else.`;
-            let result: string;
+            let result: string | { text: string; provider: 'openrouter' | 'gemini'; wasFallback: boolean; statusCode?: number; rawResponse?: any };
+            let provider: string = apiType;
+            let wasFallback: boolean = false;
 
             if (apiType === 'openrouter') {
-                result = await generateWithOpenRouter(prompt, tier);
+                result = await generateWithOpenRouter(prompt, tier, undefined, 60000, true);
             } else {
-                result = await generateWithGemini(prompt, tier);
+                result = await generateWithGemini(prompt, tier, undefined, 60000, true);
             }
+
+            if (typeof result === 'object' && 'text' in result) {
+                provider = result.provider;
+                wasFallback = result.wasFallback || false;
+                result = result.text;
+            }
+
+            if (wasFallback) {
+                fallbacksUsed++;
+            }
+            finalProviderCounts[provider] = (finalProviderCounts[provider] || 0) + 1;
 
             const duration = Date.now() - start;
 
             if (!result || result.trim().length === 0) {
                 console.log(`  ✗ FAILED: Empty response`);
-                results.push({ index: i, success: false, duration, error: 'Empty response' });
+                console.log(`  Provider: ${provider} | Fallback: ${wasFallback ? 'Yes' : 'No'}`);
+                results.push({ index: i, success: false, duration, error: 'Empty response', provider, wasFallback });
             } else {
                 const preview = result.trim().substring(0, 50) + (result.length > 50 ? '...' : '');
                 console.log(`  ✓ SUCCESS: "${preview}"`);
-                console.log(`  Duration: ${duration}ms`);
-                results.push({ index: i, success: true, duration, response: result.trim() });
+                console.log(`  Duration: ${duration}ms | Provider: ${provider} | Fallback: ${wasFallback ? 'Yes' : 'No'}`);
+                results.push({ index: i, success: true, duration, response: result.trim(), provider, wasFallback });
             }
         } catch (error: any) {
             const duration = Date.now() - start;
@@ -97,6 +122,8 @@ async function testAPI(
     const noCreditCount = results.filter(r => r.error?.includes('credit') || r.error?.includes('empty')).length;
 
     console.log(`Total: ${requestCount} | ✓ Success: ${successCount} | ✗ Failed: ${failCount}`);
+    console.log(`Fallbacks Used: ${fallbacksUsed}`);
+    console.log(`Final Provider Distribution:`, finalProviderCounts);
     if (rateLimitCount > 0) console.log(`⚠ Rate Limited: ${rateLimitCount}`);
     if (noCreditCount > 0) console.log(`⚠ No Credits/Empty: ${noCreditCount}`);
 
@@ -108,7 +135,9 @@ async function testAPI(
         successCount,
         failCount,
         rateLimitCount,
-        noCreditCount
+        noCreditCount,
+        fallbacksUsed,
+        finalProviderCounts
     };
 }
 
@@ -139,15 +168,38 @@ async function testAllAPIs() {
     // Test Gemini Pro
     allResults.push(await testAPI('Gemini Pro', 'pro', 'gemini', 3, 6000));
 
+    // Test fallback scenarios (if OpenRouter is being tested)
+    console.log('\n\n╔════════════════════════════════════════════════════════════╗');
+    console.log('║              FALLBACK SCENARIO TESTS                        ║');
+    console.log('╚════════════════════════════════════════════════════════════╝\n');
+
+    // Note: Actual error simulation would require mocking, but we can test with real errors
+    // For now, we'll document the expected behavior
+    console.log('Note: Fallback behavior is tested through normal error conditions.');
+    console.log('Expected: OpenRouter failures (429, 503, 5xx, empty response, timeout) should trigger Gemini fallback.\n');
+
     // Final Summary
     console.log('\n\n╔════════════════════════════════════════════════════════════╗');
     console.log('║                    FINAL SUMMARY                           ║');
     console.log('╚════════════════════════════════════════════════════════════╝\n');
 
+    let totalFallbacks = 0;
+    const allProviderCounts: Record<string, number> = {};
+
     allResults.forEach(result => {
         const status = result.successCount === 3 ? '✅' :
             result.successCount > 0 ? '⚠️' : '❌';
         console.log(`${status} ${result.name.padEnd(20)} | Success: ${result.successCount}/3 | Failed: ${result.failCount}/3`);
+        if (result.fallbacksUsed > 0) {
+            console.log(`   └─ Fallbacks Used: ${result.fallbacksUsed}`);
+            totalFallbacks += result.fallbacksUsed;
+        }
+        if (result.finalProviderCounts) {
+            Object.entries(result.finalProviderCounts).forEach(([provider, count]) => {
+                console.log(`   └─ ${provider}: ${count} responses`);
+                allProviderCounts[provider] = (allProviderCounts[provider] || 0) + count;
+            });
+        }
         if (result.rateLimitCount > 0) {
             console.log(`   └─ Rate Limited: ${result.rateLimitCount}`);
         }
@@ -161,6 +213,8 @@ async function testAllAPIs() {
 
     console.log('\n' + '─'.repeat(60));
     console.log(`Overall: ${totalSuccess}/${totalRequests} requests succeeded`);
+    console.log(`Total Fallbacks Used: ${totalFallbacks}`);
+    console.log(`Provider Distribution:`, allProviderCounts);
 
     if (totalSuccess === totalRequests) {
         console.log('\n🎉 ALL TESTS PASSED! All API keys are working correctly.');

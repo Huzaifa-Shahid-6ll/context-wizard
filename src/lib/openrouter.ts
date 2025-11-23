@@ -63,6 +63,14 @@ export type OutputPrediction = {
   predictedResponse: string;
 };
 
+export type GenerationResult = {
+  text: string;
+  provider: 'openrouter' | 'gemini';
+  wasFallback: boolean;
+  statusCode?: number;
+  rawResponse?: any;
+};
+
 class OpenRouterError extends Error {
   status?: number;
   shouldFallback?: boolean; // Flag to indicate if fallback should be attempted
@@ -112,6 +120,7 @@ async function requestWithRetry(
 ): Promise<Response> {
   let attempt = 0;
   let delay = opts.baseDelayMs;
+  const maxDelay = 30000; // Cap at 30 seconds
 
   while (true) {
     try {
@@ -119,18 +128,18 @@ async function requestWithRetry(
       if (res.status === 429 || res.status === 503) {
         if (attempt >= opts.maxRetries) return res;
         const retryAfter = res.headers.get('retry-after');
-        const retryMs = retryAfter ? Number(retryAfter) * 1000 : delay;
+        const retryMs = retryAfter ? Math.min(Number(retryAfter) * 1000, maxDelay) : Math.min(delay, maxDelay);
         await sleep(retryMs);
         attempt += 1;
-        delay *= 2; // exponential backoff
+        delay = Math.min(delay * 2, maxDelay); // exponential backoff with cap
         continue;
       }
       return res;
     } catch (err) {
       if (attempt >= opts.maxRetries) throw err;
-      await sleep(delay);
+      await sleep(Math.min(delay, maxDelay));
       attempt += 1;
-      delay *= 2;
+      delay = Math.min(delay * 2, maxDelay);
     }
   }
 }
@@ -164,12 +173,18 @@ async function handleOpenRouterResponse(res: Response): Promise<OpenRouterRespon
   if (res.status === 401) {
     // Check if it's credit exhaustion vs invalid key
     const errorMsg = (errorBody?.error?.message || message).toLowerCase();
+    const errorCode = (errorBody?.error?.code || '').toLowerCase();
     const isCreditExhausted =
       errorMsg.includes('credit') ||
       errorMsg.includes('quota') ||
       errorMsg.includes('insufficient') ||
       errorMsg.includes('balance') ||
-      errorMsg.includes('exceeded');
+      errorMsg.includes('exceeded') ||
+      errorMsg.includes('depleted') ||
+      errorMsg.includes('out of credits') ||
+      errorCode === 'insufficient_credits' ||
+      errorCode === 'quota_exceeded' ||
+      errorCode === 'rate_limit_exceeded';
 
     if (isCreditExhausted) {
       // Credit exhausted - trigger fallback
@@ -206,6 +221,20 @@ function shouldFallbackToGemini(error: any): boolean {
     return true;
   }
 
+  // Check for timeout errors (AbortError, ETIMEDOUT, ECONNRESET)
+  if (error.name === 'AbortError' || 
+      error.code === 'ETIMEDOUT' || 
+      error.code === 'ECONNRESET' ||
+      error.message?.includes('timeout') ||
+      error.message?.includes('aborted')) {
+    return true;
+  }
+
+  // Network errors should trigger fallback
+  if (error.name === 'TypeError' && error.message?.includes('fetch')) {
+    return true;
+  }
+
   // Check for specific error conditions
   if (error?.status === 429 || error?.status === 503) {
     return true;
@@ -218,7 +247,9 @@ function shouldFallbackToGemini(error: any): boolean {
       errorMsg.includes('quota') ||
       errorMsg.includes('insufficient') ||
       errorMsg.includes('balance') ||
-      errorMsg.includes('exceeded');
+      errorMsg.includes('exceeded') ||
+      errorMsg.includes('depleted') ||
+      errorMsg.includes('out of credits');
   }
 
   // Check for server errors (5xx)
@@ -233,8 +264,9 @@ export async function generateWithOpenRouter(
   prompt: string,
   userTier: 'free' | 'pro',
   model?: string,
-  timeoutMs: number = 60000 // Default 60 second timeout
-): Promise<string> {
+  timeoutMs: number = 60000, // Default 60 second timeout
+  returnMeta?: boolean
+): Promise<string | GenerationResult> {
   const circuitBreaker = getCircuitBreaker('openrouter', {
     failureThreshold: 5,
     resetTimeout: 60000, // 1 minute
@@ -242,6 +274,7 @@ export async function generateWithOpenRouter(
   });
 
   return circuitBreaker.execute(async () => {
+    const requestStart = Date.now();
     const apiKey = getApiKey(userTier);
     if (!apiKey) throw new OpenRouterError('API key is missing', 401);
 
@@ -273,45 +306,126 @@ export async function generateWithOpenRouter(
       const json = await handleOpenRouterResponse(res);
       const text = json.choices?.[0]?.message?.content ?? '';
 
-      if (!text || text.trim().length === 0) {
+      // Standardized empty response check
+      if (!text || typeof text !== 'string' || text.trim().length === 0) {
+        const latencyMs = Date.now() - requestStart;
+        console.log(JSON.stringify({
+          ts: new Date().toISOString(),
+          provider_attempt: 'openrouter',
+          tier: userTier,
+          attempt: 1,
+          status: 500,
+          wasFallback: false,
+          finalProvider: null,
+          latencyMs,
+          error: 'Received empty response from OpenRouter',
+        }));
         throw new OpenRouterError('Received empty response from OpenRouter', 500, true);
       }
 
+      const latencyMs = Date.now() - requestStart;
+      console.log(JSON.stringify({
+        ts: new Date().toISOString(),
+        provider_attempt: 'openrouter',
+        tier: userTier,
+        attempt: 1,
+        status: res.status,
+        wasFallback: false,
+        finalProvider: 'openrouter',
+        latencyMs,
+      }));
+
+      if (returnMeta) {
+        return { text, provider: 'openrouter', wasFallback: false, statusCode: res.status, rawResponse: json };
+      }
       return text;
     } catch (error: any) {
       clearTimeout(timeoutId);
+      const latencyMs = Date.now() - requestStart;
 
-      // Handle timeout errors
+      // Handle timeout errors - these are fallbackable
       if (error.name === 'AbortError' || error.message?.includes('aborted')) {
-        throw new Error(`Request timeout: Generation took longer than ${timeoutMs / 1000} seconds`);
+        const timeoutError = new Error(`Request timeout: Generation took longer than ${timeoutMs / 1000} seconds`);
+        (timeoutError as any).name = 'AbortError';
+        error = timeoutError;
       }
 
       // Check if we should fallback to Gemini
       if (shouldFallbackToGemini(error)) {
-        console.warn('OpenRouter failed, falling back to Gemini', {
-          error: error.message,
-          status: error.status,
+        console.log(JSON.stringify({
+          ts: new Date().toISOString(),
+          provider_attempt: 'openrouter',
           tier: userTier,
-          timestamp: new Date().toISOString()
-        });
+          attempt: 1,
+          status: error.status || 500,
+          wasFallback: false,
+          finalProvider: null,
+          latencyMs,
+          error: error.message || 'OpenRouter failed',
+        }));
 
         try {
-          const fallbackResult = await generateWithGemini(prompt, userTier, undefined, timeoutMs);
-          console.info('Gemini fallback succeeded', {
+          const fallbackResult = await generateWithGemini(prompt, userTier, undefined, timeoutMs, returnMeta);
+          const fallbackLatencyMs = Date.now() - requestStart;
+          
+          if (returnMeta && typeof fallbackResult === 'object' && 'text' in fallbackResult) {
+            console.log(JSON.stringify({
+              ts: new Date().toISOString(),
+              provider_attempt: 'gemini',
+              tier: userTier,
+              attempt: 1,
+              status: fallbackResult.statusCode || 200,
+              wasFallback: true,
+              finalProvider: 'gemini',
+              latencyMs: fallbackLatencyMs,
+            }));
+            return { ...fallbackResult, wasFallback: true };
+          }
+
+          console.log(JSON.stringify({
+            ts: new Date().toISOString(),
+            provider_attempt: 'gemini',
             tier: userTier,
-            timestamp: new Date().toISOString()
-          });
-          return fallbackResult;
+            attempt: 1,
+            status: 200,
+            wasFallback: true,
+            finalProvider: 'gemini',
+            latencyMs: fallbackLatencyMs,
+          }));
+
+          if (returnMeta) {
+            return { text: fallbackResult as string, provider: 'gemini', wasFallback: true };
+          }
+          return fallbackResult as string;
         } catch (fallbackError: any) {
-          console.error('Gemini fallback also failed', {
-            error: fallbackError.message,
+          const totalLatencyMs = Date.now() - requestStart;
+          console.log(JSON.stringify({
+            ts: new Date().toISOString(),
+            provider_attempt: 'gemini',
             tier: userTier,
-            timestamp: new Date().toISOString()
-          });
+            attempt: 1,
+            status: fallbackError.status || 500,
+            wasFallback: true,
+            finalProvider: null,
+            latencyMs: totalLatencyMs,
+            error: fallbackError.message || 'Gemini fallback failed',
+          }));
           // If Gemini also fails, throw the original OpenRouter error
           throw error;
         }
       }
+
+      console.log(JSON.stringify({
+        ts: new Date().toISOString(),
+        provider_attempt: 'openrouter',
+        tier: userTier,
+        attempt: 1,
+        status: error.status || 500,
+        wasFallback: false,
+        finalProvider: null,
+        latencyMs,
+        error: error.message || 'OpenRouter error',
+      }));
 
       // Don't fallback for other errors
       throw error;

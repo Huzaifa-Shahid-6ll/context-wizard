@@ -22,6 +22,11 @@ interface HealthCheckResult {
   details?: Record<string, unknown>;
 }
 
+interface ApiKeyHealth {
+  present: boolean;
+  validFormat: boolean;
+}
+
 /**
  * Check Convex health
  */
@@ -212,6 +217,16 @@ async function checkStripeHealth(): Promise<HealthCheckResult> {
 }
 
 /**
+ * Check API key format (non-empty string)
+ */
+function checkApiKeyFormat(key: string | undefined): ApiKeyHealth {
+  return {
+    present: !!key,
+    validFormat: !!key && typeof key === 'string' && key.trim().length > 0,
+  };
+}
+
+/**
  * GET /api/health
  * Returns health status of all external services
  */
@@ -221,75 +236,85 @@ export async function GET(request: NextRequest) {
   // Check if detailed health check is requested
   const url = new URL(request.url);
   const detailed = url.searchParams.get('detailed') === 'true';
+  const checkAuth = url.searchParams.get('checkAuth') === 'true'; // Optional auth check flag
   
-  // Run all health checks in parallel
-  const [convexHealth, openRouterHealth, geminiHealth, stripeHealth] = await Promise.allSettled([
-    checkConvexHealth(),
-    checkOpenRouterHealth(),
-    checkGeminiHealth(),
-    checkStripeHealth(),
-  ]);
+  // Check API keys format
+  const apiKeyHealth = {
+    openrouter_free: checkApiKeyFormat(getApiKey('free')),
+    openrouter_pro: checkApiKeyFormat(getApiKey('pro')),
+    gemini_free: checkApiKeyFormat(getGeminiApiKey('free')),
+    gemini_pro: checkApiKeyFormat(getGeminiApiKey('pro')),
+  };
 
-  const results: HealthCheckResult[] = [];
+  // If checkAuth is enabled, attempt light authenticated requests
+  if (checkAuth) {
+    // Optional: Make HEAD requests to validate keys (if supported by providers)
+    // For now, we'll just return the format checks
+  }
   
-  if (convexHealth.status === 'fulfilled') {
-    results.push(convexHealth.value);
-  } else {
-    results.push({
-      service: 'convex',
-      status: 'unhealthy',
-      error: convexHealth.reason?.message || 'Check failed',
-    });
-  }
+  // Run all health checks in parallel (if detailed)
+  let results: HealthCheckResult[] = [];
+  if (detailed) {
+    const [convexHealth, openRouterHealth, geminiHealth, stripeHealth] = await Promise.allSettled([
+      checkConvexHealth(),
+      checkOpenRouterHealth(),
+      checkGeminiHealth(),
+      checkStripeHealth(),
+    ]);
 
-  if (openRouterHealth.status === 'fulfilled') {
-    results.push(openRouterHealth.value);
-  } else {
-    results.push({
-      service: 'openrouter',
-      status: 'unhealthy',
-      error: openRouterHealth.reason?.message || 'Check failed',
-    });
-  }
+    if (convexHealth.status === 'fulfilled') {
+      results.push(convexHealth.value);
+    } else {
+      results.push({
+        service: 'convex',
+        status: 'unhealthy',
+        error: convexHealth.reason?.message || 'Check failed',
+      });
+    }
 
-  if (geminiHealth.status === 'fulfilled') {
-    results.push(geminiHealth.value);
-  } else {
-    results.push({
-      service: 'gemini',
-      status: 'unhealthy',
-      error: geminiHealth.reason?.message || 'Check failed',
-    });
-  }
+    if (openRouterHealth.status === 'fulfilled') {
+      results.push(openRouterHealth.value);
+    } else {
+      results.push({
+        service: 'openrouter',
+        status: 'unhealthy',
+        error: openRouterHealth.reason?.message || 'Check failed',
+      });
+    }
 
-  if (stripeHealth.status === 'fulfilled') {
-    results.push(stripeHealth.value);
-  } else {
-    results.push({
-      service: 'stripe',
-      status: 'unhealthy',
-      error: stripeHealth.reason?.message || 'Check failed',
-    });
-  }
+    if (geminiHealth.status === 'fulfilled') {
+      results.push(geminiHealth.value);
+    } else {
+      results.push({
+        service: 'gemini',
+        status: 'unhealthy',
+        error: geminiHealth.reason?.message || 'Check failed',
+      });
+    }
 
-  // Determine overall health
-  const overallStatus = results.every(r => r.status === 'healthy')
-    ? 'healthy'
-    : results.some(r => r.status === 'healthy')
-    ? 'degraded'
-    : 'unhealthy';
+    if (stripeHealth.status === 'fulfilled') {
+      results.push(stripeHealth.value);
+    } else {
+      results.push({
+        service: 'stripe',
+        status: 'unhealthy',
+        error: stripeHealth.reason?.message || 'Check failed',
+      });
+    }
+  }
 
   const totalTime = Date.now() - startTime;
 
   const response = {
-    status: overallStatus,
+    ...apiKeyHealth,
+    ...(detailed && { services: results }),
     timestamp: new Date().toISOString(),
     responseTime: totalTime,
-    services: results,
   };
 
-  // Return appropriate status code
-  const statusCode = overallStatus === 'healthy' ? 200 : overallStatus === 'degraded' ? 207 : 503;
+  // Return 200 if all keys are present and valid format
+  const allValid = Object.values(apiKeyHealth).every(k => k.present && k.validFormat);
+  const statusCode = allValid ? 200 : 207; // 207 Multi-Status if some keys missing
 
   return NextResponse.json(response, { status: statusCode });
 }

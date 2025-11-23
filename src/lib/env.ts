@@ -5,6 +5,7 @@ const requiredEnvVars = [
   'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
   'CLERK_SECRET_KEY',
   'OPENROUTER_API_KEY_FREE',
+  'OPENROUTER_API_KEY_PRO',
 ] as const;
 
 // Optional env vars (for fallback functionality)
