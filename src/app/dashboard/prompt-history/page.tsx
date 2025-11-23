@@ -46,7 +46,7 @@ export default function PromptHistoryPage() {
   const pageSize = 20;
 
   const deletePrompt = useMutation(api.mutations.deletePrompt);
-  const prompts = useQuery(api.queries.listPromptsByUser, userId ? { userId, clerkId: userId } : "skip") as PromptItem[] | undefined;
+  const prompts = useQuery(api.queries.listPromptsByUser, userId ? { userId } : "skip") as PromptItem[] | undefined;
 
   const filtered = React.useMemo(() => {
     const items = (prompts || []).filter((p) => {
@@ -69,7 +69,7 @@ export default function PromptHistoryPage() {
   function onDelete(id: string) {
     if (!userId) return;
     trackEvent('prompt_deleted');
-    deletePrompt({ id: id as Id<"prompts">, clerkId: userId }).catch(() => {});
+    deletePrompt({ id: id as Id<"prompts">, clerkId: userId }).catch(() => { });
   }
 
   function downloadText(filename: string, content: string, mime: string) {
@@ -93,7 +93,7 @@ export default function PromptHistoryPage() {
           <div>
             <Label className="mb-1 block text-xs">Filter by type</Label>
             <Select className="w-full" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-              {["all","cursor-app","frontend","backend","cursorrules","error-fix","generic","image"].map((t) => (
+              {["all", "cursor-app", "frontend", "backend", "cursorrules", "error-fix", "generic", "image"].map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </Select>
@@ -148,7 +148,7 @@ export default function PromptHistoryPage() {
                       <div className="mt-2 line-clamp-2 text-sm font-medium">{p.title || "Untitled"}</div>
                       <div className="mt-2 line-clamp-3 text-xs text-foreground/70">{p.content}</div>
                       <div className="mt-3 flex items-center justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(p.content).catch(() => {}); trackEvent('prompt_copied_to_clipboard', { prompt_type: p.type, prompt_id: p._id }); }}>Copy</Button>
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(p.content).catch(() => { }); trackEvent('prompt_copied_to_clipboard', { prompt_type: p.type, prompt_id: p._id }); }}>Copy</Button>
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); downloadText(p.title || "prompt.txt", p.content, "text/plain"); }}>.txt</Button>
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); downloadText((p.title || "prompt") + ".md", p.content, "text/markdown"); }}>.md</Button>
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onDelete(p._id as Id<"prompts">); }}>Delete</Button>
@@ -176,7 +176,7 @@ export default function PromptHistoryPage() {
                       <TableCell className="w-full">{p.title || "Untitled"}</TableCell>
                       <TableCell className="whitespace-nowrap">{new Date(p.createdAt).toLocaleString()}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(p.content).catch(() => {}); trackEvent('prompt_copied_to_clipboard', { prompt_type: p.type, prompt_id: p._id }); }}>Copy</Button>
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(p.content).catch(() => { }); trackEvent('prompt_copied_to_clipboard', { prompt_type: p.type, prompt_id: p._id }); }}>Copy</Button>
                         <Button variant="outline" size="sm" className="ml-2" onClick={(e) => { e.stopPropagation(); downloadText(p.title || "prompt.txt", p.content, "text/plain"); }}>.txt</Button>
                         <Button variant="outline" size="sm" className="ml-2" onClick={(e) => { e.stopPropagation(); downloadText((p.title || "prompt") + ".md", p.content, "text/markdown"); }}>.md</Button>
                         <Button variant="outline" size="sm" className="ml-2" onClick={(e) => { e.stopPropagation(); onDelete(p._id as Id<"prompts">); }}>Delete</Button>
@@ -217,7 +217,7 @@ export default function PromptHistoryPage() {
                 </div>
               )}
               <div className="mt-4 flex items-center gap-2">
-                <Button onClick={() => { if (selected) navigator.clipboard.writeText(selected.content).catch(() => {}); }}>Reuse</Button>
+                <Button onClick={() => { if (selected) navigator.clipboard.writeText(selected.content).catch(() => { }); }}>Reuse</Button>
                 <Button variant="outline">Edit</Button>
                 <Button variant="outline" onClick={() => { if (selected) onDelete(selected._id as Id<"prompts">); setSelected(null); }}>Delete</Button>
               </div>

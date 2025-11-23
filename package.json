@@ -16,7 +16,7 @@
     "@anthropic-ai/sdk": "^0.69.0",
     "@clerk/nextjs": "^6.33.3",
     "@dqbd/tiktoken": "^1.0.22",
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^1.30.0",
     "@hookform/resolvers": "^5.2.2",
     "@lineiconshq/free-icons": "^1.0.3",
     "@lineiconshq/react-lineicons": "^1.0.5",

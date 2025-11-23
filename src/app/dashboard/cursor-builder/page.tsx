@@ -666,17 +666,17 @@ export default function CursorBuilderPage() {
         userId: user.id,
         formData,
       });
-      
+
       if (!prd || prd.trim().length === 0) {
         throw new Error("PRD generation returned empty content");
       }
-      
+
       logger.info("[submit] PRD generated successfully", {
         generationId: genId,
         prdLength: prd.length,
         hasContent: prd.trim().length > 0
       });
-      
+
       setPrdContent(prd);
       setProgress(30);
       toast.success("PRD generated! Please review and approve.");
@@ -706,11 +706,11 @@ export default function CursorBuilderPage() {
       logger.warn("[approvePRD] Missing required data", { generationId, hasPrd: !!prdContent, userId: user?.id });
       return;
     }
-    
+
     logger.info("[approvePRD] Starting user flows generation", { generationId, userId: user.id });
     setIsSubmitting(true);
     setProgress(40);
-    
+
     try {
       await approveStep({
         generationId: generationId as GenerationId,
@@ -728,11 +728,11 @@ export default function CursorBuilderPage() {
         formData,
         prd: prdContent,
       });
-      
+
       if (!userFlows || userFlows.trim().length === 0) {
         throw new Error("User flows generation returned empty content");
       }
-      
+
       logger.info("[approvePRD] User flows generated successfully", {
         generationId,
         userId: user.id,
@@ -776,11 +776,11 @@ export default function CursorBuilderPage() {
         prd: prdContent,
         userFlows: userFlowsContent,
       });
-      
+
       if (!taskFile || taskFile.trim().length === 0) {
         throw new Error("Task file generation returned empty content");
       }
-      
+
       logger.info("[approveUserFlows] Task file generated successfully", {
         generationId,
         userId: user.id,
@@ -825,7 +825,7 @@ export default function CursorBuilderPage() {
         userId: user.id,
         selectedTypes
       });
-      
+
       const lists = await generateLists({
         generationId: generationId as GenerationId,
         userId: user.id,
@@ -834,7 +834,7 @@ export default function CursorBuilderPage() {
         userFlows: userFlowsContent,
         selectedPromptTypes: selectedTypes,
       });
-      
+
       logger.info("[approveTasks] Lists generated successfully", {
         generationId,
         userId: user.id,
@@ -943,15 +943,15 @@ export default function CursorBuilderPage() {
       });
       return;
     }
-    
+
     // Use provided lists parameter, ref, or fall back to state
     const listsToUse = lists || generatedListsRef.current || generatedLists;
-    
+
     // Update ref when we have lists
     if (listsToUse && !generatedListsRef.current) {
       generatedListsRef.current = listsToUse;
     }
-    
+
     // Validation with detailed error messages
     const missing: string[] = [];
     if (!generationId) missing.push("Generation ID");
@@ -960,7 +960,7 @@ export default function CursorBuilderPage() {
     if (!prdContent) missing.push("PRD");
     if (!user?.id) missing.push("User ID");
     if (!listsToUse) missing.push("Generated Lists");
-    
+
     if (missing.length > 0) {
       const errorMsg = `Cannot generate prompts: Missing required data (${missing.join(", ")})`;
       logger.error("[generateNextPrompt] Validation failed", { missing, generationId, hasLists: !!listsToUse });
@@ -969,7 +969,7 @@ export default function CursorBuilderPage() {
       setGenerationError(errorMsg);
       return;
     }
-    
+
     // Validate lists have actual content
     const hasValidLists = listsToUse && (
       (listsToUse.frontend && listsToUse.frontend.length > 0) ||
@@ -978,7 +978,7 @@ export default function CursorBuilderPage() {
       (listsToUse.functionality && listsToUse.functionality.length > 0) ||
       (listsToUse.errorFixing && listsToUse.errorFixing.length > 0)
     );
-    
+
     if (!hasValidLists) {
       const errorMsg = "Generated lists are empty. Please regenerate lists.";
       logger.error("[generateNextPrompt] Lists validation failed", { listsToUse });
@@ -987,17 +987,17 @@ export default function CursorBuilderPage() {
       setGenerationError(errorMsg);
       return;
     }
-    
+
     // Set lock BEFORE any async operations
     isGeneratingRef.current = true;
     setIsSubmitting(true);
     setGenerationError(null);
-    
+
     logger.info("[generateNextPrompt] Starting generation", {
       generationId,
       timestamp: Date.now()
     });
-    
+
     try {
       // Use local ref for duplicate detection to avoid race conditions with server state
       const syncedPrompts = generatedPromptsRef.current || generatedPrompts;
@@ -1014,7 +1014,7 @@ export default function CursorBuilderPage() {
         // Check both synced and ref to catch all cases
         const alreadyExists = syncedPromptsList.some((p: GeneratedItem) => p.title === name) ||
           refPromptsList.some((p: GeneratedItem) => p.title === name);
-        
+
         if (alreadyExists) {
           logger.debug("[generateNextPrompt] Item already generated, skipping", {
             type,
@@ -1023,7 +1023,7 @@ export default function CursorBuilderPage() {
             refCount: refPromptsList.length
           });
         }
-        
+
         return alreadyExists;
       }
 
@@ -1136,7 +1136,7 @@ export default function CursorBuilderPage() {
         isGeneratingRef.current = false;
         return;
       }
-      
+
       logger.debug("[generateNextPrompt] Selected next item to generate", {
         type: nextItem.type,
         name: nextItem.name,
@@ -1236,17 +1236,17 @@ export default function CursorBuilderPage() {
       setIsSubmitting(false);
       setGenerationError(null);
       lastGeneratedItemRef.current = null; // Clear last item on success
-      
+
       // CRITICAL: Clear lock BEFORE attempting next generation to prevent infinite loops
       isGeneratingRef.current = false;
-      
+
       logger.info("[generateNextPrompt] Successfully generated prompt", {
         itemType: nextItem.type,
         itemName: nextItem.name,
         generationId,
         timestamp: Date.now()
       });
-      
+
       // Continue to next prompt - but only if we're not already generating
       // Use a small delay to ensure state has settled, but check guard first
       setTimeout(() => {
@@ -1263,7 +1263,7 @@ export default function CursorBuilderPage() {
             timestamp: Date.now()
           });
         }
-      }, 500);
+      }, 6000); // 6 second delay to respect Gemini Free tier rate limits (15 RPM)
     } catch (e: any) {
       const errorMsg = e.message || "Failed to generate prompt";
       logger.error("[generateNextPrompt] Error occurred", {

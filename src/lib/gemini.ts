@@ -15,7 +15,7 @@
  * - Pro tier: gemini-1.5-pro (higher quality)
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 
 class GeminiError extends Error {
   status?: number;
@@ -37,8 +37,8 @@ function getGeminiModel(userTier: 'free' | 'pro'): string {
   // Free tier: fast, cost-effective model
   // Pro tier: higher quality model
   return userTier === 'pro'
-    ? 'gemini-1.5-pro'
-    : 'gemini-2.0-flash-exp';
+    ? 'gemini-2.5-pro'
+    : 'gemini-2.5-flash';
 }
 
 /**
@@ -55,38 +55,6 @@ function normalizeGeminiModelName(model: string): string {
     model = model.split(':')[0];
   }
   return model;
-}
-
-/**
- * Convert OpenRouter-style prompt (string) to Gemini chat format
- * The prompt may contain system and user messages separated by newlines
- * or it may be a simple user message
- */
-function convertPromptToGeminiMessages(prompt: string): Array<{ role: string; parts: string }> {
-  // Check if prompt contains system message pattern
-  // Using [\s\S] instead of /s flag for ES2017 compatibility
-  const systemMatch = prompt.match(/You are a helpful assistant\.\s*\n\s*User:\s*([\s\S]+)/);
-  if (systemMatch) {
-    // Has system message, extract user content
-    return [
-      { role: 'user', parts: systemMatch[1] }
-    ];
-  }
-
-  // Check for explicit system/user separation
-  const systemUserMatch = prompt.match(/(?:system|System):\s*([\s\S]+?)\s*\n\s*(?:user|User):\s*([\s\S]+)/);
-  if (systemUserMatch) {
-    // For Gemini, we'll combine system and user into a single user message
-    // since Gemini handles system instructions differently
-    return [
-      { role: 'user', parts: `${systemUserMatch[1]}\n\n${systemUserMatch[2]}` }
-    ];
-  }
-
-  // Simple case: just user content
-  return [
-    { role: 'user', parts: prompt }
-  ];
 }
 
 /**
@@ -113,18 +81,8 @@ export async function generateWithGemini(
   // Normalize model name (remove OpenRouter-style prefixes)
   const baseModel = model ? normalizeGeminiModelName(model) : getGeminiModel(userTier);
 
-  // Initialize Gemini client
-  const genAI = new GoogleGenerativeAI(apiKey);
-
-  // Get the generative model
-  const geminiModel = genAI.getGenerativeModel({ model: baseModel });
-
-  // Convert prompt to Gemini format
-  // For simplicity, we'll treat the prompt as a user message
-  // If it contains system instructions, they'll be included in the user message
-  const userMessage = prompt.includes('You are a helpful assistant')
-    ? prompt.split('User:')[1]?.trim() || prompt
-    : prompt;
+  // Initialize Gemini client with the new SDK
+  const ai = new GoogleGenAI({ apiKey });
 
   // Create timeout promise
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -134,21 +92,56 @@ export async function generateWithGemini(
   });
 
   try {
-    // Generate content with timeout handling
-    const result = await Promise.race([
-      geminiModel.generateContent(userMessage),
-      timeoutPromise
-    ]);
+    // Retry logic with exponential backoff
+    let lastError: any;
+    const maxRetries = 3;
+    let retryDelay = 2000; // Start with 2 seconds
 
-    // Extract response text
-    const response = await result.response;
-    const text = response.text();
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        // Generate content with timeout handling
+        // New SDK usage: ai.models.generateContent({ model: ..., contents: ... })
+        const result = await Promise.race([
+          ai.models.generateContent({
+            model: baseModel,
+            contents: prompt,
+          }),
+          timeoutPromise
+        ]);
 
-    if (!text) {
-      throw new GeminiError('Empty response from Gemini API', 500);
+        // Extract response text
+        // Cast to any to access properties safely if types aren't fully inferred
+        const response = result as any;
+        const text = response.text;
+
+        if (!text) {
+          throw new GeminiError('Empty response from Gemini API', 500);
+        }
+
+        return text;
+      } catch (error: any) {
+        lastError = error;
+
+        // Check if we should retry (only on 429 or 503)
+        const isRateLimit = error.message?.includes('429') ||
+          error.message?.toLowerCase().includes('rate limit') ||
+          error.message?.toLowerCase().includes('quota');
+        const isServerOverload = error.message?.includes('503') ||
+          error.message?.toLowerCase().includes('overloaded');
+
+        if ((isRateLimit || isServerOverload) && attempt < maxRetries) {
+          console.warn(`Gemini API rate limit/overload (attempt ${attempt + 1}/${maxRetries}). Retrying in ${retryDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          retryDelay *= 2; // Exponential backoff
+          continue;
+        }
+
+        // If not retryable or out of retries, throw
+        throw error;
+      }
     }
 
-    return text;
+    throw lastError;
   } catch (error: any) {
     // Handle timeout errors
     if (error.message?.includes('timeout') || error.message?.includes('took longer than')) {
@@ -179,4 +172,3 @@ export async function generateWithGemini(
     );
   }
 }
-
