@@ -272,6 +272,11 @@ export async function generateWithOpenRouter(
       clearTimeout(timeoutId);
       const json = await handleOpenRouterResponse(res);
       const text = json.choices?.[0]?.message?.content ?? '';
+
+      if (!text || text.trim().length === 0) {
+        throw new OpenRouterError('Received empty response from OpenRouter', 500, true);
+      }
+
       return text;
     } catch (error: any) {
       clearTimeout(timeoutId);
