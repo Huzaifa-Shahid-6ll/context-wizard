@@ -2,7 +2,7 @@
 
 **Stop fighting AI coding tools with bad context. Generate perfect .cursorrules and context files from any GitHub repo in 30 seconds.**
 
-**Live URL:** [https://www.contextwizard.ai](https://www.contextwizard.ai)
+**Live URL:** [https://www.contextwizard.ai](https://context-wizard.vercel.app)
 
 **Demo:**
 
