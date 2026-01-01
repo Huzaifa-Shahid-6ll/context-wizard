@@ -4,7 +4,6 @@ import { PlusIcon } from 'lucide-react';
 import { Boxes, RefreshCw, Headphones, HelpCircle } from '@/lib/icons';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { Accordion, AccordionContent, AccordionItem } from '@/components/ui/accordion';
-import ShinyText from '@/components/ui/ShinyText';
 
 export type AccordionItemData = {
   icon: React.ComponentType<{ className?: string }>;
@@ -19,8 +18,8 @@ type AccordionExpandIconProps = {
   className?: string;
 };
 
-const AccordionExpandIconDemo = ({ 
-  items, 
+const AccordionExpandIconDemo = ({
+  items,
   defaultValue = 'item-1',
   className = 'w-full'
 }: AccordionExpandIconProps) => {
@@ -33,17 +32,17 @@ const AccordionExpandIconDemo = ({
             <AccordionPrimitive.Header className='flex'>
               <AccordionPrimitive.Trigger
                 data-slot='accordion-trigger'
-                className='focus-visible:border-ring focus-visible:ring-ring/50 flex flex-1 items-start justify-between gap-4 rounded-md py-4 px-4 text-left text-base font-bold transition-all outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 [&[data-state=open]>svg]:rotate-45'
+                className='border-b border-white/10 py-4 px-4 text-left text-base font-semibold transition-all outline-none focus-visible:ring-2 focus-visible:ring-white/30 hover:bg-white/5 [&[data-state=open]>svg]:rotate-45'
                 onClick={item.onItemClick}
               >
                 <span className='flex items-center gap-4'>
-                  <IconComponent className='size-5 shrink-0' />
-                  <ShinyText text={item.title} speed={3} className='text-lg font-bold' />
+                  <IconComponent className='size-5 shrink-0 text-purple-400' />
+                  <span className='text-lg font-semibold text-white'>{item.title}</span>
                 </span>
-                <PlusIcon className='text-muted-foreground pointer-events-none size-4 shrink-0 transition-transform duration-200' />
+                <PlusIcon className='pointer-events-none size-4 shrink-0 transition-transform duration-200 text-white/60' />
               </AccordionPrimitive.Trigger>
             </AccordionPrimitive.Header>
-            <AccordionContent className='text-muted-foreground px-4'>{item.content}</AccordionContent>
+            <AccordionContent className='text-white/70 px-4'>{item.content}</AccordionContent>
           </AccordionItem>
         );
       })}
